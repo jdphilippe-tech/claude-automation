@@ -1,0 +1,11 @@
+{
+  "name": "claude-automation",
+  "version": "1.0.0",
+  "description": "Daily portfolio check — Lighter, Raydium, Moonwell, Suilend",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^3.3.2",
+    "ethers": "^6.11.1"
+  }
+}
