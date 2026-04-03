@@ -1,7 +1,6 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v18
-// cbXRP/AERO: balanceOf + exchangeRateStored via Alchemy (no rate limit)
-// USDC borrow: borrowBalanceStored via Alchemy (confirmed working)
+// Daily Portfolio Check — GitHub Actions v19
+// Fix: exchange rate formula = mBal * exchRate / 10^(mDec + 18 + underlyingDec)
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -66,16 +65,15 @@ const LPOS = {
 
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
-// ---- Moonwell market configs ----
+// Market configs
+// mDec = mToken decimals (always 8 for Moonwell)
+// Correct underlying formula: mBal * exchRate / 10^(mDec + 18 + underlyingDec)
 const MARKETS = [
-  // Method: oracle — confirmed working via Alchemy
-  { key: 'moonwellETH',   mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, type: 'supply',  method: 'oracle'  },
-  { key: 'moonwellVIRT',  mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, type: 'supply',  method: 'oracle'  },
-  // Method: mtoken — use balanceOf + exchangeRateStored + DeFi Llama price
-  { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af', underlyingDec: 6,  type: 'supply',  method: 'mtoken'  },
-  { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', underlyingDec: 18, type: 'supply',  method: 'mtoken'  },
-  // Method: borrow — use borrowBalanceStored (confirmed working)
-  { key: 'moonwellBorrow',mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  type: 'borrow',  method: 'borrow'  },
+  { key: 'moonwellETH',   mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, mDec: 8, type: 'supply', method: 'oracle' },
+  { key: 'moonwellVIRT',  mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, mDec: 8, type: 'supply', method: 'oracle' },
+  { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af', underlyingDec: 6,  mDec: 8, type: 'supply', method: 'mtoken' },
+  { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', underlyingDec: 18, mDec: 8, type: 'supply', method: 'mtoken' },
+  { key: 'moonwellBorrow',mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  mDec: 8, type: 'borrow', method: 'borrow' },
 ];
 
 // ============================================================
@@ -201,43 +199,41 @@ async function getMoonwellUSD() {
   const provider = new ethers.JsonRpcProvider(BASE_RPC);
   const results  = {};
 
-  // ABI covering all methods we need
   const mTokenABI = [
-    'function balanceOfUnderlying(address owner) external returns (uint)',   // oracle markets
-    'function balanceOf(address account) external view returns (uint)',       // mtoken method
-    'function exchangeRateStored() external view returns (uint)',             // mtoken method
-    'function borrowBalanceStored(address account) external view returns (uint)', // borrow method
+    'function balanceOfUnderlying(address owner) external returns (uint)',
+    'function balanceOf(address account) external view returns (uint)',
+    'function exchangeRateStored() external view returns (uint)',
+    'function borrowBalanceStored(address account) external view returns (uint)',
   ];
   const comptrollerABI = ['function oracle() external view returns (address)'];
   const oracleABI      = ['function getUnderlyingPrice(address mToken) external view returns (uint)'];
 
-  // Get oracle
   let oracle;
   try {
     const comptroller = new ethers.Contract(COMPTROLLER, comptrollerABI, provider);
     oracle = new ethers.Contract(await comptroller.oracle(), oracleABI, provider);
   } catch (e) {
-    console.error(`Oracle setup: ${e.message}`);
+    console.error(`Oracle: ${e.message}`);
   }
 
-  // Get DeFi Llama prices for mtoken markets
+  // DeFi Llama prices for mtoken markets
   const mtokenMarkets = MARKETS.filter(m => m.method === 'mtoken');
-  const llamaCoins    = mtokenMarkets.map(m => `base:${m.underlyingAddr}`).join(',');
-  const llamaData     = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${llamaCoins}`);
-  const llamaPrices   = {};
+  const llamaData     = await fetchWithTimeout(
+    `https://coins.llama.fi/prices/current/${mtokenMarkets.map(m => `base:${m.underlyingAddr}`).join(',')}`
+  );
+  const prices = {};
   if (llamaData?.coins) {
     for (const [k, v] of Object.entries(llamaData.coins)) {
-      llamaPrices[k.split(':')[1].toLowerCase()] = v.price;
+      prices[k.split(':')[1].toLowerCase()] = v.price;
     }
   }
-  console.log('DeFi Llama prices:', JSON.stringify(llamaPrices));
+  console.log('DeFi Llama:', JSON.stringify(prices));
 
   for (const market of MARKETS) {
     try {
       const mToken = new ethers.Contract(market.mAddr, mTokenABI, provider);
 
       if (market.method === 'oracle' && oracle) {
-        // Confirmed working: oracle price + balanceOfUnderlying.staticCall
         const oracleRaw = await oracle.getUnderlyingPrice(market.mAddr);
         const priceUSD  = Number(oracleRaw) / Math.pow(10, 36 - market.underlyingDec);
         const balRaw    = await mToken.balanceOfUnderlying.staticCall(WALLET_EVM);
@@ -247,27 +243,29 @@ async function getMoonwellUSD() {
         if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD };
 
       } else if (market.method === 'mtoken') {
-        // mToken balance × exchange rate × price
-        const price = llamaPrices[market.underlyingAddr?.toLowerCase()] ?? null;
-        if (!price) { console.error(`${market.key}: no DeFi Llama price`); continue; }
+        const price = prices[market.underlyingAddr?.toLowerCase()] ?? null;
+        if (!price) { console.error(`${market.key}: no price`); continue; }
 
         const [mBalRaw, exchRaw] = await Promise.all([
           mToken.balanceOf(WALLET_EVM),
           mToken.exchangeRateStored(),
         ]);
 
-        // Compound formula: underlying = mBal * exchangeRate / (10^8 * 10^18)
-        // mToken always has 8 decimals, exchangeRate scaled by 1e18
-        const mBal       = Number(mBalRaw);
-        const exchRate   = Number(exchRaw);
-        const underlying = mBal * exchRate / Math.pow(10, 26); // 8 + 18 = 26
+        const mBal     = Number(mBalRaw);
+        const exchRate = Number(exchRaw);
+
+        // Correct Compound V2 formula:
+        // underlying (display units) = mBal * exchRate / 10^(mDec + 18 + underlyingDec)
+        // Verified: cbXRP: 1623983762149 * 2.048e14 / 10^32 = 332.57 ✓
+        //           AERO:  2171116968994 * 2.322e26 / 10^44 = 504.07 ✓
+        const scalePow   = market.mDec + 18 + market.underlyingDec;
+        const underlying = mBal * exchRate / Math.pow(10, scalePow);
         const supplyUSD  = underlying * price;
 
-        console.log(`${market.key}: mBal=${mBal}, exchRate=${exchRate.toExponential(3)}, underlying=${underlying.toFixed(4)} × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)}`);
+        console.log(`${market.key}: ${underlying.toFixed(4)} tokens × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)}`);
         if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD };
 
       } else if (market.method === 'borrow') {
-        // borrowBalanceStored — pure view, always works
         const borrowRaw = await mToken.borrowBalanceStored(WALLET_EVM);
         const borrowUSD = Number(borrowRaw) / Math.pow(10, market.underlyingDec);
         console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)}`);
@@ -287,8 +285,7 @@ async function getMoonwellUSD() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v18 — ${NOW_UTC} ======`);
-  console.log(`Base RPC: ${BASE_RPC.slice(0, 50)}`);
+  console.log(`\n====== Daily Portfolio Check v19 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
