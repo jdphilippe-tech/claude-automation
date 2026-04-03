@@ -1,7 +1,8 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v24
-// Fix: Moonwell borrow APY derived on-chain via borrowRatePerTimestamp()
-// Schedule: 14:00 UTC = 7:00 AM PDT (update workflow cron accordingly)
+// Daily Portfolio Check — GitHub Actions v25
+// Removed: Lighter (LLP, Edge & Hedge, LIT) — data unreliable
+// Retained: WETH/USDC Primary (Arbitrum), Moonwell (Base)
+// Schedule: 14:00 UTC = 7:00 AM PDT
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -10,12 +11,6 @@ const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE    = 'appWojaxYR99bXC1f';
 const DAILY_TABLE      = 'tblKsk0QnkOoKNLuk';
 const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
-
-const LIGHTER_BASE_URL    = 'https://mainnet.zklighter.elliot.ai/api/v1';
-const LIGHTER_ACCOUNT_IDX = 449217;
-const POOL_LLP            = 281474976710654;
-const POOL_EDGE_HEDGE     = 281474976688087;
-const POOL_LIT            = 281474976624800;
 
 const WALLET_EVM  = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
 const WETH_POS_ID = 5384162n;
@@ -53,9 +48,6 @@ const LF = {
 // ---- Asset record IDs ----
 const ASSET = {
   wethPrimary: 'recbVsmOWh9YOWPBZ',
-  llp:         'recEFiaxgavObYWzL',
-  litStaking:  'receiu02rkzc3quDW',
-  edgeHedge:   'rectz3Zo3aDbe4GgL',
 };
 
 // ---- Lending position record IDs ----
@@ -70,11 +62,11 @@ const LPOS = {
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
 const MARKETS = [
-  { key: 'moonwellETH',   mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, type: 'supply', method: 'oracle' },
-  { key: 'moonwellVIRT',  mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, type: 'supply', method: 'oracle' },
-  { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af', underlyingDec: 6,  type: 'supply', method: 'mtoken' },
-  { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', underlyingDec: 18, type: 'supply', method: 'mtoken' },
-  { key: 'moonwellBorrow',mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  type: 'borrow', method: 'borrow' },
+  { key: 'moonwellETH',    mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, type: 'supply', method: 'oracle' },
+  { key: 'moonwellVIRT',   mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, type: 'supply', method: 'oracle' },
+  { key: 'moonwellCBXRP',  mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af', underlyingDec: 6,  type: 'supply', method: 'mtoken' },
+  { key: 'moonwellAERO',   mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', underlyingDec: 18, type: 'supply', method: 'mtoken' },
+  { key: 'moonwellBorrow', mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  type: 'borrow', method: 'borrow' },
 ];
 
 // ============================================================
@@ -121,28 +113,7 @@ function lendingRecord(positionId, extra = {}) {
 }
 
 // ============================================================
-// MODULE 1 — LIGHTER
-// ============================================================
-
-async function getLighterData() {
-  console.log('\n--- Lighter ---');
-  const results = { llp: null, edgeHedge: null, lit: null };
-  const data = await fetchWithTimeout(`${LIGHTER_BASE_URL}/account?by=index&value=${LIGHTER_ACCOUNT_IDX}`);
-  if (data?.accounts?.[0]?.shares) {
-    for (const share of data.accounts[0].shares) {
-      const poolIdx   = Number(share.public_pool_index);
-      const principal = parseFloat(share.principal_amount ?? 0);
-      if (poolIdx === POOL_LLP)        results.llp       = principal;
-      if (poolIdx === POOL_EDGE_HEDGE) results.edgeHedge = principal;
-      if (poolIdx === POOL_LIT)        results.lit       = principal;
-    }
-  }
-  console.log(`LLP: $${results.llp}, Edge&Hedge: $${results.edgeHedge}, LIT: $${results.lit}`);
-  return results;
-}
-
-// ============================================================
-// MODULE 2 — WETH/USDC PRIMARY (Arbitrum)
+// MODULE 1 — WETH/USDC PRIMARY (Arbitrum)
 // ============================================================
 
 async function getWethPosition() {
@@ -185,7 +156,7 @@ async function getWethPosition() {
 
     const positionValue = (amount0 * ethPrice) + amount1;
 
-    const MAX128 = BigInt('0xffffffffffffffffffffffffffffffff');
+    const MAX128     = BigInt('0xffffffffffffffffffffffffffffffff');
     const nftCollect = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', collectABI, provider);
     let feeValue = 0;
     try {
@@ -212,7 +183,7 @@ async function getWethPosition() {
 }
 
 // ============================================================
-// MODULE 3 — Moonwell (Base)
+// MODULE 2 — Moonwell (Base)
 // ============================================================
 
 async function getMoonwellData() {
@@ -225,7 +196,7 @@ async function getMoonwellData() {
     'function balanceOf(address account) external view returns (uint)',
     'function exchangeRateStored() external view returns (uint)',
     'function borrowBalanceStored(address account) external view returns (uint)',
-    'function borrowRatePerTimestamp() external view returns (uint)',  // ← v24: on-chain borrow APY
+    'function borrowRatePerTimestamp() external view returns (uint)',
   ];
   const comptrollerABI = ['function oracle() external view returns (address)'];
   const oracleABI      = ['function getUnderlyingPrice(address mToken) external view returns (uint)'];
@@ -239,7 +210,7 @@ async function getMoonwellData() {
   }
 
   // DeFi Llama prices for mtoken markets
-  const mtokenMarkets = MARKETS.filter(m => m.method === 'mtoken');
+  const mtokenMarkets  = MARKETS.filter(m => m.method === 'mtoken');
   const llamaPriceData = await fetchWithTimeout(
     `https://coins.llama.fi/prices/current/${mtokenMarkets.map(m => `base:${m.underlyingAddr}`).join(',')}`
   );
@@ -250,7 +221,7 @@ async function getMoonwellData() {
     }
   }
 
-  // DeFi Llama pools for supply APYs only (borrow APY now derived on-chain)
+  // DeFi Llama pools for supply APYs only (borrow APY derived on-chain)
   const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
   const moonwellPools  = {};
   if (llamaPoolsData?.data) {
@@ -269,10 +240,8 @@ async function getMoonwellData() {
 
   for (const market of MARKETS) {
     try {
-      const mToken = new ethers.Contract(market.mAddr, mTokenABI, provider);
-      const pool   = moonwellPools[market.key];
-
-      // Supply APY from DeFi Llama
+      const mToken    = new ethers.Contract(market.mAddr, mTokenABI, provider);
+      const pool      = moonwellPools[market.key];
       const supplyAPY = pool?.apy ?? null;
 
       if (market.method === 'oracle' && oracle) {
@@ -333,33 +302,19 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v24 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v25 — ${NOW_UTC} ======`);
 
-  const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
-    getLighterData(),
+  const [wethRes, moonwellRes] = await Promise.allSettled([
     getWethPosition(),
     getMoonwellData(),
   ]);
 
-  const lighter  = lighterRes.value  ?? null;
   const weth     = wethRes.value     ?? null;
   const moonwell = moonwellRes.value ?? null;
 
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
 
-  if (lighter?.llp != null) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.llp, true, { [F.positionValue]: lighter.llp, [F.notes]: 'Principal amount — real equity deferred' })]);
-    if (ok) { written++; console.log(`✓ LLP: $${lighter.llp}`); }
-  }
-  if (lighter?.edgeHedge != null) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.edgeHedge, true, { [F.positionValue]: lighter.edgeHedge, [F.notes]: 'Principal amount — real equity deferred' })]);
-    if (ok) { written++; console.log(`✓ Edge & Hedge: $${lighter.edgeHedge}`); }
-  }
-  if (lighter?.lit != null) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.litStaking, true, { [F.positionValue]: lighter.lit, [F.notes]: 'Principal amount — real equity deferred' })]);
-    if (ok) { written++; console.log(`✓ LIT Staking: $${lighter.lit}`); }
-  }
   if (weth) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
       [F.positionValue]: weth.positionValue,
