@@ -33,6 +33,7 @@ const F = {
   inRange:       'fld9pdBIkiEIv352W',
   positionValue: 'fldWElDtJZRYTaZtD',
   revertPosVal:  'fldcciMBHm1kI0dL9',
+  feeValue:      'fld6QnTv9CKHvglcX',
   notes:         'fldxWdSuQ09uhadFo',
 };
 
@@ -328,7 +329,7 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v22 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v23 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
