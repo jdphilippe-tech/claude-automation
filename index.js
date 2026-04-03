@@ -1,7 +1,7 @@
 // ============================================================
 // Daily Portfolio Check — GitHub Actions v17
-// Fix: 429 rate limit on Base RPC — use alternate endpoints
-//      Add delay between RPC calls
+// Uses BASE_RPC_URL secret (Alchemy/Infura) to avoid rate limits
+// Hard 10s timeout on all RPC calls to prevent hanging
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -20,17 +20,11 @@ const POOL_LIT            = 281474976624800;
 const WALLET_EVM  = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
 const WETH_POS_ID = 5384162n;
 
-// Use multiple Base RPC endpoints to avoid rate limiting
-// ethers provider will use the first one that works
-const BASE_RPC_URLS = [
-  'https://base.llamarpc.com',             // LlamaRPC — no rate limit
-  'https://base-rpc.publicnode.com',       // PublicNode
-  'https://mainnet.base.org',              // Official (fallback)
-];
+// BASE_RPC_URL comes from GitHub Secrets — set to Alchemy/Infura endpoint
+const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 
-const NOW_UTC       = new Date().toISOString();
-const FETCH_TIMEOUT = 20000;
+const NOW_UTC = new Date().toISOString();
 
 // ---- Daily Actions field IDs ----
 const F = {
@@ -73,13 +67,13 @@ const LPOS = {
 
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
-// Markets confirmed working with oracle + staticCall
+// Markets confirmed working with oracle + balanceOfUnderlying.staticCall
 const ORACLE_MARKETS = [
   { key: 'moonwellETH',  mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, type: 'supply' },
   { key: 'moonwellVIRT', mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, type: 'supply' },
 ];
 
-// Markets using raw eth_call on separate RPC to avoid rate limiting
+// Markets that use getAccountSnapshot via raw eth_call
 const RAW_MARKETS = [
   { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af', underlyingDec: 6,  type: 'supply' },
   { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', underlyingDec: 18, type: 'supply' },
@@ -90,116 +84,63 @@ const RAW_MARKETS = [
 // HELPERS
 // ============================================================
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-async function fetchWithTimeout(url, options = {}) {
+// Fetch with hard timeout — never hangs
+async function fetchWithTimeout(url, options = {}, ms = 10000) {
   const { default: fetch } = await import('node-fetch');
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+  const timer = setTimeout(() => controller.abort(), ms);
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timer);
-    if (!res.ok) { console.error(`[HTTP ${res.status}] ${url.slice(0, 80)}`); return null; }
+    if (!res.ok) { console.error(`[HTTP ${res.status}] ${url.slice(0, 70)}`); return null; }
     return await res.json();
   } catch (e) {
     clearTimeout(timer);
-    console.error(`[fetch] ${e.name === 'AbortError' ? 'Timeout' : e.message}`);
+    if (e.name === 'AbortError') console.error(`[TIMEOUT ${ms}ms] ${url.slice(0, 70)}`);
+    else console.error(`[fetch] ${e.message}`);
     return null;
   }
 }
 
-// Raw eth_call via JSON-RPC — tries multiple RPC endpoints
-async function ethCallWithFallback(to, data) {
-  for (const rpcUrl of BASE_RPC_URLS) {
-    try {
-      const result = await fetchWithTimeout(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0', id: 1,
-          method: 'eth_call',
-          params: [{ to, data }, 'latest'],
-        }),
-      });
-      if (result?.error) {
-        console.error(`  eth_call error on ${rpcUrl.slice(0, 30)}: ${JSON.stringify(result.error)}`);
-        continue;
-      }
-      if (result?.result && result.result !== '0x') {
-        return result.result;
-      }
-      if (result?.result === '0x') {
-        return '0x'; // contract returned empty — valid response
-      }
-    } catch (e) {
-      console.error(`  RPC ${rpcUrl.slice(0, 30)} failed: ${e.message}`);
-    }
-    await sleep(500);
-  }
-  return null;
+// Raw eth_call — uses BASE_RPC (Alchemy/Infura, no rate limit)
+function encodeCall(selector, addr) {
+  return '0x' + selector + addr.slice(2).toLowerCase().padStart(64, '0');
 }
 
-// Get a working Base provider — tries URLs in order
-async function getBaseProvider() {
-  for (const url of BASE_RPC_URLS) {
-    try {
-      const provider = new ethers.JsonRpcProvider(url);
-      await provider.getBlockNumber(); // quick connectivity test
-      console.log(`Using Base RPC: ${url}`);
-      return provider;
-    } catch {
-      // try next
-    }
-  }
-  return new ethers.JsonRpcProvider(BASE_RPC_URLS[0]);
-}
-
-function encodeCall(selector, ...args) {
-  let data = '0x' + selector;
-  for (const arg of args) {
-    if (typeof arg === 'string' && arg.startsWith('0x')) {
-      data += arg.slice(2).toLowerCase().padStart(64, '0');
-    }
-  }
-  return data;
+async function ethCall(to, data) {
+  const result = await fetchWithTimeout(BASE_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0', id: 1,
+      method: 'eth_call',
+      params: [{ to, data }, 'latest'],
+    }),
+  }, 10000);
+  if (result?.error) throw new Error(JSON.stringify(result.error));
+  return result?.result ?? null;
 }
 
 async function airtableCreate(tableId, records) {
   const { default: fetch } = await import('node-fetch');
-  const body = JSON.stringify({ records: records.map(r => ({ fields: r })) });
   const res = await fetch(
     `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}`,
     {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}`, 'Content-Type': 'application/json' },
-      body,
+      body: JSON.stringify({ records: records.map(r => ({ fields: r })) }),
     }
   );
-  if (!res.ok) {
-    const err = await res.text();
-    console.error(`[Airtable] FAILED: ${err.slice(0, 200)}`);
-    return false;
-  }
+  if (!res.ok) { console.error(`[Airtable] ${await res.text().catch(() => '')}`); return false; }
   return true;
 }
 
 function dailyRecord(assetId, inRange, extra = {}) {
-  return {
-    [F.asset]:      [assetId],
-    [F.actionType]: 'Fee Check',
-    [F.date]:       NOW_UTC,
-    [F.inRange]:    inRange ? 'Yes' : 'No',
-    ...extra,
-  };
+  return { [F.asset]: [assetId], [F.actionType]: 'Fee Check', [F.date]: NOW_UTC, [F.inRange]: inRange ? 'Yes' : 'No', ...extra };
 }
 
 function lendingRecord(positionId, extra = {}) {
-  return {
-    [LF.position]:   [positionId],
-    [LF.actionType]: 'Rate Check',
-    [LF.date]:       NOW_UTC,
-    ...extra,
-  };
+  return { [LF.position]: [positionId], [LF.actionType]: 'Rate Check', [LF.date]: NOW_UTC, ...extra };
 }
 
 // ============================================================
@@ -224,7 +165,7 @@ async function getLighterData() {
 }
 
 // ============================================================
-// MODULE 2 — WETH/USDC PRIMARY
+// MODULE 2 — WETH/USDC PRIMARY (Arbitrum)
 // ============================================================
 
 async function getWethPosition() {
@@ -244,7 +185,6 @@ async function getWethPosition() {
     const factory  = new ethers.Contract('0x1F98431c8aD98523631AE4a59f267346ea31F984', factoryABI, provider);
     const poolAddr = await factory.getPool(raw[2], raw[3], raw[4]);
     const slot0    = await (new ethers.Contract(poolAddr, poolABI, provider)).slot0();
-
     const currentTick  = Number(slot0.tick);
     const inRange      = currentTick >= tickLowerN && currentTick < tickUpperN;
     const sqrtP        = Number(slot0.sqrtPriceX96) / Number(2n ** 96n);
@@ -274,16 +214,16 @@ async function getWethPosition() {
 }
 
 // ============================================================
-// MODULE 3 — Moonwell USD values
+// MODULE 3 — Moonwell USD values (Base)
 // ============================================================
 
 async function getMoonwellUSD() {
   console.log('\n--- Moonwell USD ---');
-  const results = {};
+  console.log(`Using Base RPC: ${BASE_RPC.slice(0, 50)}...`);
+  const provider = new ethers.JsonRpcProvider(BASE_RPC);
+  const results  = {};
 
-  // Part A: Oracle markets via ethers (ETH, VIRTUAL)
-  const provider = await getBaseProvider();
-
+  // Part A: Oracle markets via ethers (ETH, VIRTUAL) — confirmed working
   const comptrollerABI = ['function oracle() external view returns (address)'];
   const oracleABI      = ['function getUnderlyingPrice(address mToken) external view returns (uint)'];
   const mTokenABI      = ['function balanceOfUnderlying(address owner) external returns (uint)'];
@@ -305,49 +245,42 @@ async function getMoonwellUSD() {
       } catch (e) {
         console.error(`${market.key}: ${e.message.slice(0, 60)}`);
       }
-      await sleep(300); // small delay between calls
     }
   } catch (e) {
     console.error(`Oracle setup: ${e.message}`);
   }
 
-  // Part B: Raw markets via eth_call with fallback RPCs
-  // Get DeFi Llama prices first
+  // Part B: Raw markets via eth_call + DeFi Llama prices
   const llamaCoins = RAW_MARKETS.map(m => `base:${m.underlyingAddr}`).join(',');
   const llamaData  = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${llamaCoins}`);
-  const llamaPrices = {};
+  const prices     = {};
   if (llamaData?.coins) {
     for (const [k, v] of Object.entries(llamaData.coins)) {
-      llamaPrices[k.split(':')[1].toLowerCase()] = v.price;
+      prices[k.split(':')[1].toLowerCase()] = v.price;
     }
   }
-  console.log('DeFi Llama prices:', JSON.stringify(llamaPrices));
-
-  await sleep(1000); // wait 1s before hitting Base RPC again
+  console.log('DeFi Llama prices:', JSON.stringify(prices));
 
   for (const market of RAW_MARKETS) {
     try {
-      const price = llamaPrices[market.underlyingAddr.toLowerCase()]
+      const price = prices[market.underlyingAddr.toLowerCase()]
         ?? (market.key === 'moonwellBorrow' ? 1.0 : null);
 
       if (!price) { console.error(`${market.key}: no price`); continue; }
 
       if (market.type === 'supply') {
-        // getAccountSnapshot(address) — selector 0xc37f428e
-        const snapData = encodeCall('c37f428e', WALLET_EVM);
-        const snapHex  = await ethCallWithFallback(market.mAddr, snapData);
-        console.log(`${market.key} snapshot: ${snapHex?.slice(0, 130)}`);
+        // getAccountSnapshot(address) selector = 0xc37f428e
+        const hex = await ethCall(market.mAddr, encodeCall('c37f428e', WALLET_EVM));
+        console.log(`${market.key} snapshot: ${hex?.slice(0, 130)}`);
 
-        if (snapHex && snapHex !== '0x' && snapHex.length >= 258) {
-          // Decode 4 uint256: [error, mTokenBal, borrowBal, exchangeRate]
+        if (hex && hex !== '0x' && hex.length >= 258) {
           const vals = [];
-          for (let i = 2; i < snapHex.length; i += 64) {
-            vals.push(BigInt('0x' + snapHex.slice(i, i + 64)));
+          for (let i = 2; i < hex.length; i += 64) {
+            vals.push(BigInt('0x' + hex.slice(i, i + 64)));
           }
           const mBal     = Number(vals[1] ?? 0n);
           const exchRate = Number(vals[3] ?? 0n);
           console.log(`  mBal: ${mBal}, exchRate: ${exchRate}`);
-
           if (mBal > 0 && exchRate > 0) {
             // underlying = mBal * exchRate / (10^8 * 10^18)
             const underlying = mBal * exchRate / Math.pow(10, 26);
@@ -360,20 +293,16 @@ async function getMoonwellUSD() {
         }
 
       } else {
-        // borrowBalanceStored(address) — selector 0x95dd9193
-        const borrowData = encodeCall('95dd9193', WALLET_EVM);
-        const borrowHex  = await ethCallWithFallback(market.mAddr, borrowData);
-        console.log(`${market.key} borrow: ${borrowHex}`);
-
-        if (borrowHex && borrowHex !== '0x' && borrowHex.length >= 66) {
-          const borrowRaw = BigInt('0x' + borrowHex.slice(2).padStart(64, '0'));
+        // borrowBalanceStored(address) selector = 0x95dd9193
+        const hex = await ethCall(market.mAddr, encodeCall('95dd9193', WALLET_EVM));
+        console.log(`${market.key} borrow hex: ${hex}`);
+        if (hex && hex !== '0x' && hex.length >= 66) {
+          const borrowRaw = BigInt('0x' + hex.slice(2).padStart(64, '0'));
           const borrowUSD = Number(borrowRaw) / Math.pow(10, market.underlyingDec);
           console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)}`);
           if (borrowUSD > 0.01) results[market.key] = { type: 'borrow', borrowUSD };
         }
       }
-
-      await sleep(500);
     } catch (e) {
       console.error(`${market.key}: ${e.message.slice(0, 80)}`);
     }
@@ -388,6 +317,7 @@ async function getMoonwellUSD() {
 
 async function main() {
   console.log(`\n====== Daily Portfolio Check v17 — ${NOW_UTC} ======`);
+  console.log(`Base RPC configured: ${!!process.env.BASE_RPC_URL}`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
@@ -403,29 +333,17 @@ async function main() {
   let written = 0;
 
   if (lighter?.llp != null) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.llp, true, {
-      [F.positionValue]: lighter.llp,
-      [F.notes]:         'Principal amount — real equity deferred',
-    })]);
+    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.llp, true, { [F.positionValue]: lighter.llp, [F.notes]: 'Principal amount — real equity deferred' })]);
     if (ok) { written++; console.log(`✓ LLP: $${lighter.llp}`); }
   }
-
   if (lighter?.edgeHedge != null) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.edgeHedge, true, {
-      [F.positionValue]: lighter.edgeHedge,
-      [F.notes]:         'Principal amount — real equity deferred',
-    })]);
+    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.edgeHedge, true, { [F.positionValue]: lighter.edgeHedge, [F.notes]: 'Principal amount — real equity deferred' })]);
     if (ok) { written++; console.log(`✓ Edge & Hedge: $${lighter.edgeHedge}`); }
   }
-
   if (lighter?.lit != null) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.litStaking, true, {
-      [F.positionValue]: lighter.lit,
-      [F.notes]:         'Principal amount — real equity deferred',
-    })]);
+    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.litStaking, true, { [F.positionValue]: lighter.lit, [F.notes]: 'Principal amount — real equity deferred' })]);
     if (ok) { written++; console.log(`✓ LIT Staking: $${lighter.lit}`); }
   }
-
   if (weth) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
       [F.positionValue]: weth.positionValue,
