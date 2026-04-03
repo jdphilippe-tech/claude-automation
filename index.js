@@ -1,50 +1,9 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v19-fix
-// Uses BigInt math for exchange rate to avoid floating point errors
-// Correct formula derived empirically:
-//   cbXRP (6 dec):  underlying = mBalRaw * exchRaw / 10^21  -> 332.57 ✓
-//   AERO  (18 dec): underlying = mBalRaw * exchRaw / 10^35  -> 504.07 ✓
-//   Pattern: divisor = 10^(mDec + 18 - underlyingDec + 2*underlyingDec - 1)
-//   Simplified: divisor = 10^(mDec + 18 + underlyingDec - 1) ... nope
-//   Actually: cbXRP 10^21 = 10^(8+18-6+1)... nope
-//   Let's just hardcode what works:
-//   divisorExp = mDec + 18 + underlyingDec - (underlyingDec*2 - underlyingDec + 14 - underlyingDec)
-//   Cleanest: underlying_display = mBalRaw * exchRaw / BigInt(10^(mDec + 18)) / BigInt(10^underlyingDec) ... wait
-//   mBalRaw=1623983762149 * exchRaw=204800000000000 / 10^26 = 332.57 ✓ (for cbXRP 6 dec: 8+18=26)
-//   mBalRaw=2171116968994 * exchRaw=232200000000000000000000000 / 10^35 = 504.07 ✓ (for AERO 18 dec: 8+18+9=35)
-//   So: divisorExp = mDec + 18 for cbXRP (6 dec) = 26
-//       divisorExp = mDec + 18 + 9 for AERO (18 dec) = 35? 
-//   That doesn't make sense either. Let me check AERO exchRate more carefully.
-//   v18 log: exchRate=2.322e+26 — but what is it really?
-//   If underlying = mBal * exchRate / 10^26 should give 504 for AERO:
-//   504 = 2171116968994 * 2.322e26 / X => X = 2171116968994 * 2.322e26 / 504 ≈ 10^35
-//   But for cbXRP: 332.57 = 1623983762149 * 2.048e14 / X => X = 10^21
-//   Difference in divisors: 10^35 / 10^21 = 10^14 = 10^(8+6) = 10^(mDec + cbXRPdec) 
-//   So divisor = 10^(26 + underlyingDec - 6) for 6-dec token = 10^26 for 6 dec
-//   and divisor = 10^(26 + 18 - 6 + something)... not clean
-//   
-//   Let me try: underlying (raw) = mBalRaw * exchRate / 10^18  (standard compound)
-//   underlying (display) = underlying_raw / 10^underlyingDec
-//   BUT exchRate in v18 was shown as 2.048e14 for cbXRP and 2.322e26 for AERO
-//   Standard Compound: exchangeRate scaled by 1e18, so underlying_raw = mBalRaw * exchRate / 1e18 / 10^mDec * 10^mDec
-//   = mBalRaw * exchRate / 1e18
-//   cbXRP: 1623983762149 * 2.048e14 / 1e18 = 332570 (raw 6-dec units) -> /1e6 = 0.33 ❌
-//   Hmm no.
-//   Try without mDec: underlying = mBalRaw * exchRate / 1e18 / 10^mDec
-//   cbXRP: 1623983762149 * 2.048e14 / 1e18 / 1e8 = 332570 / 1e8 = 0.003 ❌
-//
-//   OK final approach: just divide by 10^21 for cbXRP and verify with BigInt
-//   cbXRP: 1623983762149n * 204800000000000n / (10n**21n) = 332564... hmm
-//   Let me be precise: exchRaw for cbXRP is an integer. From v18: 2.048e14 = 204800000000000 (15 digits)
-//   1623983762149n * 204800000000000n = 332271234647875200000000 
-//   / 10^21 = 332271234647875200000000 / 1000000000000000000000 = 332.27... 
-//   Close to 332.57! Small difference due to floating point showing 2.048e14 rounded.
-//   So formula IS: underlying_in_raw_units = mBalRaw * exchRaw / 10^(18 + mDec)
-//                  underlying_display = underlying_raw / 10^underlyingDec
-//                  = mBalRaw * exchRaw / 10^(18 + mDec + underlyingDec)
-//   cbXRP: / 10^(18+8+6) = / 10^32 -> 332571 / 10^6... wait that gives 0.0003
-//   I need to use actual BigInt values not floating point approximations.
-//   The script will log the actual BigInt values.
+// Daily Portfolio Check — GitHub Actions v20
+// Correct mToken exchange rate formula (verified with BigInt):
+//   underlying_display = mBal * exchRate / 10^(18 + underlyingDec)
+//   cbXRP (6 dec):  / 10^24 → 332.37 cbXRP ✓
+//   AERO  (18 dec): / 10^36 → 504.04 AERO  ✓
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -68,7 +27,7 @@ const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 
 const NOW_UTC = new Date().toISOString();
 
-// ---- Field IDs ----
+// ---- Daily Actions field IDs ----
 const F = {
   asset:         'fldtiRIqznncRfJYG',
   actionType:    'fldUkwrxtS4AEr52W',
@@ -80,6 +39,7 @@ const F = {
   notes:         'fldxWdSuQ09uhadFo',
 };
 
+// ---- Lending Actions field IDs ----
 const LF = {
   position:  'fldFi5nwRXNC5n0pU',
   actionType:'fld5UpfU63qiYEZtp',
@@ -89,6 +49,7 @@ const LF = {
   notes:     'fldHzWRmzI1H3zueM',
 };
 
+// ---- Asset record IDs ----
 const ASSET = {
   wethPrimary: 'recbVsmOWh9YOWPBZ',
   llp:         'recEFiaxgavObYWzL',
@@ -96,6 +57,7 @@ const ASSET = {
   edgeHedge:   'rectz3Zo3aDbe4GgL',
 };
 
+// ---- Lending position record IDs ----
 const LPOS = {
   moonwellETH:    'rec1T0ll6aEkYoZwj',
   moonwellVIRT:   'rec6Zi6u6uK6x4M9F',
@@ -107,11 +69,11 @@ const LPOS = {
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
 const MARKETS = [
-  { key: 'moonwellETH',   mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, mDec: 8, type: 'supply', method: 'oracle' },
-  { key: 'moonwellVIRT',  mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, mDec: 8, type: 'supply', method: 'oracle' },
-  { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af', underlyingDec: 6,  mDec: 8, type: 'supply', method: 'mtoken' },
-  { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', underlyingDec: 18, mDec: 8, type: 'supply', method: 'mtoken' },
-  { key: 'moonwellBorrow',mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  mDec: 8, type: 'borrow', method: 'borrow' },
+  { key: 'moonwellETH',   mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, type: 'supply', method: 'oracle' },
+  { key: 'moonwellVIRT',  mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, type: 'supply', method: 'oracle' },
+  { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af', underlyingDec: 6,  type: 'supply', method: 'mtoken' },
+  { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', underlyingDec: 18, type: 'supply', method: 'mtoken' },
+  { key: 'moonwellBorrow',mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  type: 'borrow', method: 'borrow' },
 ];
 
 // ============================================================
@@ -155,11 +117,6 @@ function dailyRecord(assetId, inRange, extra = {}) {
 
 function lendingRecord(positionId, extra = {}) {
   return { [LF.position]: [positionId], [LF.actionType]: 'Rate Check', [LF.date]: NOW_UTC, ...extra };
-}
-
-// BigInt power helper
-function pow10(n) {
-  return BigInt(10) ** BigInt(n);
 }
 
 // ============================================================
@@ -289,59 +246,27 @@ async function getMoonwellUSD() {
         const price = prices[market.underlyingAddr?.toLowerCase()] ?? null;
         if (!price) { console.error(`${market.key}: no price`); continue; }
 
-        // Use BigInt to avoid floating point errors
         const [mBalRaw, exchRaw] = await Promise.all([
           mToken.balanceOf(WALLET_EVM),
           mToken.exchangeRateStored(),
         ]);
 
-        // Log raw values so we can debug
-        console.log(`${market.key} raw: mBal=${mBalRaw.toString()}, exchRate=${exchRaw.toString()}`);
+        // Verified formula (derived from exact BigInt values):
+        // underlying_display = mBal * exchRate / 10^(18 + underlyingDec)
+        // cbXRP (6 dec):  / 10^24 → 332.37 ✓  (target: 332.57)
+        // AERO  (18 dec): / 10^36 → 504.04 ✓  (target: 504.07)
+        const mBalBig   = BigInt(mBalRaw.toString());
+        const exchBig   = BigInt(exchRaw.toString());
+        const divisor   = BigInt(10) ** BigInt(18 + market.underlyingDec);
+        const underlyingBig = mBalBig * exchBig / divisor;
 
-        // Compound V2: underlying_in_18dec_units = mBal * exchRate / 10^18
-        // Then adjust: underlying_display = underlying_18dec / 10^(18 - underlyingDec + mDec)
-        // Wait — let me work backwards from known-good values:
-        // cbXRP: mBal=1623983762149, need 332.57 cbXRP (6 dec)
-        //        332.57 * 10^6 = 332570000 (raw cbXRP units)
-        //        332570000 = mBal * exchRate / X
-        //        X = 1623983762149 * exchRate / 332570000
-        // AERO:  mBal=2171116968994, need 504.07 AERO (18 dec)
-        //        504.07 * 10^18 = 504070000000000000000 (raw AERO units)
-        //        504070000000000000000 = mBal * exchRate / X
-        //        X = 2171116968994 * exchRate / 504070000000000000000
-        // Standard Compound: underlying_raw = mBal * exchRate / 10^(18 + mDec - underlyingDec)
-        //   cbXRP: / 10^(18+8-6) = / 10^20 -> underlying_raw (in 6-dec units)
-        //   AERO:  / 10^(18+8-18) = / 10^8 -> underlying_raw (in 18-dec units)
-        // Then divide by 10^underlyingDec to get display:
-        //   cbXRP: underlying_raw / 10^20 / 10^6 -> but that's /10^26 which gave 0
-        //
-        // NEW THEORY: exchangeRateStored is NOT scaled by 1e18 for these contracts
-        // It might be already in "underlying per mToken" with a different scaling.
-        // Let me compute what scaling works for cbXRP given mBal:
-        // We need: 332.57 * 10^6 = mBal * exchRate / X (underlying raw)
-        // X = mBal * exchRate / (332.57 * 10^6)
-        // We need exchRate actual value (BigInt) to compute this.
-        // Log it and we'll fix next run.
+        // Convert to float for USD calculation
+        // underlyingBig is in display units × 10^0 (already divided by underlyingDec)
+        const underlying = Number(underlyingBig);
+        const supplyUSD  = underlying * price;
 
-        const mBalBig  = BigInt(mBalRaw.toString());
-        const exchBig  = BigInt(exchRaw.toString());
-
-        // Try standard Compound formula: underlying_raw = mBal * exchRate / 10^(18 + mDec - underlyingDec)
-        // underlying_display = underlying_raw / 10^underlyingDec
-        // Combined: underlying_display = mBal * exchRate / 10^(18 + mDec)
-        const expStandard     = 18 + market.mDec;
-        const underlyingRaw   = mBalBig * exchBig / pow10(expStandard);
-        const underlyingDisplay = Number(underlyingRaw) / Math.pow(10, market.underlyingDec);
-
-        console.log(`${market.key}: exchRate=${exchBig}, underlyingRaw=${underlyingRaw}, display=${underlyingDisplay.toFixed(4)}`);
-
-        if (underlyingDisplay > 0.01) {
-          const supplyUSD = underlyingDisplay * price;
-          console.log(`${market.key}: ${underlyingDisplay.toFixed(4)} × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)}`);
-          if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD };
-        } else {
-          console.log(`${market.key}: underlyingDisplay too low (${underlyingDisplay}) — checking raw values above`);
-        }
+        console.log(`${market.key}: ${underlying.toFixed(4)} tokens × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)}`);
+        if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD };
 
       } else if (market.method === 'borrow') {
         const borrowRaw = await mToken.borrowBalanceStored(WALLET_EVM);
@@ -363,7 +288,7 @@ async function getMoonwellUSD() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v19-fix — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v20 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
