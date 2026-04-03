@@ -1,7 +1,7 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v16
-// ETH/VIRTUAL: oracle + balanceOfUnderlying.staticCall (confirmed)
-// cbXRP/AERO/USDC: raw eth_call via JSON-RPC (bypasses proxy issues)
+// Daily Portfolio Check — GitHub Actions v17
+// Fix: 429 rate limit on Base RPC — use alternate endpoints
+//      Add delay between RPC calls
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -20,7 +20,13 @@ const POOL_LIT            = 281474976624800;
 const WALLET_EVM  = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
 const WETH_POS_ID = 5384162n;
 
-const BASE_RPC     = 'https://mainnet.base.org';
+// Use multiple Base RPC endpoints to avoid rate limiting
+// ethers provider will use the first one that works
+const BASE_RPC_URLS = [
+  'https://base.llamarpc.com',             // LlamaRPC — no rate limit
+  'https://base-rpc.publicnode.com',       // PublicNode
+  'https://mainnet.base.org',              // Official (fallback)
+];
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 
 const NOW_UTC       = new Date().toISOString();
@@ -73,35 +79,18 @@ const ORACLE_MARKETS = [
   { key: 'moonwellVIRT', mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, type: 'supply' },
 ];
 
-// Markets using raw eth_call
-// These are MErc20Delegator proxies added recently — use getAccountSnapshot via raw call
+// Markets using raw eth_call on separate RPC to avoid rate limiting
 const RAW_MARKETS = [
-  {
-    key:            'moonwellCBXRP',
-    mAddr:          '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d',
-    underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af',
-    underlyingDec:  6,
-    type:           'supply',
-  },
-  {
-    key:            'moonwellAERO',
-    mAddr:          '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6',
-    underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631',
-    underlyingDec:  18,
-    type:           'supply',
-  },
-  {
-    key:            'moonwellBorrow',
-    mAddr:          '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22',
-    underlyingAddr: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-    underlyingDec:  6,
-    type:           'borrow',
-  },
+  { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingAddr: '0xcb585250f852C6c6bf90434AB21A00f02833a4af', underlyingDec: 6,  type: 'supply' },
+  { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingAddr: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', underlyingDec: 18, type: 'supply' },
+  { key: 'moonwellBorrow',mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingAddr: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', underlyingDec: 6,  type: 'borrow' },
 ];
 
 // ============================================================
 // HELPERS
 // ============================================================
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function fetchWithTimeout(url, options = {}) {
   const { default: fetch } = await import('node-fetch');
@@ -119,22 +108,60 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
-// Raw eth_call via JSON-RPC — bypasses ethers proxy issues
-async function ethCall(rpcUrl, to, data) {
-  const result = await fetchWithTimeout(rpcUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'eth_call',
-      params: [{ to, data }, 'latest'],
-    }),
-  });
-  if (result?.error) {
-    throw new Error(`eth_call error: ${JSON.stringify(result.error)}`);
+// Raw eth_call via JSON-RPC — tries multiple RPC endpoints
+async function ethCallWithFallback(to, data) {
+  for (const rpcUrl of BASE_RPC_URLS) {
+    try {
+      const result = await fetchWithTimeout(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0', id: 1,
+          method: 'eth_call',
+          params: [{ to, data }, 'latest'],
+        }),
+      });
+      if (result?.error) {
+        console.error(`  eth_call error on ${rpcUrl.slice(0, 30)}: ${JSON.stringify(result.error)}`);
+        continue;
+      }
+      if (result?.result && result.result !== '0x') {
+        return result.result;
+      }
+      if (result?.result === '0x') {
+        return '0x'; // contract returned empty — valid response
+      }
+    } catch (e) {
+      console.error(`  RPC ${rpcUrl.slice(0, 30)} failed: ${e.message}`);
+    }
+    await sleep(500);
   }
-  return result?.result ?? null;
+  return null;
+}
+
+// Get a working Base provider — tries URLs in order
+async function getBaseProvider() {
+  for (const url of BASE_RPC_URLS) {
+    try {
+      const provider = new ethers.JsonRpcProvider(url);
+      await provider.getBlockNumber(); // quick connectivity test
+      console.log(`Using Base RPC: ${url}`);
+      return provider;
+    } catch {
+      // try next
+    }
+  }
+  return new ethers.JsonRpcProvider(BASE_RPC_URLS[0]);
+}
+
+function encodeCall(selector, ...args) {
+  let data = '0x' + selector;
+  for (const arg of args) {
+    if (typeof arg === 'string' && arg.startsWith('0x')) {
+      data += arg.slice(2).toLowerCase().padStart(64, '0');
+    }
+  }
+  return data;
 }
 
 async function airtableCreate(tableId, records) {
@@ -173,22 +200,6 @@ function lendingRecord(positionId, extra = {}) {
     [LF.date]:       NOW_UTC,
     ...extra,
   };
-}
-
-// Encode function call data
-function encodeCall(selector, ...args) {
-  // selector is 4-byte hex string without 0x
-  // args are ABI-encoded (we handle address and uint256 manually)
-  let data = '0x' + selector;
-  for (const arg of args) {
-    if (typeof arg === 'string' && arg.startsWith('0x')) {
-      // Address — pad to 32 bytes
-      data += arg.slice(2).toLowerCase().padStart(64, '0');
-    } else if (typeof arg === 'bigint' || typeof arg === 'number') {
-      data += BigInt(arg).toString(16).padStart(64, '0');
-    }
-  }
-  return data;
 }
 
 // ============================================================
@@ -268,10 +279,11 @@ async function getWethPosition() {
 
 async function getMoonwellUSD() {
   console.log('\n--- Moonwell USD ---');
-  const provider = new ethers.JsonRpcProvider(BASE_RPC);
-  const results  = {};
+  const results = {};
 
-  // Part A: confirmed working markets via ethers
+  // Part A: Oracle markets via ethers (ETH, VIRTUAL)
+  const provider = await getBaseProvider();
+
   const comptrollerABI = ['function oracle() external view returns (address)'];
   const oracleABI      = ['function getUnderlyingPrice(address mToken) external view returns (uint)'];
   const mTokenABI      = ['function balanceOfUnderlying(address owner) external returns (uint)'];
@@ -293,13 +305,14 @@ async function getMoonwellUSD() {
       } catch (e) {
         console.error(`${market.key}: ${e.message.slice(0, 60)}`);
       }
+      await sleep(300); // small delay between calls
     }
   } catch (e) {
     console.error(`Oracle setup: ${e.message}`);
   }
 
-  // Part B: raw markets via direct eth_call JSON-RPC
-  // Get DeFi Llama prices for these
+  // Part B: Raw markets via eth_call with fallback RPCs
+  // Get DeFi Llama prices first
   const llamaCoins = RAW_MARKETS.map(m => `base:${m.underlyingAddr}`).join(',');
   const llamaData  = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${llamaCoins}`);
   const llamaPrices = {};
@@ -308,14 +321,9 @@ async function getMoonwellUSD() {
       llamaPrices[k.split(':')[1].toLowerCase()] = v.price;
     }
   }
-  console.log('DeFi Llama:', JSON.stringify(llamaPrices));
+  console.log('DeFi Llama prices:', JSON.stringify(llamaPrices));
 
-  // Function selectors:
-  // balanceOfUnderlying(address) = 0x3af9e669 ... actually let's use getAccountSnapshot
-  // getAccountSnapshot(address) = 0xc37f428e
-  // borrowBalanceStored(address) = 0x95dd9193
-  // balanceOf(address) = 0x70a08231
-  // exchangeRateStored() = 0x182df0f5
+  await sleep(1000); // wait 1s before hitting Base RPC again
 
   for (const market of RAW_MARKETS) {
     try {
@@ -325,49 +333,39 @@ async function getMoonwellUSD() {
       if (!price) { console.error(`${market.key}: no price`); continue; }
 
       if (market.type === 'supply') {
-        // Try getAccountSnapshot — returns (error, mTokenBal, borrowBal, exchangeRate)
-        // selector: 0xc37f428e
+        // getAccountSnapshot(address) — selector 0xc37f428e
         const snapData = encodeCall('c37f428e', WALLET_EVM);
-        const snapHex  = await ethCall(BASE_RPC, market.mAddr, snapData);
-        console.log(`${market.key} snapshot raw: ${snapHex?.slice(0, 100)}`);
+        const snapHex  = await ethCallWithFallback(market.mAddr, snapData);
+        console.log(`${market.key} snapshot: ${snapHex?.slice(0, 130)}`);
 
-        if (snapHex && snapHex !== '0x' && snapHex.length > 10) {
-          // Decode 4 uint256 values: error, mTokenBal, borrowBal, exchangeRate
-          const decoded = [];
+        if (snapHex && snapHex !== '0x' && snapHex.length >= 258) {
+          // Decode 4 uint256: [error, mTokenBal, borrowBal, exchangeRate]
+          const vals = [];
           for (let i = 2; i < snapHex.length; i += 64) {
-            decoded.push(BigInt('0x' + snapHex.slice(i, i + 64)));
+            vals.push(BigInt('0x' + snapHex.slice(i, i + 64)));
           }
-          console.log(`${market.key} decoded: [${decoded.map(x => x.toString()).join(', ')}]`);
+          const mBal     = Number(vals[1] ?? 0n);
+          const exchRate = Number(vals[3] ?? 0n);
+          console.log(`  mBal: ${mBal}, exchRate: ${exchRate}`);
 
-          if (decoded.length >= 4) {
-            const mBal    = Number(decoded[1]);
-            const exchRate = Number(decoded[3]);
-
-            if (mBal > 0 && exchRate > 0) {
-              // underlying = mBal * exchangeRate / (10^8 * 10^18)
-              // mToken has 8 decimals, exchangeRate scaled by 1e18
-              const underlying = mBal * exchRate / Math.pow(10, 8 + 18);
-              const supplyUSD  = underlying * price;
-              console.log(`${market.key}: ${underlying.toFixed(4)} × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)}`);
-              if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD };
-            } else {
-              console.log(`${market.key}: zero balance`);
-            }
+          if (mBal > 0 && exchRate > 0) {
+            // underlying = mBal * exchRate / (10^8 * 10^18)
+            const underlying = mBal * exchRate / Math.pow(10, 26);
+            const supplyUSD  = underlying * price;
+            console.log(`${market.key}: ${underlying.toFixed(4)} × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)}`);
+            if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD };
+          } else {
+            console.log(`${market.key}: zero balance`);
           }
-        } else {
-          // Try balanceOf as last resort
-          const balData = encodeCall('70a08231', WALLET_EVM);
-          const balHex  = await ethCall(BASE_RPC, market.mAddr, balData);
-          console.log(`${market.key} balanceOf raw: ${balHex}`);
         }
 
       } else {
-        // Borrow: use borrowBalanceStored selector 0x95dd9193
+        // borrowBalanceStored(address) — selector 0x95dd9193
         const borrowData = encodeCall('95dd9193', WALLET_EVM);
-        const borrowHex  = await ethCall(BASE_RPC, market.mAddr, borrowData);
-        console.log(`${market.key} borrowBalanceStored raw: ${borrowHex}`);
+        const borrowHex  = await ethCallWithFallback(market.mAddr, borrowData);
+        console.log(`${market.key} borrow: ${borrowHex}`);
 
-        if (borrowHex && borrowHex !== '0x' && borrowHex.length > 10) {
+        if (borrowHex && borrowHex !== '0x' && borrowHex.length >= 66) {
           const borrowRaw = BigInt('0x' + borrowHex.slice(2).padStart(64, '0'));
           const borrowUSD = Number(borrowRaw) / Math.pow(10, market.underlyingDec);
           console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)}`);
@@ -375,6 +373,7 @@ async function getMoonwellUSD() {
         }
       }
 
+      await sleep(500);
     } catch (e) {
       console.error(`${market.key}: ${e.message.slice(0, 80)}`);
     }
@@ -388,7 +387,7 @@ async function getMoonwellUSD() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v16 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v17 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
