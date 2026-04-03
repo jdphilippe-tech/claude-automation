@@ -1,7 +1,7 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v21
-// Adds to lending records: Token Amount, Supply APY %, Borrow APY %
-// APYs sourced from DeFi Llama pools (same as Airtable rate check script)
+// Daily Portfolio Check — GitHub Actions v21-final
+// Fix: borrow APY field — try apyBaseBorrow then apyBorrow
+// Schedule: 14:00 UTC = 7:00 AM PDT (update workflow cron accordingly)
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -43,9 +43,9 @@ const LF = {
   date:       'fldUksu7BXYunAADh',
   supplyUSD:  'fldJ7T452iqgQNiWb',
   borrowUSD:  'fldTSqf1Yrxg7O0tr',
-  tokenAmt:   'fldrWm55G12S1qQjY',   // Token Amount
-  supplyAPY:  'fldJLDy5yOHq8S6RS',   // Supply APY %
-  borrowAPY:  'fldWHlp8HCuMYGc9e',   // Borrow APY %
+  tokenAmt:   'fldrWm55G12S1qQjY',
+  supplyAPY:  'fldJLDy5yOHq8S6RS',
+  borrowAPY:  'fldWHlp8HCuMYGc9e',
   notes:      'fldHzWRmzI1H3zueM',
 };
 
@@ -67,15 +67,6 @@ const LPOS = {
 };
 
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
-
-// DeFi Llama pool IDs for Moonwell Base markets (supply APY)
-const LLAMA_POOL_IDS = {
-  moonwellETH:    'f4156e9a-4134-415c-a6d9-23e9a1a0bb2b',
-  moonwellVIRT:   'c2a3aa4f-4d02-45e0-8ce3-0b7c2f0d29d6',
-  moonwellCBXRP:  '99d2a0a6-bfcc-4e11-aab6-aba30e7d57aa',
-  moonwellAERO:   '5d1eca59-eb5e-4765-831e-3b1e7e7ca3e3',
-  moonwellBorrow: 'b8de2e3f-7a34-4c1d-bef0-c7d37f7e5a3e', // USDC borrow pool
-};
 
 const MARKETS = [
   { key: 'moonwellETH',   mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, type: 'supply', method: 'oracle' },
@@ -201,7 +192,6 @@ async function getWethPosition() {
 
 // ============================================================
 // MODULE 3 — Moonwell (Base via Alchemy)
-// Gets: USD value, token amount, supply/borrow APY
 // ============================================================
 
 async function getMoonwellData() {
@@ -238,29 +228,36 @@ async function getMoonwellData() {
     }
   }
 
-  // DeFi Llama pools for APYs
+  // DeFi Llama pools for APYs — log all Moonwell Base pool symbols to debug
   const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
-  const moonwellPools = {};
+  const moonwellPools  = {};
   if (llamaPoolsData?.data) {
-    for (const pool of llamaPoolsData.data) {
-      if (pool.project === 'moonwell-lending' && pool.chain === 'Base') {
-        const sym = pool.symbol?.toUpperCase();
-        if (sym === 'ETH')    moonwellPools['moonwellETH']    = pool;
-        if (sym === 'VIRTUAL') moonwellPools['moonwellVIRT']  = pool;
-        if (sym === 'CBXRP')  moonwellPools['moonwellCBXRP']  = pool;
-        if (sym === 'AERO')   moonwellPools['moonwellAERO']   = pool;
-        if (sym === 'USDC')   moonwellPools['moonwellBorrow'] = pool;
-      }
+    const basePools = llamaPoolsData.data.filter(
+      p => p.project === 'moonwell-lending' && p.chain === 'Base'
+    );
+    // Log all symbols so we can see exact names
+    console.log('Moonwell Base pools:', basePools.map(p => `${p.symbol}(supply:${p.apy?.toFixed(2)}%,borrow:${(p.apyBaseBorrow ?? p.apyBorrow)?.toFixed(2)}%)`).join(', '));
+
+    for (const pool of basePools) {
+      const sym = pool.symbol?.toUpperCase();
+      if (sym === 'ETH')     moonwellPools['moonwellETH']    = pool;
+      if (sym === 'VIRTUAL') moonwellPools['moonwellVIRT']   = pool;
+      if (sym === 'CBXRP')  moonwellPools['moonwellCBXRP']  = pool;
+      if (sym === 'AERO')   moonwellPools['moonwellAERO']   = pool;
+      if (sym === 'USDC')   moonwellPools['moonwellBorrow'] = pool;
     }
   }
-  console.log(`APY pools found: ${Object.keys(moonwellPools).join(', ')}`);
 
   for (const market of MARKETS) {
     try {
       const mToken = new ethers.Contract(market.mAddr, mTokenABI, provider);
       const pool   = moonwellPools[market.key];
+
+      // Supply APY — straightforward
       const supplyAPY = pool?.apy ?? null;
-      const borrowAPY = pool?.apyBaseBorrow ?? null;
+
+      // Borrow APY — DeFi Llama uses different field names
+      const borrowAPY = pool?.apyBaseBorrow ?? pool?.apyBorrow ?? null;
 
       if (market.method === 'oracle' && oracle) {
         const oracleRaw = await oracle.getUnderlyingPrice(market.mAddr);
@@ -268,7 +265,7 @@ async function getMoonwellData() {
         const balRaw    = await mToken.balanceOfUnderlying.staticCall(WALLET_EVM);
         const tokens    = Number(balRaw) / Math.pow(10, market.underlyingDec);
         const supplyUSD = tokens * priceUSD;
-        console.log(`${market.key}: ${tokens.toFixed(4)} tokens × $${priceUSD.toFixed(4)} = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY?.toFixed(2)}%`);
+        console.log(`${market.key}: ${tokens.toFixed(4)} tokens × $${priceUSD.toFixed(4)} = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2)}%`);
         if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD, tokens, supplyAPY };
 
       } else if (market.method === 'mtoken') {
@@ -280,20 +277,19 @@ async function getMoonwellData() {
           mToken.exchangeRateStored(),
         ]);
 
-        // underlying_display = mBal * exchRate / 10^(18 + underlyingDec)
-        const mBalBig   = BigInt(mBalRaw.toString());
-        const exchBig   = BigInt(exchRaw.toString());
-        const divisor   = BigInt(10) ** BigInt(18 + market.underlyingDec);
+        const mBalBig    = BigInt(mBalRaw.toString());
+        const exchBig    = BigInt(exchRaw.toString());
+        const divisor    = BigInt(10) ** BigInt(18 + market.underlyingDec);
         const underlying = Number(mBalBig * exchBig / divisor);
         const supplyUSD  = underlying * price;
-        console.log(`${market.key}: ${underlying.toFixed(4)} tokens × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY?.toFixed(2)}%`);
+        console.log(`${market.key}: ${underlying.toFixed(4)} tokens × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2)}%`);
         if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD, tokens: underlying, supplyAPY };
 
       } else if (market.method === 'borrow') {
         const borrowRaw = await mToken.borrowBalanceStored(WALLET_EVM);
         const borrowUSD = Number(borrowRaw) / Math.pow(10, market.underlyingDec);
-        const tokens    = Number(borrowRaw) / Math.pow(10, market.underlyingDec);
-        console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)} | Borrow APY: ${borrowAPY?.toFixed(2)}%`);
+        const tokens    = borrowUSD; // USDC: 1:1
+        console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)} | borrowAPY: ${borrowAPY?.toFixed(2)}%`);
         if (borrowUSD > 0.01) results[market.key] = { type: 'borrow', borrowUSD, tokens, borrowAPY };
       }
 
@@ -310,7 +306,7 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v21 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v21-final — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
@@ -351,21 +347,15 @@ async function main() {
     for (const [posKey, data] of Object.entries(moonwell)) {
       if (!LPOS[posKey]) continue;
       if (data.type === 'supply') {
-        const fields = {
-          [LF.supplyUSD]: data.supplyUSD,
-          [LF.tokenAmt]:  data.tokens,
-        };
+        const fields = { [LF.supplyUSD]: data.supplyUSD, [LF.tokenAmt]: data.tokens };
         if (data.supplyAPY != null) fields[LF.supplyAPY] = data.supplyAPY;
         batch.push(lendingRecord(LPOS[posKey], fields));
-        console.log(`  Queued ${posKey}: $${data.supplyUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, APY ${data.supplyAPY?.toFixed(2)}%`);
+        console.log(`  Queued ${posKey}: $${data.supplyUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, APY ${data.supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       } else if (data.type === 'borrow') {
-        const fields = {
-          [LF.borrowUSD]: data.borrowUSD,
-          [LF.tokenAmt]:  data.tokens,
-        };
+        const fields = { [LF.borrowUSD]: data.borrowUSD, [LF.tokenAmt]: data.tokens };
         if (data.borrowAPY != null) fields[LF.borrowAPY] = data.borrowAPY;
         batch.push(lendingRecord(LPOS[posKey], fields));
-        console.log(`  Queued ${posKey}: $${data.borrowUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, Borrow APY ${data.borrowAPY?.toFixed(2)}%`);
+        console.log(`  Queued ${posKey}: $${data.borrowUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, Borrow APY ${data.borrowAPY?.toFixed(2) ?? 'n/a'}%`);
       }
     }
     if (batch.length > 0) {
