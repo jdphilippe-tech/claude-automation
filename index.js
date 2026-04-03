@@ -1,6 +1,6 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v21-final
-// Fix: borrow APY field — try apyBaseBorrow then apyBorrow
+// Daily Portfolio Check — GitHub Actions v24
+// Fix: Moonwell borrow APY derived on-chain via borrowRatePerTimestamp()
 // Schedule: 14:00 UTC = 7:00 AM PDT (update workflow cron accordingly)
 // ============================================================
 
@@ -152,7 +152,6 @@ async function getWethPosition() {
     const posABI     = ['function positions(uint256 tokenId) external view returns (uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128)'];
     const factoryABI = ['function getPool(address,address,uint24) external view returns (address)'];
     const poolABI    = ['function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16, uint16, uint16, uint8, bool)'];
-    // collect staticCall returns uncollected fees without spending gas
     const collectABI = ['function collect((uint256 tokenId, address recipient, uint128 amount0Max, uint128 amount1Max)) external returns (uint256 amount0, uint256 amount1)'];
 
     const nft        = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', posABI, provider);
@@ -186,7 +185,6 @@ async function getWethPosition() {
 
     const positionValue = (amount0 * ethPrice) + amount1;
 
-    // Read uncollected fees via collect.staticCall (read-only, no gas)
     const MAX128 = BigInt('0xffffffffffffffffffffffffffffffff');
     const nftCollect = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', collectABI, provider);
     let feeValue = 0;
@@ -214,7 +212,7 @@ async function getWethPosition() {
 }
 
 // ============================================================
-// MODULE 3 — Moonwell (Base via Alchemy)
+// MODULE 3 — Moonwell (Base)
 // ============================================================
 
 async function getMoonwellData() {
@@ -227,6 +225,7 @@ async function getMoonwellData() {
     'function balanceOf(address account) external view returns (uint)',
     'function exchangeRateStored() external view returns (uint)',
     'function borrowBalanceStored(address account) external view returns (uint)',
+    'function borrowRatePerTimestamp() external view returns (uint)',  // ← v24: on-chain borrow APY
   ];
   const comptrollerABI = ['function oracle() external view returns (address)'];
   const oracleABI      = ['function getUnderlyingPrice(address mToken) external view returns (uint)'];
@@ -251,23 +250,20 @@ async function getMoonwellData() {
     }
   }
 
-  // DeFi Llama pools for APYs — log all Moonwell Base pool symbols to debug
+  // DeFi Llama pools for supply APYs only (borrow APY now derived on-chain)
   const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
   const moonwellPools  = {};
   if (llamaPoolsData?.data) {
     const basePools = llamaPoolsData.data.filter(
       p => p.project === 'moonwell-lending' && p.chain === 'Base'
     );
-    // Log all symbols so we can see exact names
-    console.log('Moonwell Base pools:', basePools.map(p => `${p.symbol}(supply:${p.apy?.toFixed(2)}%,borrow:${(p.apyBaseBorrow ?? p.apyBorrow)?.toFixed(2)}%)`).join(', '));
-
     for (const pool of basePools) {
       const sym = pool.symbol?.toUpperCase();
       if (sym === 'ETH')     moonwellPools['moonwellETH']    = pool;
       if (sym === 'VIRTUAL') moonwellPools['moonwellVIRT']   = pool;
-      if (sym === 'CBXRP')  moonwellPools['moonwellCBXRP']  = pool;
-      if (sym === 'AERO')   moonwellPools['moonwellAERO']   = pool;
-      if (sym === 'USDC')   moonwellPools['moonwellBorrow'] = pool;
+      if (sym === 'CBXRP')   moonwellPools['moonwellCBXRP']  = pool;
+      if (sym === 'AERO')    moonwellPools['moonwellAERO']   = pool;
+      if (sym === 'USDC')    moonwellPools['moonwellBorrow'] = pool;
     }
   }
 
@@ -276,11 +272,8 @@ async function getMoonwellData() {
       const mToken = new ethers.Contract(market.mAddr, mTokenABI, provider);
       const pool   = moonwellPools[market.key];
 
-      // Supply APY — straightforward
+      // Supply APY from DeFi Llama
       const supplyAPY = pool?.apy ?? null;
-
-      // Borrow APY — DeFi Llama uses different field names
-      const borrowAPY = pool?.apyBaseBorrow ?? pool?.apyBorrow ?? null;
 
       if (market.method === 'oracle' && oracle) {
         const oracleRaw = await oracle.getUnderlyingPrice(market.mAddr);
@@ -312,6 +305,17 @@ async function getMoonwellData() {
         const borrowRaw = await mToken.borrowBalanceStored(WALLET_EVM);
         const borrowUSD = Number(borrowRaw) / Math.pow(10, market.underlyingDec);
         const tokens    = borrowUSD; // USDC: 1:1
+
+        // Derive borrow APY on-chain — DeFi Llama doesn't populate this for Moonwell Base
+        let borrowAPY = null;
+        try {
+          const rateRaw    = await mToken.borrowRatePerTimestamp();
+          const ratePerSec = Number(rateRaw) / 1e18;
+          borrowAPY        = ((1 + ratePerSec) ** 31_536_000 - 1) * 100;
+        } catch (e) {
+          console.error(`borrowRatePerTimestamp failed: ${e.message.slice(0, 60)}`);
+        }
+
         console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)} | borrowAPY: ${borrowAPY?.toFixed(2)}%`);
         if (borrowUSD > 0.01) results[market.key] = { type: 'borrow', borrowUSD, tokens, borrowAPY };
       }
@@ -329,7 +333,7 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v23 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v24 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
