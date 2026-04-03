@@ -1,6 +1,6 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v8
-// Uses @moonwell-fi/moonwell-sdk for clean Moonwell data
+// Daily Portfolio Check — GitHub Actions v9
+// Fix: BigInt serialization, SDK array format handling
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -65,15 +65,24 @@ const LPOS = {
   moonwellBorrow: 'recJ2skZuwzu9f1xY',
 };
 
-// Maps underlying token symbols to lending position record keys
-// We print all symbols in debug so we can refine these
-function matchSymbolToPosition(symbol) {
-  const s = symbol.toLowerCase();
-  if (s === 'weth' || s === 'eth')         return 'moonwellETH';
-  if (s.includes('virtual') || s === 'virtual') return 'moonwellVIRT';
-  if (s.includes('xrp') || s === 'cbxrp') return 'moonwellCBXRP';
-  if (s === 'aero')                        return 'moonwellAERO';
-  if (s === 'usdc')                        return 'moonwellBorrow';
+// Safe BigInt-aware JSON stringify
+function safeStr(obj, maxLen = 600) {
+  try {
+    return JSON.stringify(obj, (_, v) => typeof v === 'bigint' ? v.toString() : v).slice(0, maxLen);
+  } catch {
+    return String(obj).slice(0, maxLen);
+  }
+}
+
+// Match any string to a lending position key
+function matchToPosition(str) {
+  if (!str) return null;
+  const s = str.toString().toLowerCase();
+  if (s.includes('virtual'))                          return 'moonwellVIRT';
+  if (s.includes('xrp') || s.includes('cbxrp'))      return 'moonwellCBXRP';
+  if (s.includes('aero'))                             return 'moonwellAERO';
+  if (s === 'weth' || s === 'eth' || s === 'mweth' || s === 'meth') return 'moonwellETH';
+  if (s === 'usdc' || s === 'musdc')                  return 'moonwellBorrow';
   return null;
 }
 
@@ -216,7 +225,7 @@ async function getWethPosition() {
 
 // ============================================================
 // MODULE 3 — Moonwell USD values via official SDK
-// getUserBalances returns all positions in one call
+// Handles BigInt values and array response format
 // ============================================================
 
 async function getMoonwellUSD() {
@@ -225,85 +234,72 @@ async function getMoonwellUSD() {
 
   try {
     const moonwellClient = createMoonwellClient({
-      networks: {
-        base: {
-          rpcUrls: [BASE_RPC],
-        },
-      },
+      networks: { base: { rpcUrls: [BASE_RPC] } },
     });
 
-    // getUserBalances returns supply/borrow positions for a wallet
+    // getUserBalances returns position data for a wallet
     const balances = await moonwellClient.getUserBalances({
       userAddress: WALLET_EVM,
-      networkId: 'base',
+      networkId:   'base',
     });
 
-    console.log('Moonwell balances keys:', Object.keys(balances ?? {}).join(', '));
-
-    // Log the full structure so we can see the exact format
-    if (balances) {
-      console.log('Balances sample:', JSON.stringify(balances).slice(0, 800));
+    if (!balances) {
+      console.log('No balances returned from SDK');
+      return results;
     }
 
-    // Process supply positions
-    const supplies = balances?.supplyBalances ?? balances?.supplies ?? balances?.positions ?? [];
-    const borrows  = balances?.borrowBalances ?? balances?.borrows  ?? [];
+    // The SDK returns an array-like object — iterate over its values
+    const items = Array.isArray(balances)
+      ? balances
+      : Object.values(balances);
 
-    console.log(`Supply positions: ${Array.isArray(supplies) ? supplies.length : Object.keys(supplies ?? {}).length}`);
-    console.log(`Borrow positions: ${Array.isArray(borrows)  ? borrows.length  : Object.keys(borrows  ?? {}).length}`);
+    console.log(`SDK returned ${items.length} items`);
 
-    // Handle array format
-    if (Array.isArray(supplies)) {
-      for (const pos of supplies) {
-        const symbol  = pos.symbol ?? pos.underlyingSymbol ?? pos.asset?.symbol ?? '';
-        const usdVal  = parseFloat(pos.supplyBalanceUsd ?? pos.balanceUsd ?? pos.valueUsd ?? 0);
-        console.log(`  Supply: ${symbol} = $${usdVal.toFixed(2)}`);
-        const posKey = matchSymbolToPosition(symbol);
-        if (posKey && posKey !== 'moonwellBorrow' && usdVal > 0.01) {
-          results[posKey] = { type: 'supply', supplyUSD: usdVal };
-        }
+    for (const item of items) {
+      // Print first few items to understand structure
+      if (Object.keys(results).length === 0) {
+        console.log('Sample item keys:', Object.keys(item ?? {}).join(', '));
+        console.log('Sample item:', safeStr(item));
       }
-    }
 
-    // Handle object format (keyed by market address)
-    if (!Array.isArray(supplies) && typeof supplies === 'object') {
-      for (const [addr, pos] of Object.entries(supplies)) {
-        const symbol = pos.symbol ?? pos.underlyingSymbol ?? '';
-        const usdVal = parseFloat(pos.supplyBalanceUsd ?? pos.balanceUsd ?? 0);
-        console.log(`  Supply ${symbol}: $${usdVal.toFixed(2)}`);
-        const posKey = matchSymbolToPosition(symbol);
-        if (posKey && posKey !== 'moonwellBorrow' && usdVal > 0.01) {
-          results[posKey] = { type: 'supply', supplyUSD: usdVal };
-        }
-      }
-    }
+      if (!item) continue;
 
-    // Handle borrow
-    if (Array.isArray(borrows)) {
-      for (const pos of borrows) {
-        const symbol = pos.symbol ?? pos.underlyingSymbol ?? '';
-        const usdVal = parseFloat(pos.borrowBalanceUsd ?? pos.balanceUsd ?? 0);
-        console.log(`  Borrow: ${symbol} = $${usdVal.toFixed(2)}`);
-        if (matchSymbolToPosition(symbol) === 'moonwellBorrow' && usdVal > 0.01) {
-          results['moonwellBorrow'] = { type: 'borrow', borrowUSD: usdVal };
-        }
+      // Extract symbol — try multiple possible field paths
+      const symbol =
+        item.symbol ??
+        item.underlyingSymbol ??
+        item.asset?.symbol ??
+        item.market?.underlyingSymbol ??
+        item.token?.symbol ??
+        '';
+
+      // Extract USD values — try multiple possible field paths
+      const supplyUSD = parseFloat(
+        item.supplyBalanceUsd ?? item.supplyUsd ?? item.balanceUsd ??
+        item.supplyBalance?.usd ?? item.supply?.usd ?? 0
+      );
+      const borrowUSD = parseFloat(
+        item.borrowBalanceUsd ?? item.borrowUsd ??
+        item.borrowBalance?.usd ?? item.borrow?.usd ?? 0
+      );
+
+      if (symbol) console.log(`  ${symbol}: supply $${supplyUSD.toFixed(2)}, borrow $${borrowUSD.toFixed(2)}`);
+
+      const posKey = matchToPosition(symbol);
+      if (!posKey) continue;
+
+      if (posKey === 'moonwellBorrow' && borrowUSD > 0.01) {
+        results[posKey] = { type: 'borrow', borrowUSD };
+      } else if (posKey !== 'moonwellBorrow' && supplyUSD > 0.01) {
+        results[posKey] = { type: 'supply', supplyUSD };
       }
     }
 
   } catch (e) {
     console.error(`Moonwell SDK error: ${e.message}`);
-
-    // Fallback: use DeFi Llama Moonwell ponder endpoint
-    console.log('Trying Moonwell ponder fallback...');
-    const ponder = await fetchWithTimeout(
-      `https://ponder.moonwell.fi/positions/${WALLET_EVM.toLowerCase()}`
-    );
-    if (ponder) {
-      console.log('Ponder response:', JSON.stringify(ponder).slice(0, 500));
-    }
   }
 
-  console.log(`Moonwell results found: ${Object.keys(results).length}`);
+  console.log(`Moonwell positions matched: ${Object.keys(results).join(', ') || 'none'}`);
   return results;
 }
 
@@ -312,7 +308,7 @@ async function getMoonwellUSD() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v8 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v9 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
@@ -369,10 +365,10 @@ async function main() {
     const batch = [];
     for (const [posKey, data] of Object.entries(moonwell)) {
       if (!LPOS[posKey]) continue;
-      if (data.type === 'supply' && data.supplyUSD != null) {
+      if (data.type === 'supply' && data.supplyUSD > 0) {
         batch.push(lendingRecord(LPOS[posKey], { [LF.supplyUSD]: data.supplyUSD }));
         console.log(`  Queued ${posKey}: supply $${data.supplyUSD.toFixed(2)}`);
-      } else if (data.type === 'borrow' && data.borrowUSD != null) {
+      } else if (data.type === 'borrow' && data.borrowUSD > 0) {
         batch.push(lendingRecord(LPOS[posKey], { [LF.borrowUSD]: data.borrowUSD }));
         console.log(`  Queued ${posKey}: borrow $${data.borrowUSD.toFixed(2)}`);
       }
