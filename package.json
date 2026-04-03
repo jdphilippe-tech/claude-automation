@@ -6,7 +6,6 @@
   "type": "module",
   "dependencies": {
     "node-fetch": "^3.3.2",
-    "ethers": "^6.11.1",
-    "@moonwell-fi/moonwell-sdk": "latest"
+    "ethers": "^6.11.1"
   }
 }
