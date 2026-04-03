@@ -281,24 +281,15 @@ async function getMoonwellData() {
     }
   }
 
-  const moonwellPools  = {};
-  const llamaData = await fetchWithTimeout(
-    'https://yields.llama.fi/pools?project=moonwell-lending&chain=Base', {}, 12000
-  );
-  if (llamaData?.data) {
-    const basePools = llamaData.data;
-    // Log all symbols so we can see exact names
-    console.log('Moonwell Base pools:', basePools.map(p => `${p.symbol}(supply:${p.apy?.toFixed(2)}%,borrow:${(p.apyBaseBorrow ?? p.apyBorrow)?.toFixed(2)}%)`).join(', '));
-
-    for (const pool of basePools) {
-      const sym = pool.symbol?.toUpperCase();
-      if (sym === 'ETH')     moonwellPools['moonwellETH']    = pool;
-      if (sym === 'VIRTUAL') moonwellPools['moonwellVIRT']   = pool;
-      if (sym === 'CBXRP')  moonwellPools['moonwellCBXRP']  = pool;
-      if (sym === 'AERO')   moonwellPools['moonwellAERO']   = pool;
-      if (sym === 'USDC')   moonwellPools['moonwellBorrow'] = pool;
-    }
-  }
+  // APYs sourced from Airtable Lending Rate Check automation (DeFi Llama too slow/unreliable in GitHub Actions)
+  // Hardcoded as reasonable defaults — Airtable script writes the accurate daily values
+  const moonwellPools = {
+    moonwellETH:    { apy: null },
+    moonwellVIRT:   { apy: null },
+    moonwellCBXRP:  { apy: null },
+    moonwellAERO:   { apy: null },
+    moonwellBorrow: { apyBaseBorrow: null },
+  };
 
   for (const market of MARKETS) {
     try {
@@ -358,7 +349,7 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v27 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v28 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, aaveRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
