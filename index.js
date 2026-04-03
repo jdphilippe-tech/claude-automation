@@ -1,8 +1,8 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v11
-// Fix: AERO, cbXRP, USDC borrow contract addresses
-//      Use borrowBalanceStored (view) instead of borrowBalanceCurrent
-//      Use exchangeRateStored + balanceOf for supply calculation
+// Daily Portfolio Check — GitHub Actions v12
+// Moonwell: use staticCall (confirmed working for ETH/VIRTUAL)
+//           fix exchange rate math for ETH supply
+//           debug oracle revert for AERO/cbXRP/USDC
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -66,23 +66,16 @@ const LPOS = {
   moonwellBorrow: 'recJ2skZuwzu9f1xY',
 };
 
-// Moonwell Comptroller and Oracle on Base
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
-// ---- Moonwell mToken addresses (verified from SDK) ----
-// Using balanceOf + exchangeRateStored for supply (pure view functions)
-// Using borrowBalanceStored for borrow (pure view function)
+// Verified mToken addresses from Moonwell SDK output
+// underlyingDec = underlying token decimals
 const MOONWELL_MARKETS = [
-  // mWETH — confirmed working
-  { key: 'moonwellETH',   mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, mDec: 8,  type: 'supply' },
-  // mVIRTUAL — confirmed working
-  { key: 'moonwellVIRT',  mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, mDec: 8,  type: 'supply' },
-  // mcbXRP — from SDK output
-  { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingDec: 6,  mDec: 8,  type: 'supply' },
-  // mAERO — from SDK output (different from earlier attempt)
-  { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingDec: 18, mDec: 8,  type: 'supply' },
-  // mUSDC — borrow position
-  { key: 'moonwellBorrow',mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  mDec: 8,  type: 'borrow' },
+  { key: 'moonwellETH',   mAddr: '0x628ff693426583D9a7FB391E54366292F509D457', underlyingDec: 18, type: 'supply' },
+  { key: 'moonwellVIRT',  mAddr: '0xdE8Df9d942D78edE3Ca06e60712582F79CFfFC64', underlyingDec: 18, type: 'supply' },
+  { key: 'moonwellCBXRP', mAddr: '0xb4fb8fed5b3AaA8434f0B19b1b623d977e07e86d', underlyingDec: 6,  type: 'supply' },
+  { key: 'moonwellAERO',  mAddr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', underlyingDec: 18, type: 'supply' },
+  { key: 'moonwellBorrow',mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  type: 'borrow' },
 ];
 
 // ============================================================
@@ -144,17 +137,13 @@ function lendingRecord(positionId, extra = {}) {
 }
 
 // ============================================================
-// MODULE 1 — LIGHTER (principal_amount)
+// MODULE 1 — LIGHTER
 // ============================================================
 
 async function getLighterData() {
   console.log('\n--- Lighter ---');
   const results = { llp: null, edgeHedge: null, lit: null };
-
-  const data = await fetchWithTimeout(
-    `${LIGHTER_BASE_URL}/account?by=index&value=${LIGHTER_ACCOUNT_IDX}`
-  );
-
+  const data = await fetchWithTimeout(`${LIGHTER_BASE_URL}/account?by=index&value=${LIGHTER_ACCOUNT_IDX}`);
   if (data?.accounts?.[0]?.shares) {
     for (const share of data.accounts[0].shares) {
       const poolIdx   = Number(share.public_pool_index);
@@ -164,35 +153,31 @@ async function getLighterData() {
       if (poolIdx === POOL_LIT)        results.lit       = principal;
     }
   }
-
   console.log(`LLP: $${results.llp}, Edge&Hedge: $${results.edgeHedge}, LIT: $${results.lit}`);
   return results;
 }
 
 // ============================================================
-// MODULE 2 — WETH/USDC PRIMARY (Arbitrum on-chain RPC)
+// MODULE 2 — WETH/USDC PRIMARY
 // ============================================================
 
 async function getWethPosition() {
   console.log('\n--- WETH/USDC Primary ---');
   try {
-    const provider = new ethers.JsonRpcProvider(ARBITRUM_RPC);
-
+    const provider   = new ethers.JsonRpcProvider(ARBITRUM_RPC);
     const posABI     = ['function positions(uint256 tokenId) external view returns (uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128)'];
     const factoryABI = ['function getPool(address,address,uint24) external view returns (address)'];
     const poolABI    = ['function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16, uint16, uint16, uint8, bool)'];
 
     const nft      = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', posABI, provider);
     const raw      = await nft.positions(WETH_POS_ID);
-    const token0 = raw[2], token1 = raw[3], fee = raw[4];
     const tickLowerN = Number(raw[5]);
     const tickUpperN = Number(raw[6]);
     const liquidity  = raw[7];
 
     const factory  = new ethers.Contract('0x1F98431c8aD98523631AE4a59f267346ea31F984', factoryABI, provider);
-    const poolAddr = await factory.getPool(token0, token1, fee);
-    const pool     = new ethers.Contract(poolAddr, poolABI, provider);
-    const slot0    = await pool.slot0();
+    const poolAddr = await factory.getPool(raw[2], raw[3], raw[4]);
+    const slot0    = await (new ethers.Contract(poolAddr, poolABI, provider)).slot0();
 
     const currentTick  = Number(slot0.tick);
     const inRange      = currentTick >= tickLowerN && currentTick < tickUpperN;
@@ -224,25 +209,44 @@ async function getWethPosition() {
 
 // ============================================================
 // MODULE 3 — Moonwell USD values
-// Uses pure view functions: balanceOf, exchangeRateStored, borrowBalanceStored
-// These never revert unlike non-view functions
+// Strategy:
+// 1. Get oracle from Comptroller
+// 2. For each market: get oracle price first
+//    - If oracle fails for a market, try CoinGecko as fallback
+// 3. Get underlying balance via balanceOfUnderlying.staticCall
+//    - If that fails, try balanceOf + exchangeRateStored
+// 4. Multiply balance × price = USD
 // ============================================================
+
+// CoinGecko IDs for fallback pricing
+const COINGECKO_IDS = {
+  moonwellETH:    'ethereum',
+  moonwellVIRT:   'virtual-protocol',
+  moonwellCBXRP:  'ripple',
+  moonwellAERO:   'aerodrome-finance',
+  moonwellBorrow: 'usd-coin',
+};
+
+async function getCoingeckoPrice(coinId) {
+  const data = await fetchWithTimeout(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd`
+  );
+  return data?.[coinId]?.usd ?? null;
+}
 
 async function getMoonwellUSD() {
   console.log('\n--- Moonwell USD ---');
   const provider = new ethers.JsonRpcProvider(BASE_RPC);
   const results  = {};
 
-  // Get oracle from Comptroller
   const comptrollerABI = ['function oracle() external view returns (address)'];
   const oracleABI      = ['function getUnderlyingPrice(address mToken) external view returns (uint)'];
-
-  // Use pure view functions only — no staticCall needed
-  const mTokenABI = [
-    'function balanceOf(address account) external view returns (uint)',          // mToken balance
-    'function exchangeRateStored() external view returns (uint)',                 // exchange rate (view)
-    'function borrowBalanceStored(address account) external view returns (uint)', // borrow balance (view)
-    'function decimals() external view returns (uint8)',
+  const mTokenABI      = [
+    'function balanceOfUnderlying(address owner) external returns (uint)',
+    'function borrowBalanceCurrent(address account) external returns (uint)',
+    'function balanceOf(address account) external view returns (uint)',
+    'function exchangeRateStored() external view returns (uint)',
+    'function borrowBalanceStored(address account) external view returns (uint)',
   ];
 
   let oracle;
@@ -250,8 +254,9 @@ async function getMoonwellUSD() {
     const comptroller = new ethers.Contract(COMPTROLLER, comptrollerABI, provider);
     const oracleAddr  = await comptroller.oracle();
     oracle = new ethers.Contract(oracleAddr, oracleABI, provider);
+    console.log(`Oracle: ${oracleAddr}`);
   } catch (e) {
-    console.error(`Comptroller error: ${e.message}`);
+    console.error(`Comptroller: ${e.message}`);
     return results;
   }
 
@@ -259,46 +264,80 @@ async function getMoonwellUSD() {
     try {
       const mToken = new ethers.Contract(market.mAddr, mTokenABI, provider);
 
-      // Get oracle price
-      // Moonwell Chainlink oracle: price * 1e(36 - underlyingDecimals) = USD/token * 1e18
-      const oracleRaw = await oracle.getUnderlyingPrice(market.mAddr);
-      const scalePow  = 36 - market.underlyingDec;
-      const priceUSD  = Number(oracleRaw) / Math.pow(10, scalePow);
+      // Step 1: Get price — try oracle first, fallback to CoinGecko
+      let priceUSD = null;
+      try {
+        const oracleRaw = await oracle.getUnderlyingPrice(market.mAddr);
+        const scalePow  = 36 - market.underlyingDec;
+        priceUSD        = Number(oracleRaw) / Math.pow(10, scalePow);
+        console.log(`${market.key}: oracle price $${priceUSD.toFixed(4)}`);
+      } catch (e) {
+        console.log(`${market.key}: oracle failed (${e.message.slice(0, 40)}), trying CoinGecko...`);
+        priceUSD = await getCoingeckoPrice(COINGECKO_IDS[market.key]);
+        if (priceUSD) {
+          console.log(`${market.key}: CoinGecko price $${priceUSD}`);
+        } else {
+          console.error(`${market.key}: no price available — skipping`);
+          continue;
+        }
+      }
 
+      // Step 2: Get balance
       if (market.type === 'supply') {
-        // Supply balance = mToken balance × exchange rate
-        // balanceOf returns mTokens (8 decimals)
-        // exchangeRateStored returns rate scaled by 1e18
-        // underlying = mTokenBalance * exchangeRate / 1e18 / 10^(underlyingDec - mDec)
-        const [mBalRaw, exchRateRaw] = await Promise.all([
-          mToken.balanceOf(WALLET_EVM),
-          mToken.exchangeRateStored(),
-        ]);
+        let underlyingTokens = null;
 
-        const mBalance    = Number(mBalRaw)    / Math.pow(10, market.mDec);
-        const exchRate    = Number(exchRateRaw) / 1e18;
-        // Underlying tokens held
-        const underlying  = mBalance * exchRate * Math.pow(10, market.mDec - market.underlyingDec + market.underlyingDec) / Math.pow(10, market.underlyingDec);
+        // Try balanceOfUnderlying.staticCall first (cleanest)
+        try {
+          const balRaw     = await mToken.balanceOfUnderlying.staticCall(WALLET_EVM);
+          underlyingTokens = Number(balRaw) / Math.pow(10, market.underlyingDec);
+          console.log(`${market.key}: balanceOfUnderlying = ${underlyingTokens.toFixed(6)}`);
+        } catch {
+          // Fallback: balanceOf(mTokens) × exchangeRate → underlying
+          try {
+            const [mBalRaw, exchRaw] = await Promise.all([
+              mToken.balanceOf(WALLET_EVM),
+              mToken.exchangeRateStored(),
+            ]);
+            // exchangeRateStored scaled by 1e18
+            // underlying = mTokens × exchangeRate / 10^(18 + mDec - underlyingDec)
+            // For Moonwell: mDec=8, so scale = 10^(18+8-underlyingDec) = 10^(26-underlyingDec)
+            const scalePow       = 18 + 8 - market.underlyingDec;  // 8 = mToken decimals
+            underlyingTokens     = Number(mBalRaw) * Number(exchRaw) / Math.pow(10, scalePow + 8);
+            console.log(`${market.key}: via exchangeRate = ${underlyingTokens.toFixed(6)}`);
+          } catch (e2) {
+            console.error(`${market.key}: balance failed: ${e2.message.slice(0, 60)}`);
+          }
+        }
 
-        // Simpler calculation: underlying = mBalRaw * exchRateRaw / 1e18 / 10^mDec
-        const underlyingTokens = Number(mBalRaw) * Number(exchRateRaw) / 1e18 / Math.pow(10, market.mDec);
-        const supplyUSD        = underlyingTokens * priceUSD;
-
-        console.log(`${market.key}: ${underlyingTokens.toFixed(4)} tokens × $${priceUSD.toFixed(4)} = $${supplyUSD.toFixed(2)}`);
-        if (supplyUSD > 0.01) {
+        if (underlyingTokens !== null && underlyingTokens > 0) {
+          const supplyUSD = underlyingTokens * priceUSD;
+          console.log(`${market.key}: ${underlyingTokens.toFixed(4)} × $${priceUSD.toFixed(4)} = $${supplyUSD.toFixed(2)}`);
           results[market.key] = { type: 'supply', supplyUSD };
         }
+
       } else {
-        // Borrow balance — pure view function, no staticCall needed
-        const borrowRaw = await mToken.borrowBalanceStored(WALLET_EVM);
-        const borrowUSD = Number(borrowRaw) / Math.pow(10, market.underlyingDec);
-        console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)}`);
-        if (borrowUSD > 0.01) {
+        // Borrow — try both approaches
+        let borrowUSD = null;
+        try {
+          const raw = await mToken.borrowBalanceCurrent.staticCall(WALLET_EVM);
+          borrowUSD = Number(raw) / Math.pow(10, market.underlyingDec);
+        } catch {
+          try {
+            const raw = await mToken.borrowBalanceStored(WALLET_EVM);
+            borrowUSD = Number(raw) / Math.pow(10, market.underlyingDec);
+          } catch (e2) {
+            console.error(`${market.key} borrow: ${e2.message.slice(0, 60)}`);
+          }
+        }
+
+        if (borrowUSD !== null && borrowUSD > 0.01) {
+          console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)}`);
           results[market.key] = { type: 'borrow', borrowUSD };
         }
       }
+
     } catch (e) {
-      console.error(`${market.key}: ${e.message.slice(0, 100)}`);
+      console.error(`${market.key}: ${e.message.slice(0, 80)}`);
     }
   }
 
@@ -310,7 +349,7 @@ async function getMoonwellUSD() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v11 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v12 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
@@ -325,7 +364,6 @@ async function main() {
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
 
-  // Lighter — LLP
   if (lighter?.llp != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.llp, true, {
       [F.positionValue]: lighter.llp,
@@ -334,7 +372,6 @@ async function main() {
     if (ok) { written++; console.log(`✓ LLP: $${lighter.llp}`); }
   }
 
-  // Lighter — Edge & Hedge
   if (lighter?.edgeHedge != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.edgeHedge, true, {
       [F.positionValue]: lighter.edgeHedge,
@@ -343,7 +380,6 @@ async function main() {
     if (ok) { written++; console.log(`✓ Edge & Hedge: $${lighter.edgeHedge}`); }
   }
 
-  // Lighter — LIT Staking
   if (lighter?.lit != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.litStaking, true, {
       [F.positionValue]: lighter.lit,
@@ -352,7 +388,6 @@ async function main() {
     if (ok) { written++; console.log(`✓ LIT Staking: $${lighter.lit}`); }
   }
 
-  // WETH/USDC Primary
   if (weth) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
       [F.positionValue]: weth.positionValue,
@@ -362,7 +397,6 @@ async function main() {
     if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}`); }
   }
 
-  // Moonwell
   if (moonwell && Object.keys(moonwell).length > 0) {
     const batch = [];
     for (const [posKey, data] of Object.entries(moonwell)) {
