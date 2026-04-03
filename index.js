@@ -222,30 +222,20 @@ async function getWethPosition() {
 // USDC on Ethereum: 6 decimals
 // ============================================================
 
-async function getAaveData(llamaPoolsData) {
+async function getAaveData() {
   console.log('\n--- Aave ---');
   try {
-    const provider  = new ethers.JsonRpcProvider(ETH_RPC);
+    const provider   = new ethers.JsonRpcProvider(ETH_RPC);
     const aUSDC_ADDR = '0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c';
     const erc20ABI   = ['function balanceOf(address) external view returns (uint256)'];
     const aUSDC      = new ethers.Contract(aUSDC_ADDR, erc20ABI, provider);
     const balRaw     = await aUSDC.balanceOf(WALLET_EVM);
     const tokens     = Number(balRaw) / 1e6;
-    const supplyUSD  = tokens;
-
-    // Get Aave USDC APY from targeted DeFi Llama pool query
-    let supplyAPY = null;
-    try {
-      const aavePool = await fetchWithTimeout(
-        'https://yields.llama.fi/pools?project=aave-v3&chain=Ethereum', {}, 15000
-      );
-      const pool = aavePool?.data?.find(p => p.symbol?.toUpperCase() === 'USDC');
-      supplyAPY = pool?.apy ?? null;
-    } catch (e) {
-      console.error(`Aave APY lookup: ${e.message.slice(0, 40)}`);
-    }
-
-    console.log(`Aave USDC: ${tokens.toFixed(2)} tokens = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY?.toFixed(2)}%`);
+    const supplyUSD  = tokens; // USDC = $1
+    // APY hardcoded — Aave V3 USDC on Ethereum is stable ~2.7%
+    // Update manually if rate shifts significantly
+    const supplyAPY  = 2.73;
+    console.log(`Aave USDC: ${tokens.toFixed(2)} tokens = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY}% (hardcoded)`);
     return { supplyUSD, tokens, supplyAPY };
   } catch (e) {
     console.error(`Aave: ${e.message.slice(0, 80)}`);
@@ -257,7 +247,7 @@ async function getAaveData(llamaPoolsData) {
 // MODULE 3 — Moonwell (Base via Alchemy)
 // ============================================================
 
-async function getMoonwellData(llamaPoolsData) {
+async function getMoonwellData() {
   console.log('\n--- Moonwell ---');
   const provider = new ethers.JsonRpcProvider(BASE_RPC);
   const results  = {};
@@ -292,8 +282,11 @@ async function getMoonwellData(llamaPoolsData) {
   }
 
   const moonwellPools  = {};
-  if (llamaPoolsData?.data) {
-    const basePools = llamaPoolsData.data ?? [];
+  const llamaData = await fetchWithTimeout(
+    'https://yields.llama.fi/pools?project=moonwell-lending&chain=Base', {}, 12000
+  );
+  if (llamaData?.data) {
+    const basePools = llamaData.data;
     // Log all symbols so we can see exact names
     console.log('Moonwell Base pools:', basePools.map(p => `${p.symbol}(supply:${p.apy?.toFixed(2)}%,borrow:${(p.apyBaseBorrow ?? p.apyBorrow)?.toFixed(2)}%)`).join(', '));
 
@@ -365,20 +358,13 @@ async function getMoonwellData(llamaPoolsData) {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v26 — ${NOW_UTC} ======`);
-
-  // Fetch targeted pool data — Moonwell Base only (avoids full pools dump)
-  console.log('\n--- Fetching APY data ---');
-  const llamaPoolsData = await fetchWithTimeout(
-    'https://yields.llama.fi/pools?project=moonwell-lending&chain=Base', {}, 15000
-  );
-  console.log(`Moonwell pools loaded: ${llamaPoolsData?.data?.length ?? 0}`);
+  console.log(`\n====== Daily Portfolio Check v27 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, aaveRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
     getWethPosition(),
-    getAaveData(llamaPoolsData),
-    getMoonwellData(llamaPoolsData),
+    getAaveData(),
+    getMoonwellData(),
   ]);
 
   const lighter  = lighterRes.value  ?? null;
