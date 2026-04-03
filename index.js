@@ -1,8 +1,8 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v5
-// Fix: linked record fields = array of string IDs ["recXXX"]
-//      Correct Moonwell checksummed addresses
-//      15s timeout on all HTTP calls
+// Daily Portfolio Check — GitHub Actions v6
+// Moonwell: uses Comptroller.getAllMarkets() + oracle for USD values
+// WETH/USDC: on-chain Arbitrum RPC
+// Lighter: principal_amount from public endpoint
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -24,8 +24,8 @@ const WETH_POS_ID = 5384162n;
 const BASE_RPC     = 'https://mainnet.base.org';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 
-const NOW_UTC = new Date().toISOString();
-const FETCH_TIMEOUT = 15000;
+const NOW_UTC       = new Date().toISOString();
+const FETCH_TIMEOUT = 20000;
 
 // ---- Daily Actions field IDs ----
 const F = {
@@ -56,21 +56,16 @@ const ASSET = {
   llp:         'recEFiaxgavObYWzL',
   litStaking:  'receiu02rkzc3quDW',
   edgeHedge:   'rectz3Zo3aDbe4GgL',
-  tsla:        'recd33iBRKrMMq710',
-  nvda:        'recdQq6r8iDl3BGYZ',
-  crcl:        'recPq2Ee2MsoMa21S',
-  spy:         'rechX4b2anmi82enx',
-  googl:       'recRxStry17D0ZGB5',
-  aapl:        'recGF59dwIOnE8fm2',
 };
 
 // ---- Lending position record IDs ----
+// Mapped by underlying token symbol
 const LPOS = {
-  moonwellETH:    'rec1T0ll6aEkYoZwj',
-  moonwellVIRT:   'rec6Zi6u6uK6x4M9F',
-  moonwellCBXRP:  'recQRudPvkFOMhfWL',
-  moonwellAERO:   'recwH74S9hCOqPBjR',
-  moonwellBorrow: 'recJ2skZuwzu9f1xY',
+  WETH:    'rec1T0ll6aEkYoZwj',  // Moonwell ETH supply
+  VIRTUAL: 'rec6Zi6u6uK6x4M9F',  // Moonwell VIRTUAL supply
+  cbXRP:   'recQRudPvkFOMhfWL',  // Moonwell cbXRP supply
+  AERO:    'recwH74S9hCOqPBjR',  // Moonwell AERO supply
+  USDC:    'recJ2skZuwzu9f1xY',  // Moonwell USDC borrow
 };
 
 // ============================================================
@@ -84,72 +79,55 @@ async function fetchWithTimeout(url, options = {}) {
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timer);
-    if (!res.ok) {
-      console.error(`[HTTP ${res.status}] ${url.slice(0, 80)}`);
-      return null;
-    }
+    if (!res.ok) { console.error(`[HTTP ${res.status}] ${url.slice(0, 80)}`); return null; }
     return await res.json();
   } catch (e) {
     clearTimeout(timer);
-    console.error(`[fetch] ${e.name === 'AbortError' ? 'Timeout' : e.message}: ${url.slice(0, 60)}`);
+    console.error(`[fetch] ${e.name === 'AbortError' ? 'Timeout' : e.message}`);
     return null;
   }
 }
 
-// Write records to Airtable REST API
-// LINKED RECORD FIELDS: must be array of string record IDs ["recXXX"]
-// SINGLE SELECT FIELDS: must be plain string option name "Fee Check"
 async function airtableCreate(tableId, records) {
   const { default: fetch } = await import('node-fetch');
-
-  const body = JSON.stringify({
-    records: records.map(r => ({ fields: r }))
-  });
-
+  const body = JSON.stringify({ records: records.map(r => ({ fields: r })) });
   const res = await fetch(
     `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}`,
     {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type':  'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}`, 'Content-Type': 'application/json' },
       body,
     }
   );
-
   if (!res.ok) {
     const err = await res.text();
-    console.error(`[Airtable] FAILED ${tableId}: ${err.slice(0, 200)}`);
+    console.error(`[Airtable] FAILED: ${err.slice(0, 200)}`);
     return false;
   }
   return true;
 }
 
-// Build a Daily Actions record
-// CRITICAL: asset field (multipleRecordLinks) needs array of string IDs
 function dailyRecord(assetId, inRange, extra = {}) {
   return {
-    [F.asset]:      [assetId],        // array of string record IDs
-    [F.actionType]: 'Fee Check',       // singleSelect — plain string name
+    [F.asset]:      [assetId],
+    [F.actionType]: 'Fee Check',
     [F.date]:       NOW_UTC,
-    [F.inRange]:    inRange ? 'Yes' : 'No',  // singleSelect — plain string name
+    [F.inRange]:    inRange ? 'Yes' : 'No',
     ...extra,
   };
 }
 
-// Build a Lending Actions record
 function lendingRecord(positionId, extra = {}) {
   return {
-    [LF.position]:   [positionId],    // array of string record IDs
-    [LF.actionType]: 'Rate Check',     // singleSelect — plain string name
+    [LF.position]:   [positionId],
+    [LF.actionType]: 'Rate Check',
     [LF.date]:       NOW_UTC,
     ...extra,
   };
 }
 
 // ============================================================
-// MODULE 1 — LIGHTER (principal_amount from public endpoint)
+// MODULE 1 — LIGHTER (principal_amount)
 // ============================================================
 
 async function getLighterData() {
@@ -230,50 +208,123 @@ async function getWethPosition() {
 }
 
 // ============================================================
-// MODULE 3 — Moonwell USD values (Base RPC, staticCall)
-// Checksummed addresses verified on BaseScan
+// MODULE 3 — Moonwell USD values (Base RPC)
+// Uses Comptroller.getAllMarkets() to find all market addresses
+// Uses Moonwell oracle to get USD prices for each token
 // ============================================================
 
 async function getMoonwellUSD() {
   console.log('\n--- Moonwell USD ---');
   const provider = new ethers.JsonRpcProvider(BASE_RPC);
 
+  const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
+  const comptrollerABI = [
+    'function getAllMarkets() external view returns (address[])',
+    'function oracle() external view returns (address)',
+  ];
   const mTokenABI = [
+    'function symbol() external view returns (string)',
+    'function underlying() external view returns (address)',
     'function balanceOfUnderlying(address owner) external returns (uint)',
     'function borrowBalanceCurrent(address account) external returns (uint)',
+    'function decimals() external view returns (uint8)',
   ];
-
-  // Verified checksummed addresses from BaseScan/Moonwell docs
-  const MARKETS = {
-    ETH:     { addr: '0x628ff693426583D9a7FB391E54366292F509D457', dec: 18 },
-    VIRTUAL: { addr: '0xbC58Ce8D5A58012e01d9C7C91Ab5Ff1bCE9f8Fe', dec: 18 },
-    cbXRP:   { addr: '0x259151d7B82C5e8D4Fb3975e4b38f77A4BFa8c9', dec: 6  },
-    AERO:    { addr: '0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6', dec: 18 },
-  };
+  const underlyingABI = [
+    'function symbol() external view returns (string)',
+    'function decimals() external view returns (uint8)',
+  ];
+  const oracleABI = [
+    'function getUnderlyingPrice(address mToken) external view returns (uint)',
+  ];
 
   const results = {};
 
-  for (const [symbol, { addr, dec }] of Object.entries(MARKETS)) {
-    try {
-      const mToken = new ethers.Contract(addr, mTokenABI, provider);
-      const raw    = await mToken.balanceOfUnderlying.staticCall(WALLET_EVM);
-      results[symbol] = Number(raw) / Math.pow(10, dec);
-      console.log(`Moonwell ${symbol}: ${results[symbol].toFixed(4)}`);
-    } catch (e) {
-      console.error(`Moonwell ${symbol}: ${e.message.slice(0, 80)}`);
-      results[symbol] = null;
-    }
-  }
-
-  // USDC borrow
   try {
-    const mUSDC = new ethers.Contract('0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', mTokenABI, provider);
-    const raw   = await mUSDC.borrowBalanceCurrent.staticCall(WALLET_EVM);
-    results.USDCBorrow = Number(raw) / 1e6;
-    console.log(`Moonwell USDC borrow: $${results.USDCBorrow.toFixed(2)}`);
+    const comptroller  = new ethers.Contract(COMPTROLLER, comptrollerABI, provider);
+    const [markets, oracleAddr] = await Promise.all([
+      comptroller.getAllMarkets(),
+      comptroller.oracle(),
+    ]);
+    const oracle = new ethers.Contract(oracleAddr, oracleABI, provider);
+
+    console.log(`Moonwell markets found: ${markets.length}`);
+
+    for (const mAddr of markets) {
+      try {
+        const mToken = new ethers.Contract(mAddr, mTokenABI, provider);
+        const mSymbol = await mToken.symbol();
+
+        // Get underlying symbol
+        let underlyingSymbol = 'ETH';
+        let underlyingDecimals = 18;
+        try {
+          const underlyingAddr = await mToken.underlying();
+          const underlying = new ethers.Contract(underlyingAddr, underlyingABI, provider);
+          [underlyingSymbol, underlyingDecimals] = await Promise.all([
+            underlying.symbol(),
+            underlying.decimals(),
+          ]);
+        } catch {
+          // Native ETH market has no underlying()
+        }
+
+        // Get oracle price (scaled by 1e36 / token decimals for Compound-style oracle)
+        const oraclePrice = await oracle.getUnderlyingPrice(mAddr);
+        // Oracle returns price * 1e18 * 1e(18-decimals)
+        const priceScaleFactor = 18 + (18 - Number(underlyingDecimals));
+        const priceUSD = Number(oraclePrice) / Math.pow(10, priceScaleFactor);
+
+        // Check if this is a market we track
+        const isTracked = Object.keys(LPOS).some(sym =>
+          underlyingSymbol.toLowerCase().includes(sym.toLowerCase()) ||
+          mSymbol.toLowerCase().includes(sym.toLowerCase())
+        );
+
+        if (!isTracked) continue;
+
+        console.log(`Checking ${mSymbol} (${underlyingSymbol}), price: $${priceUSD.toFixed(4)}`);
+
+        // Get supply balance and convert to USD
+        try {
+          const balRaw = await mToken.balanceOfUnderlying.staticCall(WALLET_EVM);
+          const tokenBalance = Number(balRaw) / Math.pow(10, Number(underlyingDecimals));
+          const supplyUSD = tokenBalance * priceUSD;
+
+          if (supplyUSD > 0.01) {
+            console.log(`  ${underlyingSymbol} supply: ${tokenBalance.toFixed(4)} tokens = $${supplyUSD.toFixed(2)}`);
+
+            // Map to Airtable lending position record
+            const posKey = Object.keys(LPOS).find(sym =>
+              underlyingSymbol.toLowerCase().includes(sym.toLowerCase())
+            );
+            if (posKey && posKey !== 'USDC') {
+              results[posKey] = { supplyUSD, mAddr };
+            }
+          }
+        } catch (e) {
+          console.error(`  ${underlyingSymbol} supply error: ${e.message.slice(0, 60)}`);
+        }
+
+        // Check borrow balance for USDC
+        if (underlyingSymbol.toLowerCase().includes('usdc')) {
+          try {
+            const borrowRaw = await mToken.borrowBalanceCurrent.staticCall(WALLET_EVM);
+            const borrowUSD = Number(borrowRaw) / Math.pow(10, Number(underlyingDecimals));
+            if (borrowUSD > 0.01) {
+              results['USDC'] = { borrowUSD, mAddr };
+              console.log(`  USDC borrow: $${borrowUSD.toFixed(2)}`);
+            }
+          } catch (e) {
+            console.error(`  USDC borrow error: ${e.message.slice(0, 60)}`);
+          }
+        }
+
+      } catch (e) {
+        // Skip markets we can't read
+      }
+    }
   } catch (e) {
-    console.error(`Moonwell borrow: ${e.message.slice(0, 80)}`);
-    results.USDCBorrow = null;
+    console.error(`Moonwell error: ${e.message}`);
   }
 
   return results;
@@ -284,7 +335,7 @@ async function getMoonwellUSD() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v5 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v6 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
@@ -301,12 +352,10 @@ async function main() {
 
   // Lighter — LLP
   if (lighter?.llp != null) {
-    const rec = dailyRecord(ASSET.llp, true, {
+    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.llp, true, {
       [F.positionValue]: lighter.llp,
-      [F.notes]:         'Principal amount — equity update deferred',
-    });
-    console.log('[Debug] LLP record asset field:', JSON.stringify(rec[F.asset]));
-    const ok = await airtableCreate(DAILY_TABLE, [rec]);
+      [F.notes]:         'Principal amount — real equity deferred (requires Lighter auth)',
+    })]);
     if (ok) { written++; console.log(`✓ LLP: $${lighter.llp}`); }
   }
 
@@ -314,7 +363,7 @@ async function main() {
   if (lighter?.edgeHedge != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.edgeHedge, true, {
       [F.positionValue]: lighter.edgeHedge,
-      [F.notes]:         'Principal amount — equity update deferred',
+      [F.notes]:         'Principal amount — real equity deferred (requires Lighter auth)',
     })]);
     if (ok) { written++; console.log(`✓ Edge & Hedge: $${lighter.edgeHedge}`); }
   }
@@ -323,7 +372,7 @@ async function main() {
   if (lighter?.lit != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.litStaking, true, {
       [F.positionValue]: lighter.lit,
-      [F.notes]:         'Principal amount — equity update deferred',
+      [F.notes]:         'Principal amount — real equity deferred (requires Lighter auth)',
     })]);
     if (ok) { written++; console.log(`✓ LIT Staking: $${lighter.lit}`); }
   }
@@ -338,15 +387,17 @@ async function main() {
     if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}`); }
   }
 
-  // Moonwell — batch all records together
-  if (moonwell) {
-    const batch = [
-      moonwell.ETH       != null ? lendingRecord(LPOS.moonwellETH,    { [LF.supplyUSD]: moonwell.ETH        }) : null,
-      moonwell.VIRTUAL   != null ? lendingRecord(LPOS.moonwellVIRT,   { [LF.supplyUSD]: moonwell.VIRTUAL    }) : null,
-      moonwell.cbXRP     != null ? lendingRecord(LPOS.moonwellCBXRP,  { [LF.supplyUSD]: moonwell.cbXRP      }) : null,
-      moonwell.AERO      != null ? lendingRecord(LPOS.moonwellAERO,   { [LF.supplyUSD]: moonwell.AERO       }) : null,
-      moonwell.USDCBorrow!= null ? lendingRecord(LPOS.moonwellBorrow, { [LF.borrowUSD]: moonwell.USDCBorrow }) : null,
-    ].filter(Boolean);
+  // Moonwell USD values — lending table
+  if (moonwell && Object.keys(moonwell).length > 0) {
+    const batch = [];
+
+    for (const [sym, data] of Object.entries(moonwell)) {
+      if (sym === 'USDC' && data.borrowUSD != null) {
+        batch.push(lendingRecord(LPOS.USDC, { [LF.borrowUSD]: data.borrowUSD }));
+      } else if (LPOS[sym] && data.supplyUSD != null) {
+        batch.push(lendingRecord(LPOS[sym], { [LF.supplyUSD]: data.supplyUSD }));
+      }
+    }
 
     if (batch.length > 0) {
       const ok = await airtableCreate(LENDING_TABLE, batch);
