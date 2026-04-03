@@ -22,7 +22,7 @@ const WETH_POS_ID = 5384162n;
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
-const ETH_RPC      = 'https://eth.llamarpc.com'; // Ethereum mainnet for Aave
+const ETH_RPC      = 'https://ethereum-rpc.publicnode.com'; // Ethereum mainnet for Aave
 
 const NOW_UTC = new Date().toISOString();
 
@@ -229,12 +229,13 @@ async function getAaveData() {
     const aUSDC_ADDR = '0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c';
     const erc20ABI   = ['function balanceOf(address) external view returns (uint256)'];
     const aUSDC      = new ethers.Contract(aUSDC_ADDR, erc20ABI, provider);
-    const balRaw     = await aUSDC.balanceOf(WALLET_EVM);
+
+    // Hard 8-second timeout on the RPC call
+    const timeout    = new Promise((_, reject) => setTimeout(() => reject(new Error('Aave RPC timeout')), 8000));
+    const balRaw     = await Promise.race([aUSDC.balanceOf(WALLET_EVM), timeout]);
     const tokens     = Number(balRaw) / 1e6;
     const supplyUSD  = tokens; // USDC = $1
-    // APY hardcoded — Aave V3 USDC on Ethereum is stable ~2.7%
-    // Update manually if rate shifts significantly
-    const supplyAPY  = 2.73;
+    const supplyAPY  = 2.73;  // Hardcoded — stable, update manually if shifts
     console.log(`Aave USDC: ${tokens.toFixed(2)} tokens = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY}% (hardcoded)`);
     return { supplyUSD, tokens, supplyAPY };
   } catch (e) {
@@ -349,7 +350,7 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v28 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v29 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, aaveRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
