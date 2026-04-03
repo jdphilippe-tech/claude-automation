@@ -233,12 +233,16 @@ async function getAaveData(llamaPoolsData) {
     const tokens     = Number(balRaw) / 1e6;
     const supplyUSD  = tokens;
 
+    // Get Aave USDC APY from targeted DeFi Llama pool query
     let supplyAPY = null;
-    if (llamaPoolsData?.data) {
-      const pool = llamaPoolsData.data.find(
-        p => p.project === 'aave-v3' && p.chain === 'Ethereum' && p.symbol?.toUpperCase() === 'USDC'
+    try {
+      const aavePool = await fetchWithTimeout(
+        'https://yields.llama.fi/pools?project=aave-v3&chain=Ethereum', {}, 15000
       );
+      const pool = aavePool?.data?.find(p => p.symbol?.toUpperCase() === 'USDC');
       supplyAPY = pool?.apy ?? null;
+    } catch (e) {
+      console.error(`Aave APY lookup: ${e.message.slice(0, 40)}`);
     }
 
     console.log(`Aave USDC: ${tokens.toFixed(2)} tokens = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY?.toFixed(2)}%`);
@@ -289,9 +293,7 @@ async function getMoonwellData(llamaPoolsData) {
 
   const moonwellPools  = {};
   if (llamaPoolsData?.data) {
-    const basePools = llamaPoolsData.data.filter(
-      p => p.project === 'moonwell-lending' && p.chain === 'Base'
-    );
+    const basePools = llamaPoolsData.data ?? [];
     // Log all symbols so we can see exact names
     console.log('Moonwell Base pools:', basePools.map(p => `${p.symbol}(supply:${p.apy?.toFixed(2)}%,borrow:${(p.apyBaseBorrow ?? p.apyBorrow)?.toFixed(2)}%)`).join(', '));
 
@@ -363,12 +365,14 @@ async function getMoonwellData(llamaPoolsData) {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v25 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v26 — ${NOW_UTC} ======`);
 
-  // Fetch DeFi Llama pools once — shared by Aave and Moonwell modules
-  console.log('\n--- Fetching DeFi Llama pools (shared) ---');
-  const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
-  console.log(`Pools loaded: ${llamaPoolsData?.data?.length ?? 0}`);
+  // Fetch targeted pool data — Moonwell Base only (avoids full pools dump)
+  console.log('\n--- Fetching APY data ---');
+  const llamaPoolsData = await fetchWithTimeout(
+    'https://yields.llama.fi/pools?project=moonwell-lending&chain=Base', {}, 15000
+  );
+  console.log(`Moonwell pools loaded: ${llamaPoolsData?.data?.length ?? 0}`);
 
   const [lighterRes, wethRes, aaveRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
