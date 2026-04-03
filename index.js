@@ -1,8 +1,7 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v6
-// Moonwell: uses Comptroller.getAllMarkets() + oracle for USD values
-// WETH/USDC: on-chain Arbitrum RPC
-// Lighter: principal_amount from public endpoint
+// Daily Portfolio Check — GitHub Actions v7
+// Prints all Moonwell market symbols for debugging
+// Flexible symbol matching for VIRTUAL, cbXRP, AERO, WETH
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -36,7 +35,6 @@ const F = {
   positionValue: 'fldWElDtJZRYTaZtD',
   feeValue:      'fld6QnTv9CKHvglcX',
   revertPosVal:  'fldcciMBHm1kI0dL9',
-  protocolAPR:   'fldL3Pa57i3fyaAf0',
   notes:         'fldxWdSuQ09uhadFo',
 };
 
@@ -59,14 +57,25 @@ const ASSET = {
 };
 
 // ---- Lending position record IDs ----
-// Mapped by underlying token symbol
 const LPOS = {
-  WETH:    'rec1T0ll6aEkYoZwj',  // Moonwell ETH supply
-  VIRTUAL: 'rec6Zi6u6uK6x4M9F',  // Moonwell VIRTUAL supply
-  cbXRP:   'recQRudPvkFOMhfWL',  // Moonwell cbXRP supply
-  AERO:    'recwH74S9hCOqPBjR',  // Moonwell AERO supply
-  USDC:    'recJ2skZuwzu9f1xY',  // Moonwell USDC borrow
+  moonwellETH:    'rec1T0ll6aEkYoZwj',
+  moonwellVIRT:   'rec6Zi6u6uK6x4M9F',
+  moonwellCBXRP:  'recQRudPvkFOMhfWL',
+  moonwellAERO:   'recwH74S9hCOqPBjR',
+  moonwellBorrow: 'recJ2skZuwzu9f1xY',
 };
+
+// Symbol matching — maps on-chain symbols to our lending position record IDs
+// Flexible matching handles variations like WETH/ETH, cbXRP/CXRP, etc.
+function matchLendingPosition(underlyingSymbol, mSymbol) {
+  const sym = (underlyingSymbol + mSymbol).toLowerCase();
+  if (sym.includes('weth') || (sym.includes('meth') && !sym.includes('steth'))) return 'moonwellETH';
+  if (sym.includes('virtual') || sym.includes('virt'))  return 'moonwellVIRT';
+  if (sym.includes('xrp') || sym.includes('cbxrp'))     return 'moonwellCBXRP';
+  if (sym.includes('aero'))                              return 'moonwellAERO';
+  if (sym.includes('usdc') && !sym.includes('wusdc'))   return 'moonwellBorrow';
+  return null;
+}
 
 // ============================================================
 // HELPERS
@@ -161,18 +170,16 @@ async function getWethPosition() {
   try {
     const provider = new ethers.JsonRpcProvider(ARBITRUM_RPC);
 
-    const posABI = [
-      'function positions(uint256 tokenId) external view returns (uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128)'
-    ];
+    const posABI     = ['function positions(uint256 tokenId) external view returns (uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128)'];
     const factoryABI = ['function getPool(address,address,uint24) external view returns (address)'];
     const poolABI    = ['function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16, uint16, uint16, uint8, bool)'];
 
     const nft      = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', posABI, provider);
     const raw      = await nft.positions(WETH_POS_ID);
-    const token0   = raw[2], token1 = raw[3], fee = raw[4];
-    const tickLowerN  = Number(raw[5]);
-    const tickUpperN  = Number(raw[6]);
-    const liquidity   = raw[7];
+    const token0 = raw[2], token1 = raw[3], fee = raw[4];
+    const tickLowerN = Number(raw[5]);
+    const tickUpperN = Number(raw[6]);
+    const liquidity  = raw[7];
 
     const factory  = new ethers.Contract('0x1F98431c8aD98523631AE4a59f267346ea31F984', factoryABI, provider);
     const poolAddr = await factory.getPool(token0, token1, fee);
@@ -209,8 +216,8 @@ async function getWethPosition() {
 
 // ============================================================
 // MODULE 3 — Moonwell USD values (Base RPC)
-// Uses Comptroller.getAllMarkets() to find all market addresses
-// Uses Moonwell oracle to get USD prices for each token
+// Dynamically discovers all markets via Comptroller
+// Prints ALL symbols so we can see exact names
 // ============================================================
 
 async function getMoonwellUSD() {
@@ -218,6 +225,7 @@ async function getMoonwellUSD() {
   const provider = new ethers.JsonRpcProvider(BASE_RPC);
 
   const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
+
   const comptrollerABI = [
     'function getAllMarkets() external view returns (address[])',
     'function oracle() external view returns (address)',
@@ -240,22 +248,22 @@ async function getMoonwellUSD() {
   const results = {};
 
   try {
-    const comptroller  = new ethers.Contract(COMPTROLLER, comptrollerABI, provider);
+    const comptroller = new ethers.Contract(COMPTROLLER, comptrollerABI, provider);
     const [markets, oracleAddr] = await Promise.all([
       comptroller.getAllMarkets(),
       comptroller.oracle(),
     ]);
     const oracle = new ethers.Contract(oracleAddr, oracleABI, provider);
 
-    console.log(`Moonwell markets found: ${markets.length}`);
+    console.log(`Markets found: ${markets.length}`);
+    console.log('Scanning all markets:');
 
     for (const mAddr of markets) {
       try {
-        const mToken = new ethers.Contract(mAddr, mTokenABI, provider);
+        const mToken  = new ethers.Contract(mAddr, mTokenABI, provider);
         const mSymbol = await mToken.symbol();
 
-        // Get underlying symbol
-        let underlyingSymbol = 'ETH';
+        let underlyingSymbol  = 'ETH';
         let underlyingDecimals = 18;
         try {
           const underlyingAddr = await mToken.underlying();
@@ -265,68 +273,67 @@ async function getMoonwellUSD() {
             underlying.decimals(),
           ]);
         } catch {
-          // Native ETH market has no underlying()
+          // Native ETH market
         }
 
-        // Get oracle price (scaled by 1e36 / token decimals for Compound-style oracle)
-        const oraclePrice = await oracle.getUnderlyingPrice(mAddr);
-        // Oracle returns price * 1e18 * 1e(18-decimals)
-        const priceScaleFactor = 18 + (18 - Number(underlyingDecimals));
-        const priceUSD = Number(oraclePrice) / Math.pow(10, priceScaleFactor);
+        // PRINT ALL SYMBOLS — this is how we discover exact names
+        console.log(`  mToken: ${mSymbol} | underlying: ${underlyingSymbol} | addr: ${mAddr}`);
 
-        // Check if this is a market we track
-        const isTracked = Object.keys(LPOS).some(sym =>
-          underlyingSymbol.toLowerCase().includes(sym.toLowerCase()) ||
-          mSymbol.toLowerCase().includes(sym.toLowerCase())
-        );
+        // Check if this matches a position we track
+        const posKey = matchLendingPosition(underlyingSymbol, mSymbol);
+        if (!posKey) continue;
 
-        if (!isTracked) continue;
-
-        console.log(`Checking ${mSymbol} (${underlyingSymbol}), price: $${priceUSD.toFixed(4)}`);
-
-        // Get supply balance and convert to USD
+        // Get oracle price
+        let priceUSD = 0;
         try {
-          const balRaw = await mToken.balanceOfUnderlying.staticCall(WALLET_EVM);
-          const tokenBalance = Number(balRaw) / Math.pow(10, Number(underlyingDecimals));
-          const supplyUSD = tokenBalance * priceUSD;
-
-          if (supplyUSD > 0.01) {
-            console.log(`  ${underlyingSymbol} supply: ${tokenBalance.toFixed(4)} tokens = $${supplyUSD.toFixed(2)}`);
-
-            // Map to Airtable lending position record
-            const posKey = Object.keys(LPOS).find(sym =>
-              underlyingSymbol.toLowerCase().includes(sym.toLowerCase())
-            );
-            if (posKey && posKey !== 'USDC') {
-              results[posKey] = { supplyUSD, mAddr };
-            }
-          }
+          const oraclePrice = await oracle.getUnderlyingPrice(mAddr);
+          // Compound oracle: price * 1e(36 - underlyingDecimals) / 1e18 = USD per token
+          const scaledDecimals = 36 - Number(underlyingDecimals);
+          priceUSD = Number(oraclePrice) / Math.pow(10, scaledDecimals);
         } catch (e) {
-          console.error(`  ${underlyingSymbol} supply error: ${e.message.slice(0, 60)}`);
+          console.error(`    Oracle error for ${mSymbol}: ${e.message.slice(0, 50)}`);
         }
 
-        // Check borrow balance for USDC
-        if (underlyingSymbol.toLowerCase().includes('usdc')) {
+        console.log(`    -> Matched: ${posKey}, price: $${priceUSD.toFixed(4)}`);
+
+        // Get supply balance
+        if (posKey !== 'moonwellBorrow') {
+          try {
+            const balRaw = await mToken.balanceOfUnderlying.staticCall(WALLET_EVM);
+            const tokenBalance = Number(balRaw) / Math.pow(10, Number(underlyingDecimals));
+            const supplyUSD    = tokenBalance * priceUSD;
+            console.log(`    Supply: ${tokenBalance.toFixed(6)} tokens = $${supplyUSD.toFixed(2)}`);
+            if (supplyUSD > 0.01) {
+              results[posKey] = { type: 'supply', supplyUSD };
+            }
+          } catch (e) {
+            console.error(`    Supply error: ${e.message.slice(0, 60)}`);
+          }
+        }
+
+        // Get borrow balance for USDC
+        if (posKey === 'moonwellBorrow') {
           try {
             const borrowRaw = await mToken.borrowBalanceCurrent.staticCall(WALLET_EVM);
             const borrowUSD = Number(borrowRaw) / Math.pow(10, Number(underlyingDecimals));
+            console.log(`    Borrow: $${borrowUSD.toFixed(2)}`);
             if (borrowUSD > 0.01) {
-              results['USDC'] = { borrowUSD, mAddr };
-              console.log(`  USDC borrow: $${borrowUSD.toFixed(2)}`);
+              results[posKey] = { type: 'borrow', borrowUSD };
             }
           } catch (e) {
-            console.error(`  USDC borrow error: ${e.message.slice(0, 60)}`);
+            console.error(`    Borrow error: ${e.message.slice(0, 60)}`);
           }
         }
 
       } catch (e) {
-        // Skip markets we can't read
+        // Skip unreadable markets silently
       }
     }
   } catch (e) {
-    console.error(`Moonwell error: ${e.message}`);
+    console.error(`Moonwell fatal: ${e.message}`);
   }
 
+  console.log(`Moonwell results: ${JSON.stringify(Object.keys(results))}`);
   return results;
 }
 
@@ -335,7 +342,7 @@ async function getMoonwellUSD() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v6 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v7 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
@@ -354,7 +361,7 @@ async function main() {
   if (lighter?.llp != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.llp, true, {
       [F.positionValue]: lighter.llp,
-      [F.notes]:         'Principal amount — real equity deferred (requires Lighter auth)',
+      [F.notes]:         'Principal amount — real equity deferred',
     })]);
     if (ok) { written++; console.log(`✓ LLP: $${lighter.llp}`); }
   }
@@ -363,7 +370,7 @@ async function main() {
   if (lighter?.edgeHedge != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.edgeHedge, true, {
       [F.positionValue]: lighter.edgeHedge,
-      [F.notes]:         'Principal amount — real equity deferred (requires Lighter auth)',
+      [F.notes]:         'Principal amount — real equity deferred',
     })]);
     if (ok) { written++; console.log(`✓ Edge & Hedge: $${lighter.edgeHedge}`); }
   }
@@ -372,7 +379,7 @@ async function main() {
   if (lighter?.lit != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.litStaking, true, {
       [F.positionValue]: lighter.lit,
-      [F.notes]:         'Principal amount — real equity deferred (requires Lighter auth)',
+      [F.notes]:         'Principal amount — real equity deferred',
     })]);
     if (ok) { written++; console.log(`✓ LIT Staking: $${lighter.lit}`); }
   }
@@ -387,19 +394,18 @@ async function main() {
     if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}`); }
   }
 
-  // Moonwell USD values — lending table
+  // Moonwell — lending table
   if (moonwell && Object.keys(moonwell).length > 0) {
     const batch = [];
-
-    for (const [sym, data] of Object.entries(moonwell)) {
-      if (sym === 'USDC' && data.borrowUSD != null) {
-        batch.push(lendingRecord(LPOS.USDC, { [LF.borrowUSD]: data.borrowUSD }));
-      } else if (LPOS[sym] && data.supplyUSD != null) {
-        batch.push(lendingRecord(LPOS[sym], { [LF.supplyUSD]: data.supplyUSD }));
+    for (const [posKey, data] of Object.entries(moonwell)) {
+      if (data.type === 'supply' && data.supplyUSD != null) {
+        batch.push(lendingRecord(LPOS[posKey], { [LF.supplyUSD]: data.supplyUSD }));
+      } else if (data.type === 'borrow' && data.borrowUSD != null) {
+        batch.push(lendingRecord(LPOS[posKey], { [LF.borrowUSD]: data.borrowUSD }));
       }
     }
-
     if (batch.length > 0) {
+      // Max 10 records per Airtable request
       const ok = await airtableCreate(LENDING_TABLE, batch);
       if (ok) { written += batch.length; console.log(`✓ Moonwell: ${batch.length} records`); }
     }
