@@ -22,6 +22,7 @@ const WETH_POS_ID = 5384162n;
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
+const ETH_RPC      = 'https://eth.llamarpc.com'; // Ethereum mainnet for Aave
 
 const NOW_UTC = new Date().toISOString();
 
@@ -65,6 +66,7 @@ const LPOS = {
   moonwellCBXRP:  'recQRudPvkFOMhfWL',
   moonwellAERO:   'recwH74S9hCOqPBjR',
   moonwellBorrow: 'recJ2skZuwzu9f1xY',
+  aaveUSDC:       'recMVyu92cEoIk8Z2',
 };
 
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
@@ -213,6 +215,44 @@ async function getWethPosition() {
   }
 }
 
+
+// ============================================================
+// MODULE 3b — Aave V3 USDC Supply (Ethereum mainnet)
+// aUSDC contract: 0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c
+// USDC on Ethereum: 6 decimals
+// ============================================================
+
+async function getAaveData() {
+  console.log('\n--- Aave ---');
+  try {
+    const provider  = new ethers.JsonRpcProvider(ETH_RPC);
+    // aUSDC v3 on Ethereum — balanceOf returns supply amount in USDC (6 dec)
+    const aUSDC_ADDR = '0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c';
+    const erc20ABI   = ['function balanceOf(address) external view returns (uint256)'];
+    const aUSDC      = new ethers.Contract(aUSDC_ADDR, erc20ABI, provider);
+    const balRaw     = await aUSDC.balanceOf(WALLET_EVM);
+    const tokens     = Number(balRaw) / 1e6;
+    const supplyUSD  = tokens; // USDC = $1
+
+    // APY from DeFi Llama
+    const llamaData  = await fetchWithTimeout('https://yields.llama.fi/pools');
+    let supplyAPY    = null;
+    if (llamaData?.data) {
+      const pool = llamaData.data.find(
+        p => p.project === 'aave-v3' && p.chain === 'Ethereum' && p.symbol?.toUpperCase() === 'USDC'
+      );
+      supplyAPY = pool?.apy ?? null;
+      console.log(`Aave USDC pool APY: ${supplyAPY?.toFixed(2)}%`);
+    }
+
+    console.log(`Aave USDC: ${tokens.toFixed(2)} tokens = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY?.toFixed(2)}%`);
+    return { supplyUSD, tokens, supplyAPY };
+  } catch (e) {
+    console.error(`Aave: ${e.message.slice(0, 80)}`);
+    return null;
+  }
+}
+
 // ============================================================
 // MODULE 3 — Moonwell (Base via Alchemy)
 // ============================================================
@@ -329,16 +369,18 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v23 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v24 — ${NOW_UTC} ======`);
 
-  const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
+  const [lighterRes, wethRes, aaveRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
     getWethPosition(),
+    getAaveData(),
     getMoonwellData(),
   ]);
 
   const lighter  = lighterRes.value  ?? null;
   const weth     = wethRes.value     ?? null;
+  const aave     = aaveRes.value     ?? null;
   const moonwell = moonwellRes.value ?? null;
 
   console.log('\n--- Writing to Airtable ---');
@@ -364,6 +406,13 @@ async function main() {
       [F.notes]:         `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
     })]);
     if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}`); }
+  }
+
+  if (aave && aave.supplyUSD > 0) {
+    const fields = { [LF.supplyUSD]: aave.supplyUSD, [LF.tokenAmt]: aave.tokens };
+    if (aave.supplyAPY != null) fields[LF.supplyAPY] = aave.supplyAPY;
+    const ok = await airtableCreate(LENDING_TABLE, [lendingRecord(LPOS.aaveUSDC, fields)]);
+    if (ok) { written++; console.log(`✓ Aave USDC: $${aave.supplyUSD.toFixed(2)}, ${aave.tokens.toFixed(2)} tokens, APY ${aave.supplyAPY?.toFixed(2) ?? 'n/a'}%`); }
   }
 
   if (moonwell && Object.keys(moonwell).length > 0) {
