@@ -1,11 +1,12 @@
 {
   "name": "claude-automation",
   "version": "1.0.0",
-  "description": "Daily portfolio check — Lighter, Raydium, Moonwell, Suilend",
+  "description": "Daily portfolio check — Lighter, WETH/USDC, Moonwell, xStocks",
   "main": "index.js",
   "type": "module",
   "dependencies": {
     "node-fetch": "^3.3.2",
-    "ethers": "^6.11.1"
+    "ethers": "^6.11.1",
+    "@moonwell-fi/moonwell-sdk": "latest"
   }
 }
