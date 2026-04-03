@@ -151,6 +151,8 @@ async function getWethPosition() {
     const posABI     = ['function positions(uint256 tokenId) external view returns (uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128)'];
     const factoryABI = ['function getPool(address,address,uint24) external view returns (address)'];
     const poolABI    = ['function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16, uint16, uint16, uint8, bool)'];
+    // collect staticCall returns uncollected fees without spending gas
+    const collectABI = ['function collect((uint256 tokenId, address recipient, uint128 amount0Max, uint128 amount1Max)) external returns (uint256 amount0, uint256 amount1)'];
 
     const nft        = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', posABI, provider);
     const raw        = await nft.positions(WETH_POS_ID);
@@ -182,8 +184,28 @@ async function getWethPosition() {
     }
 
     const positionValue = (amount0 * ethPrice) + amount1;
-    console.log(`ETH: $${ethPrice.toFixed(2)}, position: $${positionValue.toFixed(2)}, in range: ${inRange}`);
-    return { positionValue, inRange, currentTick, tickLower: tickLowerN, tickUpper: tickUpperN, ethPrice };
+
+    // Read uncollected fees via collect.staticCall (read-only, no gas)
+    const MAX128 = BigInt('0xffffffffffffffffffffffffffffffff');
+    const nftCollect = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', collectABI, provider);
+    let feeValue = 0;
+    try {
+      const fees = await nftCollect.collect.staticCall({
+        tokenId:    WETH_POS_ID,
+        recipient:  WALLET_EVM,
+        amount0Max: MAX128,
+        amount1Max: MAX128,
+      });
+      const feeETH  = Number(fees[0]) / 1e18;
+      const feeUSDC = Number(fees[1]) / 1e6;
+      feeValue = (feeETH * ethPrice) + feeUSDC;
+      console.log(`ETH: $${ethPrice.toFixed(2)}, position: $${positionValue.toFixed(2)}, fees: $${feeValue.toFixed(2)}, in range: ${inRange}`);
+    } catch (e) {
+      console.error(`Fee collect failed: ${e.message.slice(0, 60)}`);
+      console.log(`ETH: $${ethPrice.toFixed(2)}, position: $${positionValue.toFixed(2)}, in range: ${inRange}`);
+    }
+
+    return { positionValue, feeValue, inRange, currentTick, tickLower: tickLowerN, tickUpper: tickUpperN, ethPrice };
   } catch (e) {
     console.error(`WETH/USDC: ${e.message}`);
     return null;
@@ -306,7 +328,7 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v21-final — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v22 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
@@ -337,9 +359,10 @@ async function main() {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
       [F.positionValue]: weth.positionValue,
       [F.revertPosVal]:  weth.positionValue,
+      ...(weth.feeValue > 0 ? { [F.feeValue]: weth.feeValue } : {}),
       [F.notes]:         `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
     })]);
-    if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}`); }
+    if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}`); }
   }
 
   if (moonwell && Object.keys(moonwell).length > 0) {
