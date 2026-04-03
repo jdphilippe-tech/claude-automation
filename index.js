@@ -252,10 +252,12 @@ async function getMoonwellData() {
   }
 
   // DeFi Llama pools for APYs — log all Moonwell Base pool symbols to debug
-  const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools?project=moonwell-lending&chain=Base', {}, 10000);
+  const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
   const moonwellPools  = {};
   if (llamaPoolsData?.data) {
-    const basePools = llamaPoolsData.data ?? [];
+    const basePools = llamaPoolsData.data.filter(
+      p => p.project === 'moonwell-lending' && p.chain === 'Base'
+    );
     // Log all symbols so we can see exact names
     console.log('Moonwell Base pools:', basePools.map(p => `${p.symbol}(supply:${p.apy?.toFixed(2)}%,borrow:${(p.apyBaseBorrow ?? p.apyBorrow)?.toFixed(2)}%)`).join(', '));
 
@@ -327,7 +329,7 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v32 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v23 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
