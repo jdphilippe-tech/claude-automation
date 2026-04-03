@@ -222,27 +222,23 @@ async function getWethPosition() {
 // USDC on Ethereum: 6 decimals
 // ============================================================
 
-async function getAaveData() {
+async function getAaveData(llamaPoolsData) {
   console.log('\n--- Aave ---');
   try {
     const provider  = new ethers.JsonRpcProvider(ETH_RPC);
-    // aUSDC v3 on Ethereum — balanceOf returns supply amount in USDC (6 dec)
     const aUSDC_ADDR = '0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c';
     const erc20ABI   = ['function balanceOf(address) external view returns (uint256)'];
     const aUSDC      = new ethers.Contract(aUSDC_ADDR, erc20ABI, provider);
     const balRaw     = await aUSDC.balanceOf(WALLET_EVM);
     const tokens     = Number(balRaw) / 1e6;
-    const supplyUSD  = tokens; // USDC = $1
+    const supplyUSD  = tokens;
 
-    // APY from DeFi Llama
-    const llamaData  = await fetchWithTimeout('https://yields.llama.fi/pools');
-    let supplyAPY    = null;
-    if (llamaData?.data) {
-      const pool = llamaData.data.find(
+    let supplyAPY = null;
+    if (llamaPoolsData?.data) {
+      const pool = llamaPoolsData.data.find(
         p => p.project === 'aave-v3' && p.chain === 'Ethereum' && p.symbol?.toUpperCase() === 'USDC'
       );
       supplyAPY = pool?.apy ?? null;
-      console.log(`Aave USDC pool APY: ${supplyAPY?.toFixed(2)}%`);
     }
 
     console.log(`Aave USDC: ${tokens.toFixed(2)} tokens = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY?.toFixed(2)}%`);
@@ -257,7 +253,7 @@ async function getAaveData() {
 // MODULE 3 — Moonwell (Base via Alchemy)
 // ============================================================
 
-async function getMoonwellData() {
+async function getMoonwellData(llamaPoolsData) {
   console.log('\n--- Moonwell ---');
   const provider = new ethers.JsonRpcProvider(BASE_RPC);
   const results  = {};
@@ -291,8 +287,6 @@ async function getMoonwellData() {
     }
   }
 
-  // DeFi Llama pools for APYs — log all Moonwell Base pool symbols to debug
-  const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
   const moonwellPools  = {};
   if (llamaPoolsData?.data) {
     const basePools = llamaPoolsData.data.filter(
@@ -369,13 +363,18 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v24 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v25 — ${NOW_UTC} ======`);
+
+  // Fetch DeFi Llama pools once — shared by Aave and Moonwell modules
+  console.log('\n--- Fetching DeFi Llama pools (shared) ---');
+  const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
+  console.log(`Pools loaded: ${llamaPoolsData?.data?.length ?? 0}`);
 
   const [lighterRes, wethRes, aaveRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
     getWethPosition(),
-    getAaveData(),
-    getMoonwellData(),
+    getAaveData(llamaPoolsData),
+    getMoonwellData(llamaPoolsData),
   ]);
 
   const lighter  = lighterRes.value  ?? null;
