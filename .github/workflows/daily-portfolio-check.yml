@@ -26,4 +26,5 @@ jobs:
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
           LIGHTER_PRIVATE_KEY: ${{ secrets.LIGHTER_PRIVATE_KEY }}
           LIGHTER_PUBLIC_KEY: ${{ secrets.LIGHTER_PUBLIC_KEY }}
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
         run: node index.js
