@@ -22,7 +22,8 @@ const WETH_POS_ID = 5384162n;
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
-const ETH_RPC      = 'https://ethereum-rpc.publicnode.com'; // Ethereum mainnet for Aave
+const POLYGON_RPC  = 'https://polygon-rpc.com';             // Polygon mainnet for Aave
+const TANGEM_WALLET = '0xF3841e27b27B6bC78Ea4ad2dC9a1882D04F39f93'; // Tangem cold storage
 
 const NOW_UTC = new Date().toISOString();
 
@@ -225,18 +226,19 @@ async function getWethPosition() {
 async function getAaveData() {
   console.log('\n--- Aave ---');
   try {
-    const provider   = new ethers.JsonRpcProvider(ETH_RPC);
-    const aUSDC_ADDR = '0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c';
+    const provider   = new ethers.JsonRpcProvider(POLYGON_RPC);
+    // aUSDC v3 on Polygon — balanceOf returns supply including accrued interest (6 dec)
+    const aUSDC_ADDR = '0x625E7708f30cA75bfd92586e17077590C60eb4cD';
     const erc20ABI   = ['function balanceOf(address) external view returns (uint256)'];
     const aUSDC      = new ethers.Contract(aUSDC_ADDR, erc20ABI, provider);
 
     // Hard 8-second timeout on the RPC call
-    const timeout    = new Promise((_, reject) => setTimeout(() => reject(new Error('Aave RPC timeout')), 8000));
-    const balRaw     = await Promise.race([aUSDC.balanceOf(WALLET_EVM), timeout]);
-    const tokens     = Number(balRaw) / 1e6;
-    const supplyUSD  = tokens; // USDC = $1
-    const supplyAPY  = 2.73;  // Hardcoded — stable, update manually if shifts
-    console.log(`Aave USDC: ${tokens.toFixed(2)} tokens = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY}% (hardcoded)`);
+    const timeout   = new Promise((_, reject) => setTimeout(() => reject(new Error('Aave RPC timeout')), 8000));
+    const balRaw    = await Promise.race([aUSDC.balanceOf(TANGEM_WALLET), timeout]);
+    const tokens    = Number(balRaw) / 1e6;
+    const supplyUSD = tokens; // USDC = $1
+    const supplyAPY = 1.91;  // From Tangem Yield Mode — update manually if shifts
+    console.log(`Aave USDC (Polygon): ${tokens.toFixed(2)} tokens = $${supplyUSD.toFixed(2)} | APY: ${supplyAPY}% (hardcoded)`);
     return { supplyUSD, tokens, supplyAPY };
   } catch (e) {
     console.error(`Aave: ${e.message.slice(0, 80)}`);
@@ -282,15 +284,26 @@ async function getMoonwellData() {
     }
   }
 
-  // APYs sourced from Airtable Lending Rate Check automation (DeFi Llama too slow/unreliable in GitHub Actions)
-  // Hardcoded as reasonable defaults — Airtable script writes the accurate daily values
-  const moonwellPools = {
-    moonwellETH:    { apy: null },
-    moonwellVIRT:   { apy: null },
-    moonwellCBXRP:  { apy: null },
-    moonwellAERO:   { apy: null },
-    moonwellBorrow: { apyBaseBorrow: null },
-  };
+  // Fetch Moonwell APYs — targeted call, only ~18 records, fast
+  const moonwellPools = {};
+  try {
+    const llamaData = await fetchWithTimeout(
+      'https://yields.llama.fi/pools?project=moonwell-lending&chain=Base', {}, 10000
+    );
+    if (llamaData?.data) {
+      for (const pool of llamaData.data) {
+        const sym = pool.symbol?.toUpperCase();
+        if (sym === 'ETH')     moonwellPools['moonwellETH']    = pool;
+        if (sym === 'VIRTUAL') moonwellPools['moonwellVIRT']   = pool;
+        if (sym === 'CBXRP')  moonwellPools['moonwellCBXRP']  = pool;
+        if (sym === 'AERO')   moonwellPools['moonwellAERO']   = pool;
+        if (sym === 'USDC')   moonwellPools['moonwellBorrow'] = pool;
+      }
+      console.log(`Moonwell APY pools found: ${Object.keys(moonwellPools).join(', ')}`);
+    }
+  } catch (e) {
+    console.error(`Moonwell APY fetch: ${e.message.slice(0, 40)} — APYs will be skipped`);
+  }
 
   for (const market of MARKETS) {
     try {
@@ -350,7 +363,7 @@ async function getMoonwellData() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v29 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v31 — ${NOW_UTC} ======`);
 
   const [lighterRes, wethRes, aaveRes, moonwellRes] = await Promise.allSettled([
     getLighterData(),
