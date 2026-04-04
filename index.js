@@ -430,13 +430,19 @@ async function getSuilendData() {
         const utils = configEl?.interest_rate_utils ?? [];
         const aprs  = configEl?.interest_rate_aprs  ?? [];
 
-        // Calculate current utilization
-        const borrowedRaw = Number(rf?.borrowed_amount?.fields?.value ?? 0) / 1e18;
-        const availableRaw = Number(rf?.available_amount ?? 0);
-        const mintDec = Number(rf?.mint_decimals ?? 6);
-        const available = availableRaw / Math.pow(10, mintDec);
-        const total = borrowedRaw + available;
-        const utilRate = total > 0 ? borrowedRaw / total : 0;
+        // borrowed_amount is a Decimal struct scaled by 1e18 (regardless of asset)
+        // available_amount is raw token units in native asset decimals
+        const mintDec      = Number(rf?.mint_decimals ?? 6);
+        const borrowedRaw  = BigInt(rf?.borrowed_amount?.fields?.value ?? 0);
+        const availableRaw = BigInt(rf?.available_amount ?? 0);
+
+        // Convert both to same scale: native token units
+        // borrowed: Decimal value / 1e18 gives token amount (already in native units)
+        // available: raw / 10^mintDec gives token amount
+        const borrowed  = Number(borrowedRaw) / 1e18;
+        const available = Number(availableRaw) / Math.pow(10, mintDec);
+        const total     = borrowed + available;
+        const utilRate  = total > 0 ? borrowed / total : 0;
 
         // Interpolate borrow APR from the lookup table
         let borrowAprPerYear = 0;
