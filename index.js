@@ -406,9 +406,6 @@ async function getSuilendData() {
     const lmFields = lendingMarketObj?.data?.content?.fields;
     const reserves  = lmFields?.reserves ?? [];
     console.log(`Lending market reserves: ${reserves.length} found`);
-
-    // Build exchange rate map for accurate token counts
-    // exchangeRate = total underlying / ctoken_supply
     const exchangeRates = {};
     for (const reserveEntry of reserves) {
       const rf       = reserveEntry?.fields ?? reserveEntry;
@@ -421,7 +418,6 @@ async function getSuilendData() {
       const key     = isSUI ? 'SUI' : 'WSOL';
       exchangeRates[key] = { mintDec: Number(rf?.mint_decimals ?? 9) };
     }
-    console.log(`Token decimals: SUI=${exchangeRates['SUI']?.mintDec} WSOL=${exchangeRates['WSOL']?.mintDec}`);
 
     const suilendAPYs = {};
     for (const reserveEntry of reserves) {
@@ -527,12 +523,18 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendAPYs[assetKey]?.supplyAPY ?? null;
 
-      // Token count: deposited_ctoken_amount in native mintDec units
-      // cToken exchange rate is very close to 1.0 — ctokens ≈ underlying tokens
-      const mintDec    = exchangeRates[assetKey]?.mintDec ?? (isSUI ? 9 : 8);
-      const ctokenRaw  = BigInt(d?.deposited_ctoken_amount ?? 0);
-      const tokens     = Number(ctokenRaw) / Math.pow(10, mintDec);
-      const supplyUSD  = tokens * price;
+      // USD value: use market_value from obligation — Suilend oracle price, most accurate
+      const mv = d?.market_value;
+      let supplyUSD = 0;
+      if (mv?.fields?.value != null) {
+        supplyUSD = Number(BigInt(mv.fields.value) / 10000n) / 1e14;
+      }
+      // Token count: deposited_ctoken_amount / 10^mintDec (checkpointed state, may lag UI by ~accrued interest)
+      const mintDec   = exchangeRates[assetKey]?.mintDec ?? (isSUI ? 9 : 8);
+      const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
+      const tokens    = Number(ctokenRaw) / Math.pow(10, mintDec);
+      // Fallback USD from price if market_value missing
+      if (supplyUSD === 0) supplyUSD = tokens * price;
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
