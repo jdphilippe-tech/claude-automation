@@ -1,11 +1,16 @@
 {
   "name": "claude-automation",
   "version": "1.0.0",
-  "description": "Daily portfolio check — Lighter, WETH/USDC, Moonwell, xStocks",
-  "main": "index.js",
+  "description": "Daily portfolio automation for OpenClaw",
   "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
+    "ethers": "^6.13.0",
     "node-fetch": "^3.3.2",
-    "ethers": "^6.11.1"
+    "@suilend/sdk": "^1.0.0",
+    "@mysten/sui": "^1.0.0"
   }
 }
