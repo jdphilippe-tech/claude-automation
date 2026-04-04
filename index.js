@@ -418,8 +418,6 @@ async function getSuilendData() {
         ?? d?.reserve_array_index  // fallback — log and skip
         ?? '';
 
-      console.log(`  deposit entry keys: ${Object.keys(d).join(', ')} | coinType: "${coinType}"`);
-
       const isSUI  = coinType.toLowerCase().includes('sui::sui');
       const isWSOL = coinType.toLowerCase().includes('b7844e28');
       if (!isSUI && !isWSOL) continue;
@@ -429,9 +427,9 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendPools[assetKey]?.apy ?? null;
 
-      // Log raw market_value structure on first run to understand format
+      // market_value.fields.value is scaled by 1e18 — confirmed from raw data
+      // e.g. wSOL: 972659829285856213321 / 1e18 = $972.66 ✓
       const mv = d?.market_value;
-      console.log(`  market_value raw: ${JSON.stringify(mv)}`);
 
       let supplyUSD = 0;
       // market_value is a Decimal struct: { fields: { value: "12345..." } } scaled 1e18
@@ -465,18 +463,15 @@ async function getSuilendData() {
       const b        = entry?.fields ?? entry;
       const coinType = b?.coin_type?.fields?.name ?? '';
 
-      console.log(`  borrow entry keys: ${Object.keys(b).join(', ')} | coinType: "${coinType}"`);
-
       const isUSDC = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
       if (!isUSDC) continue;
 
-      // borrowed_amount.fields.value is a large integer scaled by 1e18
-      // e.g. $314 USDC stored as 314000000000000000000 (21 digits)
-      // Must use BigInt — Number() loses precision above 2^53
+      // borrowed_amount.fields.value is scaled by 1e24 (confirmed from raw data)
+      // raw: 313648890508183858160030809 / 1e24 = 313.65 ✓
+      // Note: supply market_value uses 1e18, borrow uses 1e24 — different scales
       const baRaw     = b?.borrowed_amount?.fields?.value ?? b?.borrowed_amount ?? '0';
-      console.log(`  borrowed_amount raw: ${JSON.stringify(b?.borrowed_amount)}`);
       const baInt     = BigInt(String(baRaw).split('.')[0]);
-      const borrowUSD = Number(baInt / 10000n) / 1e14;  // /1e18 via BigInt
+      const borrowUSD = Number(baInt / 1000000n) / 1e18;  // /1e24 via BigInt
       const tokens    = borrowUSD;
 
       const borrowPool = suilendPools['USDC'];
