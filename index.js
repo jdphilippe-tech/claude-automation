@@ -389,38 +389,19 @@ async function getSuilendData() {
     // Log full structure on first run so we can see exact field names
     console.log('Obligation field keys:', Object.keys(obligationFields).join(', '));
 
-    // Step 3: Get prices and APYs
-    const [priceData, llamaPoolsData] = await Promise.all([
-      fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:sui,coingecko:wrapped-solana'),
-      fetchWithTimeout('https://yields.llama.fi/pools'),
-    ]);
+    // Step 3: Get prices from DeFi Llama coins endpoint
+    const priceData = await fetchWithTimeout(
+      'https://coins.llama.fi/prices/current/coingecko:sui,coingecko:wrapped-solana'
+    );
 
     const suiPrice  = priceData?.coins?.['coingecko:sui']?.price ?? 0;
     const wsolPrice = priceData?.coins?.['coingecko:wrapped-solana']?.price ?? 0;
     console.log(`Prices: SUI $${suiPrice.toFixed(4)}, wSOL $${wsolPrice.toFixed(4)}`);
 
-    const suilendPools = {};
-    if (llamaPoolsData?.data) {
-      // Try multiple project/chain name variants — DeFi Llama naming is inconsistent
-      const suiPools = llamaPoolsData.data.filter(p =>
-        (p.project?.toLowerCase().includes('suilend') ||
-         p.project?.toLowerCase().includes('sui-lend')) &&
-        (p.chain === 'Sui' || p.chain === 'SUI' || p.chain?.toLowerCase() === 'sui')
-      );
-      console.log(`All Suilend pools (${suiPools.length}):`, suiPools.map(p => `${p.symbol}(${p.apy?.toFixed(2)}%)`).join(', ') || 'none found');
-
-      // Also log all unique Sui-chain projects so we can see what DeFi Llama calls Suilend
-      const suiProjects = [...new Set(llamaPoolsData.data.filter(p => p.chain === 'Sui' || p.chain === 'SUI').map(p => p.project))];
-      console.log('All Sui projects in DeFi Llama:', suiProjects.join(', '));
-
-      for (const pool of suiPools) {
-        const sym = pool.symbol?.toUpperCase();
-        if (sym === 'SUI')  suilendPools['SUI']  = pool;
-        if (sym === 'WSOL' || sym === 'SOL') suilendPools['WSOL'] = pool;
-        if (sym === 'USDC') suilendPools['USDC'] = pool;
-      }
-    }
-    console.log('Matched pools:', Object.entries(suilendPools).map(([k, v]) => `${k}(${v.apy?.toFixed(2)}%)`).join(', ') || 'none');
+    // Suilend APYs are NOT available on DeFi Llama (project not listed for Sui chain)
+    // APYs are already written daily by the Airtable lending-rate-check automation
+    // GitHub script writes USD values and token amounts only — no APY fields for Suilend
+    const suilendPools = {}; // empty — APYs skipped intentionally
 
     // Step 4: Parse deposits
     // Suilend obligation stores deposits as a dynamic field table — try common field names
@@ -448,17 +429,21 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendPools[assetKey]?.apy ?? null;
 
-      // market_value is the on-chain USD value — most accurate source
-      // It's stored as a Decimal struct with value field scaled by 1e18
-      const mv       = d?.market_value;
-      let supplyUSD  = 0;
+      // Log raw market_value structure on first run to understand format
+      const mv = d?.market_value;
+      console.log(`  market_value raw: ${JSON.stringify(mv)}`);
+
+      let supplyUSD = 0;
+      // market_value is a Decimal struct: { fields: { value: "12345..." } } scaled 1e18
+      // OR it could be a plain numeric string scaled 1e18
+      // Use BigInt to avoid float precision loss on large integers
       if (mv?.fields?.value != null) {
-        supplyUSD = Number(mv.fields.value) / 1e18;
+        supplyUSD = Number(BigInt(mv.fields.value) / 10000n) / 1e14;  // /1e18 via BigInt
       } else if (mv != null && !isNaN(Number(mv))) {
-        supplyUSD = Number(mv) / 1e18;
+        supplyUSD = Number(BigInt(String(mv).split('.')[0]) / 10000n) / 1e14;
       }
-      // Fallback to ctoken amount * price if market_value gives 0
-      if (supplyUSD === 0) {
+      // Fallback to ctoken * price
+      if (supplyUSD === 0 || supplyUSD < 0.01) {
         const decimals  = isSUI ? 9 : 8;
         const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
         supplyUSD = (Number(ctokenRaw) / Math.pow(10, decimals)) * price;
@@ -485,10 +470,13 @@ async function getSuilendData() {
       const isUSDC = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
       if (!isUSDC) continue;
 
-      // borrowed_amount.fields.value is a fixed-point integer scaled by 1e18
-      // e.g. $314 USDC = 314000000000000000000 raw → / 1e18 = 314 ✓
+      // borrowed_amount.fields.value is a large integer scaled by 1e18
+      // e.g. $314 USDC stored as 314000000000000000000 (21 digits)
+      // Must use BigInt — Number() loses precision above 2^53
       const baRaw     = b?.borrowed_amount?.fields?.value ?? b?.borrowed_amount ?? '0';
-      const borrowUSD = Number(baRaw) / 1e18;
+      console.log(`  borrowed_amount raw: ${JSON.stringify(b?.borrowed_amount)}`);
+      const baInt     = BigInt(String(baRaw).split('.')[0]);
+      const borrowUSD = Number(baInt / 10000n) / 1e14;  // /1e18 via BigInt
       const tokens    = borrowUSD;
 
       const borrowPool = suilendPools['USDC'];
