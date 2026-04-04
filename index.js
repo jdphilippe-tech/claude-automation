@@ -437,21 +437,13 @@ async function getSuilendData() {
         const borrowedRaw  = BigInt(rf?.borrowed_amount?.fields?.value ?? 0);
         const availableRaw = BigInt(rf?.available_amount ?? 0);
 
-        // Utilization = borrowed / (borrowed + available)
-        // BUT available_amount is only the undeployed buffer, not total deposits
-        // Total deposits = borrowed + available (this is actually correct — all supply is either borrowed or available)
-        // The issue may be that ctoken_supply includes accrued interest not yet reflected in available_amount
-        // Use: utilization = borrowed / (borrowed + available) but log both for validation
+        // Utilization = borrowed / total_deposits
+        // total_deposits = ctoken_supply (total issued cTokens = total deposits in native units)
+        // available_amount is NOT total deposits - borrowed, it's the liquid buffer only
         const scale27    = 10n ** 27n;
         const borrowedNative  = Number(borrowedRaw * 1000n / scale27) / 1000;
-        const available  = Number(availableRaw) / Math.pow(10, mintDec);
-
-        // Also check ctoken_supply as a proxy for total deposits
-        const ctokenSupply = Number(BigInt(rf?.ctoken_supply ?? 0)) / Math.pow(10, mintDec);
-        // unclaimed_spread_fees in same units
-        const total     = borrowedNative + available;
-        const utilRate  = total > 0 ? borrowedNative / total : 0;
-        console.log(`Reserve ${key}: borrowed=${borrowedNative.toFixed(2)} available=${available.toFixed(2)} ctokenSupply=${ctokenSupply.toFixed(2)} util=${(utilRate*100).toFixed(1)}%`);
+        const ctokenSupplyNative = Number(BigInt(rf?.ctoken_supply ?? 0)) / Math.pow(10, mintDec);
+        const utilRate   = ctokenSupplyNative > 0 ? borrowedNative / ctokenSupplyNative : 0;
 
         // Interpolate borrow APR from the lookup table
         let borrowAprPerYear = 0;
