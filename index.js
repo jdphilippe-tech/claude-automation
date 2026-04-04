@@ -407,6 +407,25 @@ async function getSuilendData() {
     const reserves  = lmFields?.reserves ?? [];
     console.log(`Lending market reserves: ${reserves.length} found`);
 
+    // Build exchange rate map for accurate token counts
+    // exchangeRate = total underlying / ctoken_supply
+    const exchangeRates = {};
+    for (const reserveEntry of reserves) {
+      const rf       = reserveEntry?.fields ?? reserveEntry;
+      const coinType = rf?.coin_type?.fields?.name ?? '';
+      const isSUI    = coinType.toLowerCase().includes('sui::sui');
+      const isWSOL   = coinType.toLowerCase().includes('b7844e28');
+      if (!isSUI && !isWSOL) continue;
+      const key     = isSUI ? 'SUI' : 'WSOL';
+      const mintDec = Number(rf?.mint_decimals ?? 9);
+      const scale27 = 10n ** 27n;
+      const borrowed  = Number(BigInt(rf?.borrowed_amount?.fields?.value ?? 0) * 1000n / scale27) / 1000;
+      const available = Number(BigInt(rf?.available_amount ?? 0)) / Math.pow(10, mintDec);
+      const ctokens   = Number(BigInt(rf?.ctoken_supply ?? 0)) / Math.pow(10, mintDec);
+      exchangeRates[key] = ctokens > 0 ? (borrowed + available) / ctokens : 1;
+    }
+    console.log(`Exchange rates: SUI=${exchangeRates['SUI']?.toFixed(6)} WSOL=${exchangeRates['WSOL']?.toFixed(6)}`);
+
     const suilendAPYs = {};
     for (const reserveEntry of reserves) {
       const rf       = reserveEntry?.fields ?? reserveEntry;
@@ -511,26 +530,14 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendAPYs[assetKey]?.supplyAPY ?? null;
 
-      // market_value.fields.value is scaled by 1e18 — confirmed from raw data
-      // e.g. wSOL: 972659829285856213321 / 1e18 = $972.66 ✓
-      const mv = d?.market_value;
-
-      let supplyUSD = 0;
-      // market_value is a Decimal struct: { fields: { value: "12345..." } } scaled 1e18
-      // OR it could be a plain numeric string scaled 1e18
-      // Use BigInt to avoid float precision loss on large integers
-      if (mv?.fields?.value != null) {
-        supplyUSD = Number(BigInt(mv.fields.value) / 10000n) / 1e14;  // /1e18 via BigInt
-      } else if (mv != null && !isNaN(Number(mv))) {
-        supplyUSD = Number(BigInt(String(mv).split('.')[0]) / 10000n) / 1e14;
-      }
-      // Fallback to ctoken * price
-      if (supplyUSD === 0 || supplyUSD < 0.01) {
-        const decimals  = isSUI ? 9 : 8;
-        const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
-        supplyUSD = (Number(ctokenRaw) / Math.pow(10, decimals)) * price;
-      }
-      const tokens = price > 0 ? supplyUSD / price : 0;
+      // Token count: deposited_ctoken_amount × exchange rate
+      // This gives the actual underlying token amount including accrued interest
+      const decimals   = isSUI ? 9 : 8;
+      const ctokenRaw  = BigInt(d?.deposited_ctoken_amount ?? 0);
+      const ctokens    = Number(ctokenRaw) / Math.pow(10, decimals);
+      const exchRate   = exchangeRates[assetKey] ?? 1;
+      const tokens     = ctokens * exchRate;
+      const supplyUSD  = tokens * price;
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
