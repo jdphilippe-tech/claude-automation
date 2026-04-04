@@ -441,12 +441,14 @@ async function getSuilendData() {
         : null;
 
       const key = isSUI ? 'SUI' : isWSOL ? 'WSOL' : 'USDC';
-      suilendAPYs[key] = { supplyAPY, borrowAPY };
 
-      // Log reserve field keys on first pass so we can see exact structure
-      if (Object.keys(suilendAPYs).length <= 3) {
-        console.log(`Reserve ${key} field keys: ${Object.keys(rf).join(', ')}`);
+      // Log config structure on first match to find rate fields
+      if (!suilendAPYs[key]) {
+        console.log(`Reserve ${key} config keys: ${Object.keys(rf?.config?.fields ?? rf?.config ?? {}).join(', ')}`);
+        console.log(`Reserve ${key} config raw: ${JSON.stringify(rf?.config)?.slice(0, 300)}`);
       }
+
+      suilendAPYs[key] = { supplyAPY, borrowAPY };
       console.log(`Reserve ${key}: supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%, borrowAPY=${borrowAPY?.toFixed(2) ?? 'n/a'}%`);
     }
 
