@@ -413,10 +413,21 @@ async function getSuilendData() {
       const isSUI    = coinType.toLowerCase().includes('sui::sui');
       const isWSOL   = coinType.toLowerCase().includes('b7844e28');
       if (!isSUI && !isWSOL) continue;
-      // Exchange rate is very close to 1.0 for both SUI and WSOL
-      // Just store mintDec for use in deposit token calculation
       const key     = isSUI ? 'SUI' : 'WSOL';
-      exchangeRates[key] = { mintDec: Number(rf?.mint_decimals ?? 9) };
+      const mintDec = Number(rf?.mint_decimals ?? 9);
+      const scale27 = 10n ** 27n;
+      // borrowed in mintDec native units
+      const borrowedNative  = Number(BigInt(rf?.borrowed_amount?.fields?.value ?? 0) * 1000n / scale27) / 1000;
+      // available in mintDec native units
+      const availableNative = Number(BigInt(rf?.available_amount ?? 0)) / Math.pow(10, mintDec);
+      // ctoken_supply always uses 9 decimals on Sui
+      const ctokenSupply9   = Number(BigInt(rf?.ctoken_supply ?? 0)) / 1e9;
+      // Normalize total underlying to 9-decimal equivalent (multiply by 10^(9-mintDec))
+      // SUI: mintDec=9, decAdj=1 → no change
+      // wSOL: mintDec=8, decAdj=10 → scale up to match cToken precision
+      const decAdj       = Math.pow(10, 9 - mintDec);
+      const totalNorm9   = (borrowedNative + availableNative) * decAdj;
+      exchangeRates[key] = ctokenSupply9 > 0 ? totalNorm9 / ctokenSupply9 : 1;
     }
 
     const suilendAPYs = {};
@@ -529,15 +540,18 @@ async function getSuilendData() {
       if (mv?.fields?.value != null) {
         supplyUSD = Number(BigInt(mv.fields.value) / 10000n) / 1e14;
       }
-      if (supplyUSD === 0) {
-        // Fallback: ctoken amount * live price
-        const mintDec  = exchangeRates[assetKey]?.mintDec ?? (isSUI ? 9 : 8);
-        const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
-        supplyUSD = (Number(ctokenRaw) / Math.pow(10, mintDec)) * price;
-      }
-      // Token count = supplyUSD / live price
-      // This is consistent with market_value and avoids cToken checkpointing lag
-      const tokens = price > 0 ? supplyUSD / price : 0;
+
+      // Token count: deposited_ctoken_amount (9 dec) × exchange rate → native token units
+      // Exchange rate = (total_underlying_normalized_9dec) / (ctoken_supply_9dec)
+      // For wSOL (mintDec=8): underlying is scaled ×10 to normalize to 9 dec, then /10 at end
+      const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
+      const ctokens9  = Number(ctokenRaw) / 1e9;
+      const exchRate  = typeof exchangeRates[assetKey] === 'number' ? exchangeRates[assetKey] : 1;
+      const mintDec   = isSUI ? 9 : 8;
+      const decAdj    = Math.pow(10, 9 - mintDec);   // 1 for SUI, 10 for wSOL
+      const tokens    = (ctokens9 * exchRate) / decAdj;
+
+      if (supplyUSD === 0) supplyUSD = tokens * price;
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
