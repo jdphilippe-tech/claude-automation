@@ -29,6 +29,8 @@ const OBLIGATION_CAP_KEYWORD = 'ObligationOwnerCap';
 // Suilend public API — returns reserve APY data
 const SUILEND_API = 'https://api.suilend.fi/api/v1/markets/main/reserves';
 
+const NOW_UTC = new Date().toISOString();
+
 // ---- Daily Actions field IDs ----
 const F = {
   asset:         'fldtiRIqznncRfJYG',
