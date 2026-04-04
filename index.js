@@ -401,14 +401,23 @@ async function getSuilendData() {
 
     const suilendPools = {};
     if (llamaPoolsData?.data) {
-      // Log all Suilend Sui pools so we can see exact symbol names
-      const suiPools = llamaPoolsData.data.filter(p => p.project === 'suilend' && p.chain === 'Sui');
-      console.log('All Suilend pools:', suiPools.map(p => `${p.symbol}(supply:${p.apy?.toFixed(2)}%,borrow:${(p.apyBaseBorrow ?? p.apyBorrow)?.toFixed(2)}%)`).join(', '));
+      // Try multiple project/chain name variants — DeFi Llama naming is inconsistent
+      const suiPools = llamaPoolsData.data.filter(p =>
+        (p.project?.toLowerCase().includes('suilend') ||
+         p.project?.toLowerCase().includes('sui-lend')) &&
+        (p.chain === 'Sui' || p.chain === 'SUI' || p.chain?.toLowerCase() === 'sui')
+      );
+      console.log(`All Suilend pools (${suiPools.length}):`, suiPools.map(p => `${p.symbol}(${p.apy?.toFixed(2)}%)`).join(', ') || 'none found');
+
+      // Also log all unique Sui-chain projects so we can see what DeFi Llama calls Suilend
+      const suiProjects = [...new Set(llamaPoolsData.data.filter(p => p.chain === 'Sui' || p.chain === 'SUI').map(p => p.project))];
+      console.log('All Sui projects in DeFi Llama:', suiProjects.join(', '));
+
       for (const pool of suiPools) {
         const sym = pool.symbol?.toUpperCase();
-        if (sym === 'SUI' || sym === 'SUI-SUILEND')          suilendPools['SUI']  = pool;
-        if (sym === 'WSOL' || sym === 'SOL' || sym === 'WORMHOLE-WSOL') suilendPools['WSOL'] = pool;
-        if (sym === 'USDC' || sym === 'USDC-SUILEND')        suilendPools['USDC'] = pool;
+        if (sym === 'SUI')  suilendPools['SUI']  = pool;
+        if (sym === 'WSOL' || sym === 'SOL') suilendPools['WSOL'] = pool;
+        if (sym === 'USDC') suilendPools['USDC'] = pool;
       }
     }
     console.log('Matched pools:', Object.entries(suilendPools).map(([k, v]) => `${k}(${v.apy?.toFixed(2)}%)`).join(', ') || 'none');
@@ -439,12 +448,22 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendPools[assetKey]?.apy ?? null;
 
-      // deposited_ctoken_amount is the raw on-chain token balance
-      // SUI = 9 decimals, wSOL (bridged) = 8 decimals
-      const decimals  = isSUI ? 9 : 8;
-      const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
-      const tokens    = Number(ctokenRaw) / Math.pow(10, decimals);
-      const supplyUSD = tokens * price;
+      // market_value is the on-chain USD value — most accurate source
+      // It's stored as a Decimal struct with value field scaled by 1e18
+      const mv       = d?.market_value;
+      let supplyUSD  = 0;
+      if (mv?.fields?.value != null) {
+        supplyUSD = Number(mv.fields.value) / 1e18;
+      } else if (mv != null && !isNaN(Number(mv))) {
+        supplyUSD = Number(mv) / 1e18;
+      }
+      // Fallback to ctoken amount * price if market_value gives 0
+      if (supplyUSD === 0) {
+        const decimals  = isSUI ? 9 : 8;
+        const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
+        supplyUSD = (Number(ctokenRaw) / Math.pow(10, decimals)) * price;
+      }
+      const tokens = price > 0 ? supplyUSD / price : 0;
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
@@ -466,18 +485,10 @@ async function getSuilendData() {
       const isUSDC = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
       if (!isUSDC) continue;
 
-      // borrowed_amount is a Decimal struct { value: string (scaled 1e18) }
-      // But the underlying USDC value is in 6 decimals, so:
-      // actual USDC = raw_value / 1e18 * 1e6 ... no.
-      // Suilend stores amounts as fixed-point with 18 decimal places regardless of asset.
-      // So $314 USDC = 314 * 1e18 stored. Dividing by 1e18 gives 314. Correct.
-      // The issue was that the raw value printed as 313648890 which / 1e18 = tiny.
-      // Actually: 313648890510000000000000000 / 1e18 = 313648890.51 — so raw IS in 1e18 scale.
-      // But wait: real borrow is $314. Let's check: if raw = 314000000 (6 dec USDC), then /1e6 = 314. ✓
-      // The Decimal struct value field stores the raw asset amount in asset native decimals.
-      // USDC = 6 decimals. So divide by 1e6, not 1e18.
-      const baRaw   = b?.borrowed_amount?.fields?.value ?? b?.borrowed_amount ?? '0';
-      const borrowUSD = Number(baRaw) / 1e6;  // USDC has 6 decimals
+      // borrowed_amount.fields.value is a fixed-point integer scaled by 1e18
+      // e.g. $314 USDC = 314000000000000000000 raw → / 1e18 = 314 ✓
+      const baRaw     = b?.borrowed_amount?.fields?.value ?? b?.borrowed_amount ?? '0';
+      const borrowUSD = Number(baRaw) / 1e18;
       const tokens    = borrowUSD;
 
       const borrowPool = suilendPools['USDC'];
