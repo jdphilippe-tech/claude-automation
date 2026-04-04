@@ -420,10 +420,18 @@ async function getSuilendData() {
       const mintDec = Number(rf?.mint_decimals ?? 9);
       const scale27 = 10n ** 27n;
       const borrowed  = Number(BigInt(rf?.borrowed_amount?.fields?.value ?? 0) * 1000n / scale27) / 1000;
-      const available = Number(BigInt(rf?.available_amount ?? 0)) / Math.pow(10, mintDec);
-      // ctoken_supply always uses 9 decimals (Sui standard), regardless of underlying asset decimals
+      // available_amount uses 9 decimals (Sui object storage standard), not mintDec
+      const available = Number(BigInt(rf?.available_amount ?? 0)) / 1e9;
       const ctokens   = Number(BigInt(rf?.ctoken_supply ?? 0)) / 1e9;
-      exchangeRates[key] = ctokens > 0 ? (borrowed + available) / ctokens : 1;
+      // exchangeRate: underlying (9dec normalized) per ctoken
+      // For SUI (mintDec=9): direct ratio
+      // For wSOL (mintDec=8): borrowed is in 8dec, available in 9dec — normalize borrowed to 9dec
+      const borrowedNorm = mintDec === 9 ? borrowed : borrowed / Math.pow(10, mintDec - 9);
+      exchangeRates[key] = ctokens > 0 ? (borrowedNorm + available) / ctokens : 1;
+      if (key === 'WSOL') {
+        console.log(`WSOL raw: mintDec=${mintDec} borrowedRaw=${BigInt(rf?.borrowed_amount?.fields?.value??0)} availableRaw=${BigInt(rf?.available_amount??0)} ctokenSupplyRaw=${BigInt(rf?.ctoken_supply??0)}`);
+        console.log(`WSOL calc: borrowed=${borrowed.toFixed(4)} borrowedNorm=${borrowedNorm.toFixed(4)} available=${available.toFixed(4)} ctokens=${ctokens.toFixed(4)} rate=${exchangeRates[key].toFixed(6)}`);
+      }
     }
     console.log(`Exchange rates: SUI=${exchangeRates['SUI']?.toFixed(6)} WSOL=${exchangeRates['WSOL']?.toFixed(6)}`);
 
