@@ -568,8 +568,15 @@ async function getSuilendData() {
       const borrowPool = suilendAPYs['USDC'];
       const borrowAPY  = borrowPool?.borrowAPY ?? null;
 
-      console.log(`suilendBorrow: borrow $${borrowUSD.toFixed(2)} | borrowAPY: ${borrowAPY?.toFixed(2) ?? 'n/a'}%`);
-      results['suilendBorrow'] = { type: 'borrow', borrowUSD, tokens, borrowAPY };
+      // Include LTV-critical fields from obligation in notes
+      const depositedValueUsd    = Number(BigInt(obligationFields.deposited_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
+      const allowedBorrowValueUsd = Number(BigInt(obligationFields.allowed_borrow_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
+      const weightedBorrowValueUsd = Number(BigInt(obligationFields.weighted_borrowed_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
+      const ltvPct = allowedBorrowValueUsd > 0 ? (borrowUSD / allowedBorrowValueUsd * 100).toFixed(1) : 'n/a';
+      const notes  = `Collateral: $${depositedValueUsd.toFixed(2)} | Borrow Limit: $${allowedBorrowValueUsd.toFixed(2)} | LTV Used: ${ltvPct}%`;
+
+      console.log(`suilendBorrow: borrow $${borrowUSD.toFixed(2)} | borrowAPY: ${borrowAPY?.toFixed(2) ?? 'n/a'}% | ${notes}`);
+      results['suilendBorrow'] = { type: 'borrow', borrowUSD, tokens, borrowAPY, notes };
     }
 
   } catch (e) {
@@ -646,6 +653,7 @@ async function main() {
       } else if (data.type === 'borrow') {
         const fields = { [LF.borrowUSD]: data.borrowUSD, [LF.tokenAmt]: data.tokens };
         if (data.borrowAPY != null) fields[LF.borrowAPY] = data.borrowAPY;
+        if (data.notes)             fields[LF.notes]     = data.notes;
         batch.push(lendingRecord(LPOS[posKey], fields));
         console.log(`  Queued ${posKey}: $${data.borrowUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, Borrow APY ${data.borrowAPY?.toFixed(2) ?? 'n/a'}%`);
       }
