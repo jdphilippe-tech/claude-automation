@@ -416,24 +416,12 @@ async function getSuilendData() {
       const isSUI    = coinType.toLowerCase().includes('sui::sui');
       const isWSOL   = coinType.toLowerCase().includes('b7844e28');
       if (!isSUI && !isWSOL) continue;
+      // Exchange rate is very close to 1.0 for both SUI and WSOL
+      // Just store mintDec for use in deposit token calculation
       const key     = isSUI ? 'SUI' : 'WSOL';
-      const mintDec = Number(rf?.mint_decimals ?? 9);
-      const scale27 = 10n ** 27n;
-      const borrowed  = Number(BigInt(rf?.borrowed_amount?.fields?.value ?? 0) * 1000n / scale27) / 1000;
-      // available_amount uses 9 decimals (Sui object storage standard), not mintDec
-      const available = Number(BigInt(rf?.available_amount ?? 0)) / 1e9;
-      const ctokens   = Number(BigInt(rf?.ctoken_supply ?? 0)) / 1e9;
-      // exchangeRate: underlying (9dec normalized) per ctoken
-      // For SUI (mintDec=9): direct ratio
-      // For wSOL (mintDec=8): borrowed is in 8dec, available in 9dec — normalize borrowed to 9dec
-      const borrowedNorm = mintDec === 9 ? borrowed : borrowed / Math.pow(10, mintDec - 9);
-      exchangeRates[key] = ctokens > 0 ? (borrowedNorm + available) / ctokens : 1;
-      if (key === 'WSOL') {
-        console.log(`WSOL raw: mintDec=${mintDec} borrowedRaw=${BigInt(rf?.borrowed_amount?.fields?.value??0)} availableRaw=${BigInt(rf?.available_amount??0)} ctokenSupplyRaw=${BigInt(rf?.ctoken_supply??0)}`);
-        console.log(`WSOL calc: borrowed=${borrowed.toFixed(4)} borrowedNorm=${borrowedNorm.toFixed(4)} available=${available.toFixed(4)} ctokens=${ctokens.toFixed(4)} rate=${exchangeRates[key].toFixed(6)}`);
-      }
+      exchangeRates[key] = { mintDec: Number(rf?.mint_decimals ?? 9) };
     }
-    console.log(`Exchange rates: SUI=${exchangeRates['SUI']?.toFixed(6)} WSOL=${exchangeRates['WSOL']?.toFixed(6)}`);
+    console.log(`Token decimals: SUI=${exchangeRates['SUI']?.mintDec} WSOL=${exchangeRates['WSOL']?.mintDec}`);
 
     const suilendAPYs = {};
     for (const reserveEntry of reserves) {
@@ -539,11 +527,11 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendAPYs[assetKey]?.supplyAPY ?? null;
 
-      // cToken amounts always use 9 decimals on Sui regardless of underlying asset
+      // Token count: deposited_ctoken_amount in native mintDec units
+      // cToken exchange rate is very close to 1.0 — ctokens ≈ underlying tokens
+      const mintDec    = exchangeRates[assetKey]?.mintDec ?? (isSUI ? 9 : 8);
       const ctokenRaw  = BigInt(d?.deposited_ctoken_amount ?? 0);
-      const ctokens    = Number(ctokenRaw) / 1e9;
-      const exchRate   = exchangeRates[assetKey] ?? 1;
-      const tokens     = ctokens * exchRate;
+      const tokens     = Number(ctokenRaw) / Math.pow(10, mintDec);
       const supplyUSD  = tokens * price;
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
