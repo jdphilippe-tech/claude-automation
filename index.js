@@ -26,7 +26,8 @@ const SUI_RPC      = 'https://fullnode.mainnet.sui.io';
 // This avoids hardcoding the exact package address which may differ from docs
 const OBLIGATION_CAP_KEYWORD = 'ObligationOwnerCap';
 
-const NOW_UTC = new Date().toISOString();
+// Suilend public API — returns reserve APY data
+const SUILEND_API = 'https://api.suilend.fi/api/v1/markets/main/reserves';
 
 // ---- Daily Actions field IDs ----
 const F = {
@@ -389,19 +390,37 @@ async function getSuilendData() {
     // Log full structure on first run so we can see exact field names
     console.log('Obligation field keys:', Object.keys(obligationFields).join(', '));
 
-    // Step 3: Get prices from DeFi Llama coins endpoint
-    const priceData = await fetchWithTimeout(
-      'https://coins.llama.fi/prices/current/coingecko:sui,coingecko:wrapped-solana'
-    );
+    // Step 3: Get prices and APYs in parallel
+    const [priceData, reserveData] = await Promise.all([
+      fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:sui,coingecko:wrapped-solana'),
+      fetchWithTimeout(SUILEND_API),
+    ]);
 
     const suiPrice  = priceData?.coins?.['coingecko:sui']?.price ?? 0;
     const wsolPrice = priceData?.coins?.['coingecko:wrapped-solana']?.price ?? 0;
     console.log(`Prices: SUI $${suiPrice.toFixed(4)}, wSOL $${wsolPrice.toFixed(4)}`);
 
-    // Suilend APYs are NOT available on DeFi Llama (project not listed for Sui chain)
-    // APYs are already written daily by the Airtable lending-rate-check automation
-    // GitHub script writes USD values and token amounts only — no APY fields for Suilend
-    const suilendPools = {}; // empty — APYs skipped intentionally
+    // Parse APYs from Suilend API response
+    // Expected: array of reserve objects with symbol, supplyApr, borrowApr fields
+    const suilendAPYs = {};
+    if (Array.isArray(reserveData)) {
+      for (const r of reserveData) {
+        const sym = (r.symbol ?? r.coinType ?? '').toUpperCase();
+        if (sym.includes('SUI') && !sym.includes('USDC') && !sym.includes('SOL')) {
+          suilendAPYs['SUI'] = { supplyAPY: r.supplyApr ?? r.supplyApy ?? r.supply_apy ?? null, borrowAPY: r.borrowApr ?? r.borrowApy ?? r.borrow_apy ?? null };
+        }
+        if (sym.includes('SOL') || sym.includes('WSOL')) {
+          suilendAPYs['WSOL'] = { supplyAPY: r.supplyApr ?? r.supplyApy ?? r.supply_apy ?? null, borrowAPY: r.borrowApr ?? r.borrowApy ?? r.borrow_apy ?? null };
+        }
+        if (sym.includes('USDC')) {
+          suilendAPYs['USDC'] = { supplyAPY: r.supplyApr ?? r.supplyApy ?? r.supply_apy ?? null, borrowAPY: r.borrowApr ?? r.borrowApy ?? r.borrow_apy ?? null };
+        }
+      }
+      console.log('Suilend APYs:', JSON.stringify(suilendAPYs));
+    } else {
+      // Log raw response to diagnose API structure
+      console.log('Suilend API raw (first 300 chars):', JSON.stringify(reserveData)?.slice(0, 300));
+    }
 
     // Step 4: Parse deposits
     // Suilend obligation stores deposits as a dynamic field table — try common field names
@@ -425,7 +444,7 @@ async function getSuilendData() {
       const assetKey  = isSUI ? 'SUI' : 'WSOL';
       const price     = isSUI ? suiPrice : wsolPrice;
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
-      const supplyAPY = suilendPools[assetKey]?.apy ?? null;
+      const supplyAPY = suilendAPYs[assetKey]?.supplyAPY ?? null;
 
       // market_value.fields.value is scaled by 1e18 — confirmed from raw data
       // e.g. wSOL: 972659829285856213321 / 1e18 = $972.66 ✓
@@ -474,8 +493,8 @@ async function getSuilendData() {
       const borrowUSD = Number(baInt / 1000000n) / 1e18;  // /1e24 via BigInt
       const tokens    = borrowUSD;
 
-      const borrowPool = suilendPools['USDC'];
-      const borrowAPY  = borrowPool?.apyBaseBorrow ?? borrowPool?.apyBorrow ?? null;
+      const borrowPool = suilendAPYs['USDC'];
+      const borrowAPY  = borrowPool?.borrowAPY ?? null;
 
       console.log(`suilendBorrow: borrow $${borrowUSD.toFixed(2)} | borrowAPY: ${borrowAPY?.toFixed(2) ?? 'n/a'}%`);
       results['suilendBorrow'] = { type: 'borrow', borrowUSD, tokens, borrowAPY };
