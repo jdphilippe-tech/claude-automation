@@ -9,8 +9,6 @@
   },
   "dependencies": {
     "ethers": "^6.13.0",
-    "node-fetch": "^3.3.2",
-    "@suilend/sdk": "^1.0.0",
-    "@mysten/sui": "^1.0.0"
+    "node-fetch": "^3.3.2"
   }
 }
