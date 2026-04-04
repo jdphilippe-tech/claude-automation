@@ -421,43 +421,61 @@ async function getSuilendData() {
       const key = isSUI ? 'SUI' : isWSOL ? 'WSOL' : 'USDC';
 
       if (!suilendAPYs[key]) {
-        // Config is wrapped in Cell<ReserveConfig> — actual data at config.fields.element.fields
+        // Config is Cell<ReserveConfig> — actual data at config.fields.element.fields
         const configEl = rf?.config?.fields?.element?.fields ?? {};
-        console.log(`Reserve ${key} configEl keys: ${Object.keys(configEl).join(', ')}`);
 
-        // Calculate utilization = borrowed / (borrowed + available)
-        const borrowed   = Number(rf?.borrowed_amount?.fields?.value ?? 0) / 1e18;
-        const available  = Number(rf?.available_amount ?? 0) / Math.pow(10, Number(rf?.mint_decimals ?? 6));
-        const total      = borrowed + available;
-        const utilRate   = total > 0 ? borrowed / total : 0;
+        // Interest rate model: piecewise linear lookup using utils[] and aprs[] arrays
+        // interest_rate_utils: utilization breakpoints (scaled 1e18)
+        // interest_rate_aprs: APR at each breakpoint (scaled 1e18, annualized)
+        const utils = configEl?.interest_rate_utils ?? [];
+        const aprs  = configEl?.interest_rate_aprs  ?? [];
 
-        // Interest rate model is a piecewise linear function
-        // Fields: min_borrow_rate, max_borrow_rate, optimal_borrow_rate, optimal_utilization, spread_fee
-        const minRate      = Number(configEl?.min_borrow_rate?.fields?.value ?? 0) / 1e18;
-        const maxRate      = Number(configEl?.max_borrow_rate?.fields?.value ?? 0) / 1e18;
-        const optRate      = Number(configEl?.optimal_borrow_rate?.fields?.value ?? 0) / 1e18;
-        const optUtil      = Number(configEl?.optimal_utilization?.fields?.value ?? 0) / 1e18;
-        const spreadFee    = Number(configEl?.spread_fee?.fields?.value ?? 0) / 1e18;
+        // Calculate current utilization
+        const borrowedRaw = Number(rf?.borrowed_amount?.fields?.value ?? 0) / 1e18;
+        const availableRaw = Number(rf?.available_amount ?? 0);
+        const mintDec = Number(rf?.mint_decimals ?? 6);
+        const available = availableRaw / Math.pow(10, mintDec);
+        const total = borrowedRaw + available;
+        const utilRate = total > 0 ? borrowedRaw / total : 0;
 
-        console.log(`Reserve ${key}: util=${(utilRate*100).toFixed(2)}%, minRate=${minRate}, optRate=${optRate}, maxRate=${maxRate}, optUtil=${optUtil}`);
+        // Interpolate borrow APR from the lookup table
+        let borrowAprPerYear = 0;
+        if (utils.length > 0 && aprs.length >= utils.length) {
+          // Convert utils to fractions
+          const utilPoints = utils.map(u => Number(u) / 1e18);
+          const aprPoints  = aprs.map(a => Number(a) / 1e18);
 
-        // Piecewise linear borrow rate
-        let borrowRatePerSec = 0;
-        if (utilRate <= optUtil && optUtil > 0) {
-          borrowRatePerSec = minRate + (optRate - minRate) * (utilRate / optUtil);
-        } else if (optUtil < 1) {
-          borrowRatePerSec = optRate + (maxRate - optRate) * ((utilRate - optUtil) / (1 - optUtil));
+          if (utilRate <= utilPoints[0]) {
+            borrowAprPerYear = aprPoints[0];
+          } else if (utilRate >= utilPoints[utilPoints.length - 1]) {
+            borrowAprPerYear = aprPoints[aprPoints.length - 1];
+          } else {
+            for (let i = 1; i < utilPoints.length; i++) {
+              if (utilRate <= utilPoints[i]) {
+                const t = (utilRate - utilPoints[i-1]) / (utilPoints[i] - utilPoints[i-1]);
+                borrowAprPerYear = aprPoints[i-1] + t * (aprPoints[i] - aprPoints[i-1]);
+                break;
+              }
+            }
+          }
         }
 
+        // APR is already annualized — convert to APY via compound formula
+        // APR per second = borrowAprPerYear / 31536000
+        const borrowRatePerSec = borrowAprPerYear / 31_536_000;
         const borrowAPY = borrowRatePerSec > 0
           ? ((1 + borrowRatePerSec) ** 31_536_000 - 1) * 100
           : null;
-        const supplyAPY = borrowAPY != null
+
+        // Supply APY = borrow APY × utilization × (1 - spread_fee)
+        const spreadFeeBps = Number(configEl?.spread_fee_bps ?? 0);
+        const spreadFee    = spreadFeeBps / 10000;
+        const supplyAPY    = borrowAPY != null
           ? borrowAPY * utilRate * (1 - spreadFee)
           : null;
 
         suilendAPYs[key] = { supplyAPY, borrowAPY };
-        console.log(`Reserve ${key}: supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%, borrowAPY=${borrowAPY?.toFixed(2) ?? 'n/a'}%`);
+        console.log(`Reserve ${key}: util=${(utilRate*100).toFixed(1)}%, borrowAPY=${borrowAPY?.toFixed(2) ?? 'n/a'}%, supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       }
     }
 
