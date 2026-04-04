@@ -389,66 +389,65 @@ async function getSuilendData() {
     // Log full structure on first run so we can see exact field names
     console.log('Obligation field keys:', Object.keys(obligationFields).join(', '));
 
-    // Step 3: Get prices and fetch reserve APRs from on-chain in parallel
+    // Step 3: Get prices and lending market reserves in parallel
     const lendingMarketId = obligationFields.lending_market_id?.id
       ?? obligationFields.lending_market_id;
 
-    const [priceData, reserveFields] = await Promise.all([
+    const [priceData, lendingMarketObj] = await Promise.all([
       fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:sui,coingecko:wrapped-solana'),
-      // Fetch reserves from the lending market object directly
-      suiRpc('suix_getDynamicFields', [lendingMarketId, null, 20]),
+      suiRpc('sui_getObject', [lendingMarketId, { showContent: true }]),
     ]);
 
     const suiPrice  = priceData?.coins?.['coingecko:sui']?.price ?? 0;
     const wsolPrice = priceData?.coins?.['coingecko:wrapped-solana']?.price ?? 0;
     console.log(`Prices: SUI $${suiPrice.toFixed(4)}, wSOL $${wsolPrice.toFixed(4)}`);
 
-    // Build APY map by fetching each reserve object and reading interest rate
-    // Reserve objects have current_borrow_rate (per second, scaled 1e18) and
-    // supply APY can be derived from utilization. For simplicity we use
-    // the deposit's reserve_array_index to match reserves.
+    // Reserves are stored as a vector in the lending market object fields
+    const lmFields = lendingMarketObj?.data?.content?.fields;
+    const reserves  = lmFields?.reserves ?? [];
+    console.log(`Lending market reserves: ${reserves.length} found`);
+
     const suilendAPYs = {};
+    for (const reserveEntry of reserves) {
+      const rf       = reserveEntry?.fields ?? reserveEntry;
+      const coinType = rf?.coin_type?.fields?.name ?? rf?.coinType ?? '';
 
-    if (reserveFields?.data?.length) {
-      console.log(`Reserve dynamic fields: ${reserveFields.data.length} found`);
-      for (const field of reserveFields.data) {
-        // Each field is a Reserve — fetch its content
-        const reserveObj = await suiRpc('sui_getObject', [
-          field.objectId,
-          { showContent: true },
-        ]);
-        const rf = reserveObj?.data?.content?.fields;
-        if (!rf) continue;
+      const isSUI  = coinType.toLowerCase().includes('sui::sui');
+      const isWSOL = coinType.toLowerCase().includes('b7844e28');
+      const isUSDC = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
 
-        const coinType = rf.coin_type?.fields?.name ?? '';
-        const isSUI    = coinType.toLowerCase().includes('sui::sui');
-        const isWSOL   = coinType.toLowerCase().includes('b7844e28');
-        const isUSDC   = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
+      if (!isSUI && !isWSOL && !isUSDC) continue;
 
-        if (!isSUI && !isWSOL && !isUSDC) continue;
+      // Interest rates are in the reserve's interest_rate_model or config
+      // Try multiple field paths that Suilend may use
+      const interestRateFields = rf?.interest_rate?.fields ?? rf?.config?.fields;
 
-        // current_borrow_rate is per-second scaled by 1e18
-        // APY = (1 + rate)^31536000 - 1
-        const borrowRateRaw = rf.interest_rate?.fields?.value
-          ?? rf.current_borrow_rate?.fields?.value ?? '0';
-        const borrowRatePerSec = Number(borrowRateRaw) / 1e18;
-        const borrowAPY = ((1 + borrowRatePerSec) ** 31_536_000 - 1) * 100;
+      // current_borrow_rate per second scaled by 1e18
+      const borrowRateRaw    = rf?.current_borrow_rate?.fields?.value
+        ?? rf?.borrow_rate?.fields?.value
+        ?? interestRateFields?.base_rate?.fields?.value
+        ?? '0';
+      const borrowRatePerSec = Number(borrowRateRaw) / 1e18;
+      const borrowAPY        = borrowRatePerSec > 0
+        ? ((1 + borrowRatePerSec) ** 31_536_000 - 1) * 100
+        : null;
 
-        // Supply APY = borrow APY × utilization × (1 - spread_fee)
-        // For a simple approximation, use the stored supply_interest_rate if available
-        const supplyRateRaw = rf.supply_interest_rate?.fields?.value ?? '0';
-        const supplyRatePerSec = Number(supplyRateRaw) / 1e18;
-        const supplyAPY = supplyRatePerSec > 0
-          ? ((1 + supplyRatePerSec) ** 31_536_000 - 1) * 100
-          : null;
+      const supplyRateRaw    = rf?.current_supply_rate?.fields?.value
+        ?? rf?.supply_rate?.fields?.value
+        ?? '0';
+      const supplyRatePerSec = Number(supplyRateRaw) / 1e18;
+      const supplyAPY        = supplyRatePerSec > 0
+        ? ((1 + supplyRatePerSec) ** 31_536_000 - 1) * 100
+        : null;
 
-        const key = isSUI ? 'SUI' : isWSOL ? 'WSOL' : 'USDC';
-        suilendAPYs[key] = { supplyAPY, borrowAPY };
-        console.log(`Reserve ${key}: supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%, borrowAPY=${borrowAPY?.toFixed(2)}%`);
+      const key = isSUI ? 'SUI' : isWSOL ? 'WSOL' : 'USDC';
+      suilendAPYs[key] = { supplyAPY, borrowAPY };
+
+      // Log reserve field keys on first pass so we can see exact structure
+      if (Object.keys(suilendAPYs).length <= 3) {
+        console.log(`Reserve ${key} field keys: ${Object.keys(rf).join(', ')}`);
       }
-    } else {
-      console.log(`lending_market_id: ${lendingMarketId}`);
-      console.log('Reserve fields raw:', JSON.stringify(reserveFields)?.slice(0, 200));
+      console.log(`Reserve ${key}: supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%, borrowAPY=${borrowAPY?.toFixed(2) ?? 'n/a'}%`);
     }
 
     // Step 4: Parse deposits
