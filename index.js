@@ -529,12 +529,15 @@ async function getSuilendData() {
       if (mv?.fields?.value != null) {
         supplyUSD = Number(BigInt(mv.fields.value) / 10000n) / 1e14;
       }
-      // Token count: deposited_ctoken_amount / 10^mintDec (checkpointed state, may lag UI by ~accrued interest)
-      const mintDec   = exchangeRates[assetKey]?.mintDec ?? (isSUI ? 9 : 8);
-      const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
-      const tokens    = Number(ctokenRaw) / Math.pow(10, mintDec);
-      // Fallback USD from price if market_value missing
-      if (supplyUSD === 0) supplyUSD = tokens * price;
+      if (supplyUSD === 0) {
+        // Fallback: ctoken amount * live price
+        const mintDec  = exchangeRates[assetKey]?.mintDec ?? (isSUI ? 9 : 8);
+        const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
+        supplyUSD = (Number(ctokenRaw) / Math.pow(10, mintDec)) * price;
+      }
+      // Token count = supplyUSD / live price
+      // This is consistent with market_value and avoids cToken checkpointing lag
+      const tokens = price > 0 ? supplyUSD / price : 0;
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
