@@ -406,29 +406,7 @@ async function getSuilendData() {
     const lmFields = lendingMarketObj?.data?.content?.fields;
     const reserves  = lmFields?.reserves ?? [];
     console.log(`Lending market reserves: ${reserves.length} found`);
-    const exchangeRates = {};
-    for (const reserveEntry of reserves) {
-      const rf       = reserveEntry?.fields ?? reserveEntry;
-      const coinType = rf?.coin_type?.fields?.name ?? '';
-      const isSUI    = coinType.toLowerCase().includes('sui::sui');
-      const isWSOL   = coinType.toLowerCase().includes('b7844e28');
-      if (!isSUI && !isWSOL) continue;
-      const key     = isSUI ? 'SUI' : 'WSOL';
-      const mintDec = Number(rf?.mint_decimals ?? 9);
-      const scale27 = 10n ** 27n;
-      // borrowed in mintDec native units
-      const borrowedNative  = Number(BigInt(rf?.borrowed_amount?.fields?.value ?? 0) * 1000n / scale27) / 1000;
-      // available in mintDec native units
-      const availableNative = Number(BigInt(rf?.available_amount ?? 0)) / Math.pow(10, mintDec);
-      // ctoken_supply always uses 9 decimals on Sui
-      const ctokenSupply9   = Number(BigInt(rf?.ctoken_supply ?? 0)) / 1e9;
-      // Normalize total underlying to 9-decimal equivalent (multiply by 10^(9-mintDec))
-      // SUI: mintDec=9, decAdj=1 → no change
-      // wSOL: mintDec=8, decAdj=10 → scale up to match cToken precision
-      const decAdj       = Math.pow(10, 9 - mintDec);
-      const totalNorm9   = (borrowedNative + availableNative) * decAdj;
-      exchangeRates[key] = ctokenSupply9 > 0 ? totalNorm9 / ctokenSupply9 : 1;
-    }
+
 
     const suilendAPYs = {};
     for (const reserveEntry of reserves) {
