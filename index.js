@@ -421,7 +421,8 @@ async function getSuilendData() {
       const scale27 = 10n ** 27n;
       const borrowed  = Number(BigInt(rf?.borrowed_amount?.fields?.value ?? 0) * 1000n / scale27) / 1000;
       const available = Number(BigInt(rf?.available_amount ?? 0)) / Math.pow(10, mintDec);
-      const ctokens   = Number(BigInt(rf?.ctoken_supply ?? 0)) / Math.pow(10, mintDec);
+      // ctoken_supply always uses 9 decimals (Sui standard), regardless of underlying asset decimals
+      const ctokens   = Number(BigInt(rf?.ctoken_supply ?? 0)) / 1e9;
       exchangeRates[key] = ctokens > 0 ? (borrowed + available) / ctokens : 1;
     }
     console.log(`Exchange rates: SUI=${exchangeRates['SUI']?.toFixed(6)} WSOL=${exchangeRates['WSOL']?.toFixed(6)}`);
@@ -530,11 +531,9 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendAPYs[assetKey]?.supplyAPY ?? null;
 
-      // Token count: deposited_ctoken_amount × exchange rate
-      // This gives the actual underlying token amount including accrued interest
-      const decimals   = isSUI ? 9 : 8;
+      // cToken amounts always use 9 decimals on Sui regardless of underlying asset
       const ctokenRaw  = BigInt(d?.deposited_ctoken_amount ?? 0);
-      const ctokens    = Number(ctokenRaw) / Math.pow(10, decimals);
+      const ctokens    = Number(ctokenRaw) / 1e9;
       const exchRate   = exchangeRates[assetKey] ?? 1;
       const tokens     = ctokens * exchRate;
       const supplyUSD  = tokens * price;
