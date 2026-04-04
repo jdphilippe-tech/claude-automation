@@ -436,15 +436,14 @@ async function getSuilendData() {
         const borrowedRaw  = BigInt(rf?.borrowed_amount?.fields?.value ?? 0);
         const availableRaw = BigInt(rf?.available_amount ?? 0);
 
-        // Convert both to same scale: native token units
-        // borrowed: Decimal value / 1e18 gives token amount (already in native units)
-        // available: raw / 10^mintDec gives token amount
-        const borrowed  = Number(borrowedRaw) / 1e18;
+        // Reserve borrowed_amount uses 1e27 scale (ray math), NOT 1e18
+        // available_amount is in raw native token units (needs /10^mintDec)
+        // Confirmed from raw data: SUI borrowedRaw=2.1e33, availableRaw=3.56e16
+        // 2.1e33 / 1e27 = 2.1e6 SUI borrowed — plausible for protocol total
+        const borrowed  = Number(borrowedRaw / 1000000000n) / 1e18;  // /1e27 via BigInt
         const available = Number(availableRaw) / Math.pow(10, mintDec);
         const total     = borrowed + available;
         const utilRate  = total > 0 ? borrowed / total : 0;
-
-        console.log(`Reserve ${key} raw: mintDec=${mintDec} borrowedRaw=${borrowedRaw} availableRaw=${availableRaw} borrowed=${borrowed.toFixed(2)} available=${available.toFixed(2)} util=${(utilRate*100).toFixed(1)}%`);
 
         // Interpolate borrow APR from the lookup table
         let borrowAprPerYear = 0;
