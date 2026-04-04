@@ -430,7 +430,6 @@ async function getSuilendData() {
         const utils = configEl?.interest_rate_utils ?? [];
         const aprs  = configEl?.interest_rate_aprs  ?? [];
 
-        console.log(`Reserve ${key} utils: [${utils.slice(0,4).join(', ')}...] aprs: [${aprs.slice(0,4).join(', ')}...]`);
 
         // borrowed_amount is a Decimal struct scaled by 1e18 (regardless of asset)
         // available_amount is raw token units in native asset decimals
@@ -450,9 +449,10 @@ async function getSuilendData() {
         // Interpolate borrow APR from the lookup table
         let borrowAprPerYear = 0;
         if (utils.length > 0 && aprs.length >= utils.length) {
-          // Convert utils to fractions
-          const utilPoints = utils.map(u => Number(u) / 1e18);
-          const aprPoints  = aprs.map(a => Number(a) / 1e18);
+        // interest_rate_utils: utilization as percentages (0-100), NOT fractions
+        // interest_rate_aprs: APR in basis points (400 = 4%), NOT scaled by 1e18
+        const utilPoints = utils.map(u => Number(u) / 100);        // convert % to fraction
+        const aprPoints  = aprs.map(a => Number(a) / 10000);       // convert bps to decimal
 
           if (utilRate <= utilPoints[0]) {
             borrowAprPerYear = aprPoints[0];
