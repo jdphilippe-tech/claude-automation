@@ -22,7 +22,9 @@ const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 const SUI_RPC      = 'https://fullnode.mainnet.sui.io';
 
 // Suilend ObligationOwnerCap type — used to find obligation ID from wallet
-const OBLIGATION_CAP_TYPE = '0x8d9e4bde4a5d3ef9745f3793a0cfda0a69f8a49ef47ef9e1ffe9ee3a4b38218b::obligation::ObligationOwnerCap';
+// We scan all owned objects and match by type string keyword
+// This avoids hardcoding the exact package address which may differ from docs
+const OBLIGATION_CAP_KEYWORD = 'ObligationOwnerCap';
 
 const NOW_UTC = new Date().toISOString();
 
@@ -327,28 +329,46 @@ async function getSuilendData() {
   const results = {};
 
   try {
-    // Step 1: Find ObligationOwnerCap owned by wallet
-    const ownedObjs = await suiRpc('suix_getOwnedObjects', [
-      WALLET_SUI,
-      {
-        filter: { StructType: OBLIGATION_CAP_TYPE },
-        options: { showContent: true, showType: true },
-      },
-      null,
-      5,
-    ]);
+    // Step 1: Scan all owned objects and find ObligationOwnerCap by type keyword
+    // We can't use StructType filter because the exact package address varies
+    let obligationId = null;
+    let cursor = null;
 
-    if (!ownedObjs?.data?.length) {
-      console.error('Suilend: no ObligationOwnerCap found for wallet');
-      return results;
+    outer: while (true) {
+      const page = await suiRpc('suix_getOwnedObjects', [
+        WALLET_SUI,
+        { options: { showType: true, showContent: true } },
+        cursor,
+        50,
+      ]);
+
+      if (!page?.data?.length) break;
+
+      for (const obj of page.data) {
+        const objType = obj.data?.type ?? '';
+        if (objType.includes(OBLIGATION_CAP_KEYWORD)) {
+          console.log(`Suilend: found cap type: ${objType}`);
+          const fields = obj.data?.content?.fields;
+          obligationId = fields?.obligation_id ?? fields?.obligationId;
+          break outer;
+        }
+      }
+
+      if (!page.hasNextPage) break;
+      cursor = page.nextCursor;
     }
 
-    const cap          = ownedObjs.data[0];
-    const capFields    = cap.data?.content?.fields;
-    const obligationId = capFields?.obligation_id ?? capFields?.obligationId;
-
     if (!obligationId) {
-      console.error('Suilend: could not extract obligation ID. Cap fields:', JSON.stringify(capFields));
+      console.error('Suilend: no ObligationOwnerCap found. Logging all object types for debug:');
+      const debugPage = await suiRpc('suix_getOwnedObjects', [
+        WALLET_SUI,
+        { options: { showType: true } },
+        null,
+        20,
+      ]);
+      for (const obj of debugPage?.data ?? []) {
+        console.log(' -', obj.data?.type ?? 'unknown');
+      }
       return results;
     }
 
