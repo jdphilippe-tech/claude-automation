@@ -534,24 +534,13 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendAPYs[assetKey]?.supplyAPY ?? null;
 
-      // USD value: use market_value from obligation — Suilend oracle price, most accurate
-      const mv = d?.market_value;
-      let supplyUSD = 0;
-      if (mv?.fields?.value != null) {
-        supplyUSD = Number(BigInt(mv.fields.value) / 10000n) / 1e14;
-      }
-
-      // Token count: deposited_ctoken_amount (9 dec) × exchange rate → native token units
-      // Exchange rate = (total_underlying_normalized_9dec) / (ctoken_supply_9dec)
-      // For wSOL (mintDec=8): underlying is scaled ×10 to normalize to 9 dec, then /10 at end
+      // Token count: deposited_ctoken_amount in native mintDec units (stable, checkpointed)
+      // wSOL mintDec=8, SUI mintDec=9
+      const mintDec2  = isSUI ? 9 : 8;
       const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
-      const ctokens9  = Number(ctokenRaw) / 1e9;
-      const exchRate  = typeof exchangeRates[assetKey] === 'number' ? exchangeRates[assetKey] : 1;
-      const mintDec   = isSUI ? 9 : 8;
-      const decAdj    = Math.pow(10, 9 - mintDec);   // 1 for SUI, 10 for wSOL
-      const tokens    = (ctokens9 * exchRate) / decAdj;
-
-      if (supplyUSD === 0) supplyUSD = tokens * price;
+      const tokens    = Number(ctokenRaw) / Math.pow(10, mintDec2);
+      // USD: tokens × live market price (consistent with portfolio tracking)
+      const supplyUSD = tokens * price;
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
