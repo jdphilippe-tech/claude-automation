@@ -418,38 +418,47 @@ async function getSuilendData() {
 
       if (!isSUI && !isWSOL && !isUSDC) continue;
 
-      // Interest rates are in the reserve's interest_rate_model or config
-      // Try multiple field paths that Suilend may use
-      const interestRateFields = rf?.interest_rate?.fields ?? rf?.config?.fields;
-
-      // current_borrow_rate per second scaled by 1e18
-      const borrowRateRaw    = rf?.current_borrow_rate?.fields?.value
-        ?? rf?.borrow_rate?.fields?.value
-        ?? interestRateFields?.base_rate?.fields?.value
-        ?? '0';
-      const borrowRatePerSec = Number(borrowRateRaw) / 1e18;
-      const borrowAPY        = borrowRatePerSec > 0
-        ? ((1 + borrowRatePerSec) ** 31_536_000 - 1) * 100
-        : null;
-
-      const supplyRateRaw    = rf?.current_supply_rate?.fields?.value
-        ?? rf?.supply_rate?.fields?.value
-        ?? '0';
-      const supplyRatePerSec = Number(supplyRateRaw) / 1e18;
-      const supplyAPY        = supplyRatePerSec > 0
-        ? ((1 + supplyRatePerSec) ** 31_536_000 - 1) * 100
-        : null;
-
       const key = isSUI ? 'SUI' : isWSOL ? 'WSOL' : 'USDC';
 
-      // Log config structure on first match to find rate fields
       if (!suilendAPYs[key]) {
-        console.log(`Reserve ${key} config keys: ${Object.keys(rf?.config?.fields ?? rf?.config ?? {}).join(', ')}`);
-        console.log(`Reserve ${key} config raw: ${JSON.stringify(rf?.config)?.slice(0, 300)}`);
-      }
+        // Config is wrapped in Cell<ReserveConfig> — actual data at config.fields.element.fields
+        const configEl = rf?.config?.fields?.element?.fields ?? {};
+        console.log(`Reserve ${key} configEl keys: ${Object.keys(configEl).join(', ')}`);
 
-      suilendAPYs[key] = { supplyAPY, borrowAPY };
-      console.log(`Reserve ${key}: supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%, borrowAPY=${borrowAPY?.toFixed(2) ?? 'n/a'}%`);
+        // Calculate utilization = borrowed / (borrowed + available)
+        const borrowed   = Number(rf?.borrowed_amount?.fields?.value ?? 0) / 1e18;
+        const available  = Number(rf?.available_amount ?? 0) / Math.pow(10, Number(rf?.mint_decimals ?? 6));
+        const total      = borrowed + available;
+        const utilRate   = total > 0 ? borrowed / total : 0;
+
+        // Interest rate model is a piecewise linear function
+        // Fields: min_borrow_rate, max_borrow_rate, optimal_borrow_rate, optimal_utilization, spread_fee
+        const minRate      = Number(configEl?.min_borrow_rate?.fields?.value ?? 0) / 1e18;
+        const maxRate      = Number(configEl?.max_borrow_rate?.fields?.value ?? 0) / 1e18;
+        const optRate      = Number(configEl?.optimal_borrow_rate?.fields?.value ?? 0) / 1e18;
+        const optUtil      = Number(configEl?.optimal_utilization?.fields?.value ?? 0) / 1e18;
+        const spreadFee    = Number(configEl?.spread_fee?.fields?.value ?? 0) / 1e18;
+
+        console.log(`Reserve ${key}: util=${(utilRate*100).toFixed(2)}%, minRate=${minRate}, optRate=${optRate}, maxRate=${maxRate}, optUtil=${optUtil}`);
+
+        // Piecewise linear borrow rate
+        let borrowRatePerSec = 0;
+        if (utilRate <= optUtil && optUtil > 0) {
+          borrowRatePerSec = minRate + (optRate - minRate) * (utilRate / optUtil);
+        } else if (optUtil < 1) {
+          borrowRatePerSec = optRate + (maxRate - optRate) * ((utilRate - optUtil) / (1 - optUtil));
+        }
+
+        const borrowAPY = borrowRatePerSec > 0
+          ? ((1 + borrowRatePerSec) ** 31_536_000 - 1) * 100
+          : null;
+        const supplyAPY = borrowAPY != null
+          ? borrowAPY * utilRate * (1 - spreadFee)
+          : null;
+
+        suilendAPYs[key] = { supplyAPY, borrowAPY };
+        console.log(`Reserve ${key}: supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%, borrowAPY=${borrowAPY?.toFixed(2) ?? 'n/a'}%`);
+      }
     }
 
     // Step 4: Parse deposits
