@@ -430,6 +430,8 @@ async function getSuilendData() {
         const utils = configEl?.interest_rate_utils ?? [];
         const aprs  = configEl?.interest_rate_aprs  ?? [];
 
+        console.log(`Reserve ${key} utils: [${utils.slice(0,4).join(', ')}...] aprs: [${aprs.slice(0,4).join(', ')}...]`);
+
         // borrowed_amount is a Decimal struct scaled by 1e18 (regardless of asset)
         // available_amount is raw token units in native asset decimals
         const mintDec      = Number(rf?.mint_decimals ?? 6);
