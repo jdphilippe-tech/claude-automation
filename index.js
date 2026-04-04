@@ -1,26 +1,28 @@
 // ============================================================
 // Daily Portfolio Check — GitHub Actions v26
-// Added: Suilend (SUI supply, wSOL supply, USDC borrow) on Sui
+// Added: Suilend (SUI supply, wSOL supply, USDC borrow) via raw Sui RPC
+// No @suilend/sdk — avoids springsui-sdk ESM directory import bug
 // Retained: WETH/USDC Primary (Arbitrum), Moonwell (Base)
 // Schedule: 14:00 UTC = 7:00 AM PDT
 // ============================================================
 
 import { ethers } from 'ethers';
-import { SuiClient } from '@mysten/sui/client';
-import { SuilendClient, LENDING_MARKET_ID, LENDING_MARKET_TYPE } from '@suilend/sdk';
 
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE    = 'appWojaxYR99bXC1f';
 const DAILY_TABLE      = 'tblKsk0QnkOoKNLuk';
 const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
 
-const WALLET_EVM     = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
-const WALLET_SUI     = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
-const WETH_POS_ID    = 5384162n;
+const WALLET_EVM  = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
+const WALLET_SUI  = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
+const WETH_POS_ID = 5384162n;
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 const SUI_RPC      = 'https://fullnode.mainnet.sui.io';
+
+// Suilend ObligationOwnerCap type — used to find obligation ID from wallet
+const OBLIGATION_CAP_TYPE = '0x8d9e4bde4a5d3ef9745f3793a0cfda0a69f8a49ef47ef9e1ffe9ee3a4b38218b::obligation::ObligationOwnerCap';
 
 const NOW_UTC = new Date().toISOString();
 
@@ -76,13 +78,6 @@ const MARKETS = [
   { key: 'moonwellBorrow', mAddr: '0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22', underlyingDec: 6,  type: 'borrow', method: 'borrow' },
 ];
 
-// Suilend coin types for matching deposits/borrows in the obligation
-const SUILEND_COIN_TYPES = {
-  SUI:  '0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI',
-  WSOL: '0xb7844e289a8410e50fb3ca48d69eb9cf29e27d223ef90353fe1bd8e27ff8f3f8::coin::COIN',
-  USDC: '0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC',
-};
-
 // ============================================================
 // HELPERS
 // ============================================================
@@ -102,6 +97,20 @@ async function fetchWithTimeout(url, options = {}, ms = 10000) {
     else console.error(`[fetch] ${e.message}`);
     return null;
   }
+}
+
+// Sui JSON-RPC helper
+async function suiRpc(method, params) {
+  const { default: fetch } = await import('node-fetch');
+  const res = await fetch(SUI_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  if (!res.ok) { console.error(`[Sui RPC HTTP ${res.status}] ${method}`); return null; }
+  const json = await res.json();
+  if (json.error) { console.error(`[Sui RPC error] ${method}: ${json.error.message}`); return null; }
+  return json.result;
 }
 
 async function airtableCreate(tableId, records) {
@@ -124,11 +133,6 @@ function dailyRecord(assetId, inRange, extra = {}) {
 
 function lendingRecord(positionId, extra = {}) {
   return { [LF.position]: [positionId], [LF.actionType]: 'Rate Check', [LF.date]: NOW_UTC, ...extra };
-}
-
-// Normalize coin type for comparison — strip leading zeros in address segment
-function normalizeCoinType(coinType) {
-  return coinType?.toLowerCase().replace(/0x0+/, '0x');
 }
 
 // ============================================================
@@ -314,7 +318,8 @@ async function getMoonwellData() {
 }
 
 // ============================================================
-// MODULE 3 — Suilend (Sui)
+// MODULE 3 — Suilend (Sui) via raw RPC
+// No SDK — avoids @suilend/springsui-sdk ESM directory import bug
 // ============================================================
 
 async function getSuilendData() {
@@ -322,92 +327,143 @@ async function getSuilendData() {
   const results = {};
 
   try {
-    // Init Sui client and Suilend client
-    const suiClient      = new SuiClient({ url: SUI_RPC });
-    const suilendClient  = await SuilendClient.initialize(LENDING_MARKET_ID, [LENDING_MARKET_TYPE], suiClient);
+    // Step 1: Find ObligationOwnerCap owned by wallet
+    const ownedObjs = await suiRpc('suix_getOwnedObjects', [
+      WALLET_SUI,
+      {
+        filter: { StructType: OBLIGATION_CAP_TYPE },
+        options: { showContent: true, showType: true },
+      },
+      null,
+      5,
+    ]);
 
-    // Get obligation owner caps for this wallet
-    const caps = await SuilendClient.getObligationOwnerCaps(WALLET_SUI, [LENDING_MARKET_TYPE], suiClient);
-    if (!caps || caps.length === 0) {
-      console.error('Suilend: no obligations found for wallet');
+    if (!ownedObjs?.data?.length) {
+      console.error('Suilend: no ObligationOwnerCap found for wallet');
       return results;
     }
 
-    console.log(`Suilend: found ${caps.length} obligation(s)`);
+    const cap          = ownedObjs.data[0];
+    const capFields    = cap.data?.content?.fields;
+    const obligationId = capFields?.obligation_id ?? capFields?.obligationId;
 
-    // Use first obligation (main position)
-    const obligation = await SuilendClient.getObligation(caps[0].obligationId, [LENDING_MARKET_TYPE], suiClient);
+    if (!obligationId) {
+      console.error('Suilend: could not extract obligation ID. Cap fields:', JSON.stringify(capFields));
+      return results;
+    }
 
-    // Get DeFi Llama APYs for Suilend on Sui
-    const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
-    const suilendPools   = {};
+    console.log(`Suilend: obligation ${obligationId}`);
+
+    // Step 2: Fetch the obligation object
+    const obligationObj    = await suiRpc('sui_getObject', [
+      obligationId,
+      { showContent: true, showType: true },
+    ]);
+    const obligationFields = obligationObj?.data?.content?.fields;
+
+    if (!obligationFields) {
+      console.error('Suilend: could not read obligation fields');
+      return results;
+    }
+
+    // Log full structure on first run so we can see exact field names
+    console.log('Obligation field keys:', Object.keys(obligationFields).join(', '));
+
+    // Step 3: Get prices and APYs
+    const [priceData, llamaPoolsData] = await Promise.all([
+      fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:sui,coingecko:wrapped-solana'),
+      fetchWithTimeout('https://yields.llama.fi/pools'),
+    ]);
+
+    const suiPrice  = priceData?.coins?.['coingecko:sui']?.price ?? 0;
+    const wsolPrice = priceData?.coins?.['coingecko:wrapped-solana']?.price ?? 0;
+    console.log(`Prices: SUI $${suiPrice.toFixed(4)}, wSOL $${wsolPrice.toFixed(4)}`);
+
+    const suilendPools = {};
     if (llamaPoolsData?.data) {
-      const suiPools = llamaPoolsData.data.filter(
-        p => p.project === 'suilend' && p.chain === 'Sui'
-      );
-      console.log('Suilend pools:', suiPools.map(p => `${p.symbol}(${p.apy?.toFixed(2)}%)`).join(', '));
-      for (const pool of suiPools) {
+      for (const pool of llamaPoolsData.data.filter(p => p.project === 'suilend' && p.chain === 'Sui')) {
         const sym = pool.symbol?.toUpperCase();
         if (sym === 'SUI')  suilendPools['SUI']  = pool;
         if (sym === 'WSOL') suilendPools['WSOL'] = pool;
         if (sym === 'USDC') suilendPools['USDC'] = pool;
       }
     }
+    console.log('Suilend pools:', Object.entries(suilendPools).map(([k, v]) => `${k}(${v.apy?.toFixed(2)}%)`).join(', '));
 
-    // Process deposits
-    for (const deposit of obligation.deposits) {
-      const coinType    = deposit.coinType ?? deposit.reserveCoinType;
-      const normalized  = normalizeCoinType(coinType);
+    // Step 4: Parse deposits
+    // Suilend obligation stores deposits as a dynamic field table — try common field names
+    const depositList = obligationFields.deposits?.fields?.contents
+      ?? obligationFields.collateral?.fields?.contents
+      ?? obligationFields.deposits
+      ?? [];
 
-      // Match to known assets
-      let assetKey = null;
-      if (normalized === normalizeCoinType(SUILEND_COIN_TYPES.SUI))  assetKey = 'SUI';
-      if (normalized === normalizeCoinType(SUILEND_COIN_TYPES.WSOL)) assetKey = 'WSOL';
-      if (!assetKey) {
-        console.log(`Suilend deposit: unknown coin type ${coinType}`);
-        continue;
-      }
+    console.log(`Deposits raw count: ${depositList.length}`);
 
-      // depositedAmount is in raw units — decimals: SUI=9, wSOL=8
-      const decimals  = assetKey === 'SUI' ? 9 : 8;
-      const rawAmount = Number(deposit.depositedAmount ?? deposit.ctokenAmount ?? 0);
-      const tokens    = rawAmount / Math.pow(10, decimals);
+    for (const entry of depositList) {
+      const d        = entry?.fields ?? entry;
+      const coinType = d?.coin_type?.fields?.name
+        ?? d?.reserve_array_index  // fallback — log and skip
+        ?? '';
 
-      // USD value — use marketValueUsd if available, else fall back to DeFi Llama price
-      let supplyUSD = 0;
-      if (deposit.marketValueUsd != null) {
-        supplyUSD = Number(deposit.marketValueUsd);
-      } else {
-        // Fetch price from DeFi Llama coins endpoint
-        const coinId    = assetKey === 'SUI' ? 'coingecko:sui' : 'coingecko:wrapped-solana';
-        const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${coinId}`);
-        const price     = priceData?.coins?.[coinId]?.price ?? 0;
-        supplyUSD       = tokens * price;
-      }
+      console.log(`  deposit entry keys: ${Object.keys(d).join(', ')} | coinType: "${coinType}"`);
 
+      const isSUI  = coinType.toLowerCase().includes('sui::sui');
+      const isWSOL = coinType.toLowerCase().includes('b7844e28');
+      if (!isSUI && !isWSOL) continue;
+
+      const assetKey  = isSUI ? 'SUI' : 'WSOL';
+      const price     = isSUI ? suiPrice : wsolPrice;
+      const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendPools[assetKey]?.apy ?? null;
-      const lposKey   = assetKey === 'SUI' ? 'suilendSUI' : 'suilendWSOL';
+
+      // market_value_upper_bound is the most reliable USD field on the obligation
+      const mvRaw   = d?.market_value_upper_bound ?? d?.market_value ?? '0';
+      const decimals = isSUI ? 9 : 8;
+
+      let supplyUSD = 0;
+      let tokens    = 0;
+
+      // market_value is a Decimal struct with a value field scaled by 1e18
+      if (typeof mvRaw === 'object' && mvRaw?.fields?.value != null) {
+        supplyUSD = Number(mvRaw.fields.value) / 1e18;
+        tokens    = price > 0 ? supplyUSD / price : 0;
+      } else if (typeof mvRaw === 'string' || typeof mvRaw === 'number') {
+        supplyUSD = Number(mvRaw) / 1e18;
+        tokens    = price > 0 ? supplyUSD / price : 0;
+      }
+
+      // Fallback: use ctoken amount if market_value gives 0
+      if (supplyUSD === 0) {
+        const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
+        tokens    = Number(ctokenRaw) / Math.pow(10, decimals);
+        supplyUSD = tokens * price;
+      }
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
     }
 
-    // Process borrows
-    for (const borrow of obligation.borrows) {
-      const coinType   = borrow.coinType ?? borrow.reserveCoinType;
-      const normalized = normalizeCoinType(coinType);
+    // Step 5: Parse borrows
+    const borrowList = obligationFields.borrows?.fields?.contents
+      ?? obligationFields.borrows
+      ?? [];
 
-      if (normalized !== normalizeCoinType(SUILEND_COIN_TYPES.USDC)) {
-        console.log(`Suilend borrow: unknown coin type ${coinType}`);
-        continue;
-      }
+    console.log(`Borrows raw count: ${borrowList.length}`);
 
-      const decimals  = 6;
-      const rawAmount = Number(borrow.borrowedAmount ?? borrow.borrowAmount ?? 0);
-      const borrowUSD = rawAmount / Math.pow(10, decimals);
+    for (const entry of borrowList) {
+      const b        = entry?.fields ?? entry;
+      const coinType = b?.coin_type?.fields?.name ?? '';
+
+      console.log(`  borrow entry keys: ${Object.keys(b).join(', ')} | coinType: "${coinType}"`);
+
+      const isUSDC = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
+      if (!isUSDC) continue;
+
+      // borrowed_amount is a Decimal struct { value: string (scaled 1e18) }
+      const baRaw   = b?.borrowed_amount?.fields?.value ?? b?.borrowed_amount ?? '0';
+      const borrowUSD = Number(baRaw) / 1e18;
       const tokens    = borrowUSD;
 
-      // Borrow APY — try apyBaseBorrow first, then apy from borrow pool
       const borrowPool = suilendPools['USDC'];
       const borrowAPY  = borrowPool?.apyBaseBorrow ?? borrowPool?.apyBorrow ?? null;
 
@@ -416,7 +472,7 @@ async function getSuilendData() {
     }
 
   } catch (e) {
-    console.error(`Suilend: ${e.message}`);
+    console.error(`Suilend fatal: ${e.message}`);
   }
 
   return results;
