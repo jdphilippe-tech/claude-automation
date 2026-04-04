@@ -444,6 +444,8 @@ async function getSuilendData() {
         const total     = borrowed + available;
         const utilRate  = total > 0 ? borrowed / total : 0;
 
+        console.log(`Reserve ${key} raw: mintDec=${mintDec} borrowedRaw=${borrowedRaw} availableRaw=${availableRaw} borrowed=${borrowed.toFixed(2)} available=${available.toFixed(2)} util=${(utilRate*100).toFixed(1)}%`);
+
         // Interpolate borrow APR from the lookup table
         let borrowAprPerYear = 0;
         if (utils.length > 0 && aprs.length >= utils.length) {
