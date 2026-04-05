@@ -4,16 +4,25 @@
   xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>The Plug</title>
-    <description>Daily portfolio and market intelligence brief by JD</description>
+    <description>Daily Signals - No Noise</description>
     <language>en-us</language>
-    <itunes:author>JD</itunes:author>
+    <itunes:author>Daily Signals - No Noise</itunes:author>
     <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     <itunes:category text="Business"/>
     <itunes:explicit>false</itunes:explicit>
     <itunes:owner>
-      <itunes:name>JD</itunes:name>
+      <itunes:name>The Plug</itunes:name>
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
+    <item>
+      <title>Morning Brief - Sunday, April 5, 2026</title>
+      <description><![CDATA[Eth sits at Normal Zone center while extreme fear sentiment hits 12, potentially signaling oversold conditions ahead of strategy deployment.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-05.mp3" length="810884" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-04-05</guid>
+      <pubDate>Sun, 05 Apr 2026 08:58:48 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
     <item>
       <title>Morning Brief - Sunday, April 5, 2026</title>
       <description><![CDATA[Good morning JD, it's Sunday, April fifth, twenty twenty six. Eth is sitting in the Normal Zone at dead center with equal room of one hundred and one dollars to drift in either direction, giving us a perfectly balanced setup.]]></description>
