@@ -2,7 +2,7 @@ name: Daily Portfolio Check
 
 on:
   schedule:
-    - cron: '0 14 * * *'   # 14:00 UTC = 7:00 AM PDT (summer)
+    - cron: '0 14 * * *'   # 14:00 UTC = 7:00 AM PDT  (summer)
                             # Change to '0 15 * * *' in November (PST)
                             # Change back to '0 14 * * *' in March (PDT)
   workflow_dispatch:        # Allows manual trigger from GitHub Actions UI
