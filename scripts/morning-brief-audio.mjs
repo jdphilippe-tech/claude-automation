@@ -8,7 +8,6 @@ const API_KEY = process.env.ELEVENLABS_API_KEY;
 
 if (!API_KEY) { console.error('Missing ELEVENLABS_API_KEY'); process.exit(1); }
 
-// Read brief text from file (avoids env var length limits)
 const BRIEF_FILE = process.env.BRIEF_TEXT_FILE || '/tmp/brief.txt';
 if (!fs.existsSync(BRIEF_FILE)) { console.error(`Brief file not found: ${BRIEF_FILE}`); process.exit(1); }
 const BRIEF_TEXT = fs.readFileSync(BRIEF_FILE, 'utf8').trim();
@@ -20,7 +19,8 @@ const payload = JSON.stringify({
     stability: 0.5,
     similarity_boost: 0.75,
     style: 0.0,
-    use_speaker_boost: true
+    use_speaker_boost: true,
+    speed: 1.2
   }
 });
 
@@ -40,7 +40,7 @@ const outputDir = 'audio';
 if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 const outputFile = path.join(outputDir, `brief-${date}.mp3`);
 
-console.log(`Generating audio for ${date}...`);
+console.log(`Generating audio for ${date} at 1.2x speed...`);
 
 const req = https.request(options, (res) => {
   if (res.statusCode !== 200) {
