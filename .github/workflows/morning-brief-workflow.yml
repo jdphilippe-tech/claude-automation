@@ -1,0 +1,45 @@
+name: Morning Brief Audio
+
+on:
+  workflow_dispatch:
+    inputs:
+      brief_text:
+        description: 'The morning brief text to convert to audio'
+        required: true
+        type: string
+
+jobs:
+  generate-audio:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate audio via ElevenLabs
+        env:
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          BRIEF_TEXT: ${{ inputs.brief_text }}
+          GITHUB_ENV: ${{ github.env }}
+        run: node scripts/morning-brief-audio.js
+
+      - name: Update RSS feed
+        env:
+          BRIEF_TEXT: ${{ inputs.brief_text }}
+          REPO_URL: https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main
+        run: node scripts/update-rss.js
+
+      - name: Commit and push audio + RSS
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add audio/ feed.xml
+          git commit -m "Morning brief $(date +%Y-%m-%d)"
+          git push
