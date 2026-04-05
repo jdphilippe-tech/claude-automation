@@ -27,14 +27,13 @@ jobs:
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           BRIEF_TEXT: ${{ inputs.brief_text }}
-          GITHUB_ENV: ${{ github.env }}
-        run: node scripts/morning-brief-audio.js
+        run: node scripts/morning-brief-audio.mjs
 
       - name: Update RSS feed
         env:
           BRIEF_TEXT: ${{ inputs.brief_text }}
           REPO_URL: https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main
-        run: node scripts/update-rss.js
+        run: node scripts/update-rss.mjs
 
       - name: Commit and push audio + RSS
         run: |
