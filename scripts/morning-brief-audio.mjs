@@ -5,10 +5,13 @@ import path from 'path';
 const VOICE_ID = 'ewxUvnyvvOehYjKjUVKC'; // Mike
 const MODEL_ID = 'eleven_turbo_v2_5';
 const API_KEY = process.env.ELEVENLABS_API_KEY;
-const BRIEF_TEXT = process.env.BRIEF_TEXT;
 
 if (!API_KEY) { console.error('Missing ELEVENLABS_API_KEY'); process.exit(1); }
-if (!BRIEF_TEXT) { console.error('Missing BRIEF_TEXT'); process.exit(1); }
+
+// Read brief text from file (avoids env var length limits)
+const BRIEF_FILE = process.env.BRIEF_TEXT_FILE || '/tmp/brief.txt';
+if (!fs.existsSync(BRIEF_FILE)) { console.error(`Brief file not found: ${BRIEF_FILE}`); process.exit(1); }
+const BRIEF_TEXT = fs.readFileSync(BRIEF_FILE, 'utf8').trim();
 
 const payload = JSON.stringify({
   text: BRIEF_TEXT,
