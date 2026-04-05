@@ -8,16 +8,22 @@ const AIRTABLE_BASE = 'appWojaxYR99bXC1f';
 if (!CLAUDE_API_KEY) { console.error('Missing CLAUDE_API_KEY'); process.exit(1); }
 if (!AIRTABLE_API_KEY) { console.error('Missing AIRTABLE_API_KEY'); process.exit(1); }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function httpsGet(url, headers = {}) {
   return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers }, (res) => {
+    const parsedUrl = new URL(url);
+    const options = {
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.pathname + parsedUrl.search,
+      headers
+    };
+    const req = https.get(options, (res) => {
       let body = '';
       res.on('data', chunk => body += chunk);
       res.on('end', () => {
         try { resolve(JSON.parse(body)); }
-        catch (e) { reject(new Error(`JSON parse error: ${body.slice(0, 200)}`)); }
+        catch (e) { reject(new Error(`JSON parse error: ${body.slice(0, 300)}`)); }
       });
     });
     req.on('error', reject);
@@ -36,7 +42,7 @@ function httpsPost(hostname, path, headers, payload) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`JSON parse error: ${data.slice(0, 200)}`)); }
+        catch (e) { reject(new Error(`JSON parse error: ${data.slice(0, 300)}`)); }
       });
     });
     req.on('error', reject);
@@ -45,11 +51,9 @@ function httpsPost(hostname, path, headers, payload) {
   });
 }
 
-function airtableGet(path) {
-  return httpsGet(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE}${path}`,
-    { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-  );
+function airtableGet(tableId, params = '') {
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}?${params}`;
+  return httpsGet(url, { Authorization: `Bearer ${AIRTABLE_API_KEY}` });
 }
 
 // ── Data Fetching ─────────────────────────────────────────────────────────────
@@ -57,7 +61,7 @@ function airtableGet(path) {
 async function getEthPrice() {
   try {
     const data = await httpsGet('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin&vs_currencies=usd');
-    return { eth: data.ethereum.usd, btc: data.bitcoin.usd };
+    return { eth: data.ethereum?.usd, btc: data.bitcoin?.usd };
   } catch (e) {
     console.error('Price fetch error:', e.message);
     return { eth: null, btc: null };
@@ -74,35 +78,40 @@ async function getFearGreed() {
   }
 }
 
-async function getAirtableRecords(tableId, fields, filterField, filterValue) {
-  const fieldParams = fields.map(f => `fields[]=${f}`).join('&');
-  const url = `/v0/${AIRTABLE_BASE}/${tableId}?${fieldParams}&sort[0][field]=fldHG3MCcyhkXknyH&sort[0][direction]=asc`;
-  const resp = await httpsGet(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}?${fieldParams}&sort%5B0%5D%5Bdirection%5D=asc`,
-    { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-  );
-  return resp.records || [];
-}
-
 async function getPSFData() {
-  // Get all C8 records for both LP and hedge
-  const fields = ['fldtiRIqznncRfJYG','fldUkwrxtS4AEr52W','fldHG3MCcyhkXknyH',
-                  'fldWElDtJZRYTaZtD','fld6QnTv9CKHvglcX','fldWLVUqSCRJ4NtnQ',
-                  'fldE5uO0nwZmgLQtF','fldFFts5ByR1EeYBk'].join('&fields[]=');
+  const fields = [
+    'fldtiRIqznncRfJYG', // Asset link
+    'fldUkwrxtS4AEr52W', // Action Type
+    'fldHG3MCcyhkXknyH', // Date
+    'fldWElDtJZRYTaZtD', // Position Value
+    'fld6QnTv9CKHvglcX', // Fee Value
+    'fldWLVUqSCRJ4NtnQ', // Deposit Amount
+    'fldE5uO0nwZmgLQtF', // Fees Claimed
+    'fldFFts5ByR1EeYBk'  // Cycle ID
+  ].map(f => `fields[]=${f}`).join('&');
 
-  const resp = await httpsGet(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE}/tblKsk0QnkOoKNLuk?fields[]=${fields}&sort%5B0%5D%5Bfield%5D=fldHG3MCcyhkXknyH&sort%5B0%5D%5Bdirection%5D=asc`,
-    { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-  );
+  const params = `${fields}&sort[0][field]=fldHG3MCcyhkXknyH&sort[0][direction]=asc`;
+  const resp = await airtableGet('tblKsk0QnkOoKNLuk', params);
+  const records = resp.records || [];
 
-  const records = (resp.records || []).filter(r => {
+  console.log(`Total Daily Actions records: ${records.length}`);
+
+  // Filter to C8 records only
+  const c8Records = records.filter(r => {
     const cid = r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '';
     return cid.includes('WETH-PRIMARY-C8') || cid.includes('HEDGE-C8');
   });
 
-  // Separate LP and hedge
-  const lpRecords = records.filter(r => (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('WETH-PRIMARY-C8'));
-  const hedgeRecords = records.filter(r => (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('HEDGE-C8'));
+  console.log(`C8 records found: ${c8Records.length}`);
+
+  const lpRecords = c8Records.filter(r =>
+    (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('WETH-PRIMARY-C8')
+  );
+  const hedgeRecords = c8Records.filter(r =>
+    (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('HEDGE-C8')
+  );
+
+  console.log(`LP records: ${lpRecords.length}, Hedge records: ${hedgeRecords.length}`);
 
   const lpOpen = lpRecords.find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Reopen Position');
   const hedgeOpen = hedgeRecords.find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Reopen Position');
@@ -117,10 +126,15 @@ async function getPSFData() {
   const openDate = lpOpen?.cellValuesByFieldId?.fldHG3MCcyhkXknyH || '';
   const latestDate = lpLatest?.cellValuesByFieldId?.fldHG3MCcyhkXknyH || '';
 
-  // Sum all claimed fees
+  console.log(`LP open: ${lpOpenVal}, LP now: ${lpNow}, Hedge open: ${hedgeOpenVal}, Hedge now: ${hedgeNow}`);
+  console.log(`Pending fees: ${pendingFees}, Open date: ${openDate}, Latest date: ${latestDate}`);
+
+  // Sum all claimed fees from Claim actions
   const totalClaimed = lpRecords
     .filter(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Claim')
     .reduce((sum, r) => sum + (r.cellValuesByFieldId?.fldE5uO0nwZmgLQtF || 0), 0);
+
+  console.log(`Total claimed: ${totalClaimed}`);
 
   const totalFees = totalClaimed + pendingFees;
   const lpPnl = lpNow - lpOpenVal;
@@ -134,9 +148,9 @@ async function getPSFData() {
   const latestTs = new Date(latestDate).getTime();
   const hours = (latestTs - openTs) / 3600000;
   const days = hours / 24;
-  const avgDailyFee = (totalFees / hours) * 24;
-  const pctReturn = (netInclFees / totalDeployed) * 100;
-  const annualized = (pctReturn / days) * 365;
+  const avgDailyFee = hours > 0 ? (totalFees / hours) * 24 : 0;
+  const pctReturn = totalDeployed > 0 ? (netInclFees / totalDeployed) * 100 : 0;
+  const annualized = days > 0 ? (pctReturn / days) * 365 : 0;
 
   return {
     lpPnl, hedgePnl, netDelta, totalFees, avgDailyFee,
@@ -145,79 +159,118 @@ async function getPSFData() {
   };
 }
 
-async function getLendingRates() {
-  const fields = ['fldFi5nwRXNC5n0pU','fld5UpfU63qiYEZtp','fldJ7T452iqgQNiWb',
-                  'fldTSqf1Yrxg7O0tr','fldJLDy5yOHq8S6RS','fldWHlp8HCuMYGc9e'].join('&fields[]=');
-  const resp = await httpsGet(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE}/tblFw52kzeTRvxTSM?fields[]=${fields}&sort%5B0%5D%5Bfield%5D=fldxsDylRluE1PTJ7&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=20`,
-    { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-  );
-  return resp.records || [];
-}
+async function getLendingSnapshot() {
+  const fields = [
+    'fldFi5nwRXNC5n0pU', // Lending Position
+    'fld5UpfU63qiYEZtp', // Action Type
+    'fldJ7T452iqgQNiWb', // Supply Value
+    'fldTSqf1Yrxg7O0tr', // Borrow Value
+    'fldJLDy5yOHq8S6RS', // Supply APY
+    'fldWHlp8HCuMYGc9e', // Borrow APY
+  ].map(f => `fields[]=${f}`).join('&');
 
-async function getXStocks() {
-  const fields = ['fldtiRIqznncRfJYG','fldUkwrxtS4AEr52W','fldWElDtJZRYTaZtD','fld6QnTv9CKHvglcX'].join('&fields[]=');
-  const resp = await httpsGet(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE}/tblKsk0QnkOoKNLuk?fields[]=${fields}&sort%5B0%5D%5Bfield%5D=fldErSlMumagkJ12S&sort%5B0%5D%5Bdirection%5D=desc&maxRecords=30`,
-    { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-  );
-  // Get latest fee check per xStock position
+  const params = `${fields}&sort[0][field]=fldxsDylRluE1PTJ7&sort[0][direction]=desc&maxRecords=20`;
+  const resp = await airtableGet('tblFw52kzeTRvxTSM', params);
+  const records = resp.records || [];
+
+  // Get latest rate check per position
   const seen = new Set();
   const latest = [];
-  for (const r of (resp.records || [])) {
-    const asset = r.cellValuesByFieldId?.fldtiRIqznncRfJYG?.[0]?.name || '';
-    const action = r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name || '';
-    const fees = r.cellValuesByFieldId?.fld6QnTv9CKHvglcX;
-    if (action === 'Fee Check' && fees && !seen.has(asset) &&
-        ['TSLAx','NVDAx','AAPLx','GOOGLx','SPYx','CRCLx'].some(t => asset.includes(t))) {
-      seen.add(asset);
-      latest.push({ asset, value: r.cellValuesByFieldId?.fldWElDtJZRYTaZtD, fees });
+  for (const r of records) {
+    const pos = r.cellValuesByFieldId?.fldFi5nwRXNC5n0pU?.[0]?.name || '';
+    const action = r.cellValuesByFieldId?.fld5UpfU63qiYEZtp?.name || '';
+    if (action === 'Rate Check' && !seen.has(pos)) {
+      seen.add(pos);
+      latest.push({
+        position: pos,
+        supplyValue: r.cellValuesByFieldId?.fldJ7T452iqgQNiWb,
+        borrowValue: r.cellValuesByFieldId?.fldTSqf1Yrxg7O0tr,
+        supplyApy: r.cellValuesByFieldId?.fldJLDy5yOHq8S6RS,
+        borrowApy: r.cellValuesByFieldId?.fldWHlp8HCuMYGc9e,
+      });
     }
   }
   return latest;
 }
 
-// ── Band calculations ─────────────────────────────────────────────────────────
+async function getXStocks() {
+  const fields = [
+    'fldtiRIqznncRfJYG', // Asset
+    'fldUkwrxtS4AEr52W', // Action Type
+    'fldWElDtJZRYTaZtD', // Position Value
+    'fld6QnTv9CKHvglcX', // Fee Value
+  ].map(f => `fields[]=${f}`).join('&');
 
-function getBandZone(ethPrice) {
-  const center = 2080, nearDriftUpper = 2181, nearDriftLower = 1979;
-  const driftUpper = 2224, driftLower = 1936;
-  if (ethPrice >= driftUpper || ethPrice <= driftLower) return 'Drift Zone';
-  if (ethPrice >= nearDriftUpper || ethPrice <= nearDriftLower) return 'Near Drift Zone';
-  return 'Normal Zone';
+  const params = `${fields}&sort[0][field]=fldErSlMumagkJ12S&sort[0][direction]=desc&maxRecords=30`;
+  const resp = await airtableGet('tblKsk0QnkOoKNLuk', params);
+  const records = resp.records || [];
+
+  const xStockNames = ['TSLAx','NVDAx','AAPLx','GOOGLx','SPYx','CRCLx'];
+  const seen = new Set();
+  const latest = [];
+
+  for (const r of records) {
+    const asset = r.cellValuesByFieldId?.fldtiRIqznncRfJYG?.[0]?.name || '';
+    const action = r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name || '';
+    const fees = r.cellValuesByFieldId?.fld6QnTv9CKHvglcX;
+    if (action === 'Fee Check' && fees && !seen.has(asset) && xStockNames.some(t => asset.includes(t))) {
+      seen.add(asset);
+      latest.push({
+        asset,
+        value: r.cellValuesByFieldId?.fldWElDtJZRYTaZtD,
+        fees
+      });
+    }
+  }
+  return latest;
 }
 
-function getDistances(ethPrice) {
+// ── Band Zone ─────────────────────────────────────────────────────────────────
+
+function getZoneInfo(ethPrice) {
+  const center = 2080, nearDriftUpper = 2181, nearDriftLower = 1979;
+  const driftUpper = 2224, driftLower = 1936;
+  let zone;
+  if (ethPrice >= driftUpper || ethPrice <= driftLower) zone = 'Drift Zone';
+  else if (ethPrice >= nearDriftUpper || ethPrice <= nearDriftLower) zone = 'Near Drift Zone';
+  else zone = 'Normal Zone';
   return {
-    fromCenter: ethPrice - 2080,
-    toNearDriftUp: 2181 - ethPrice,
-    toNearDriftDown: ethPrice - 1979
+    zone,
+    distFromCenter: Math.round(ethPrice - center),
+    roomToNearDriftUp: Math.round(nearDriftUpper - ethPrice),
+    roomToNearDriftDown: Math.round(ethPrice - nearDriftLower)
   };
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('Fetching data...');
+  console.log('Fetching all data...');
 
   const [prices, fearGreed, psf, lending, xstocks] = await Promise.all([
     getEthPrice(),
     getFearGreed(),
     getPSFData(),
-    getLendingRates(),
+    getLendingSnapshot(),
     getXStocks()
   ]);
 
-  const zone = getBandZone(prices.eth);
-  const dist = getDistances(prices.eth);
+  const zoneInfo = getZoneInfo(prices.eth || 2080);
 
-  // Find notable xStock fee
-  const notablexStock = xstocks.sort((a, b) => b.fees - a.fees)[0];
+  // Most notable xStock by pending fees
+  const notablexStock = xstocks.length > 0
+    ? xstocks.sort((a, b) => b.fees - a.fees)[0]
+    : null;
 
-  // Build data summary to pass to Claude
+  // Check if any lending rate is unusual (VIRTUAL is the known high one)
+  const virtualPos = lending.find(p => p.position.includes('VIRTUAL'));
+
   const dataSummary = {
-    date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }),
-    eth: { price: prices.eth, zone, distFromCenter: Math.round(dist.fromCenter), roomToNearDriftUp: Math.round(dist.toNearDriftUp), roomToNearDriftDown: Math.round(dist.toNearDriftDown) },
+    date: new Date().toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+      timeZone: 'America/Los_Angeles'
+    }),
+    eth: { price: prices.eth, ...zoneInfo },
     btc: { price: prices.btc, wma200: 58000 },
     fearGreed,
     psf: {
@@ -232,25 +285,31 @@ async function main() {
       pctReturn: psf.pctReturn.toFixed(1),
       annualized: Math.round(psf.annualized)
     },
-    notablexStock: notablexStock ? { asset: notablexStock.asset, fees: Math.round(notablexStock.fees), value: Math.round(notablexStock.value) } : null
+    notablexStock: notablexStock ? {
+      asset: notablexStock.asset,
+      fees: Math.round(notablexStock.fees),
+      value: Math.round(notablexStock.value)
+    } : null,
+    virtualApy: virtualPos?.supplyApy || null
   };
 
-  console.log('Data fetched:', JSON.stringify(dataSummary, null, 2));
+  console.log('Data summary:', JSON.stringify(dataSummary, null, 2));
 
   // ── Call Claude API ───────────────────────────────────────────────────────
 
-  const systemPrompt = `You generate a daily morning audio brief for a DeFi portfolio manager named JD. 
-The brief is spoken aloud via text-to-speech so it must be pure conversational prose — no bullet points, no headers, no markdown.
-Follow these rules exactly:
-- Speak numbers naturally: "two thousand and sixty-two dollars" not "$2,062"  
+  const systemPrompt = `You generate a daily morning audio brief for a DeFi portfolio manager named JD.
+The brief is played via text-to-speech so it must be pure conversational prose with zero formatting.
+Rules:
+- Single unbroken paragraph, no line breaks between topics
+- Numbers spoken naturally: "two thousand and sixty dollars" not "$2,060"
 - Say "Eth" not "ETH", "Bitcoin" not "BTC"
-- Target 60-75 seconds when read aloud
-- Structure: date → ETH zone → PSF strategy P&L → one thing to watch → market sentiment → "Have a good one."
-- No scaffolding, no strategy explanations, just the signal
-- For net delta: say whether LP is up or down, hedge is up or down, then the net
-- Total fees and avg daily fee go in the strategy paragraph naturally
-- Close lending section in one sentence if stable
-- The brief must be a single paragraph of flowing prose with no line breaks between sections`;
+- Target 60-75 seconds when read aloud at 1.2x speed
+- Structure: date → Eth price and zone → PSF strategy P&L → one thing to watch → market sentiment → "Have a good one."
+- For net delta: state LP direction and amount, hedge direction and amount, then net
+- State total fees, avg daily fee, net return including fees, and annualized return
+- If lending is stable say so in one sentence — do not list every position
+- Close with market sentiment: Fear and Greed number, Bitcoin price, one macro sentence, then "Have a good one."
+- Never explain the strategy — just report the numbers with context and judgment`;
 
   const userPrompt = `Generate today's morning brief using this live data: ${JSON.stringify(dataSummary)}`;
 
@@ -275,12 +334,10 @@ Follow these rules exactly:
     process.exit(1);
   }
 
-  console.log('Brief generated:\n', briefText);
+  console.log('\nBrief generated:\n', briefText);
 
-  // Save to file for next steps
   fs.writeFileSync('/tmp/brief.txt', briefText);
   fs.appendFileSync(process.env.GITHUB_ENV || '/dev/null', `BRIEF_TEXT_FILE=/tmp/brief.txt\n`);
-
   console.log('Brief saved to /tmp/brief.txt');
 }
 
