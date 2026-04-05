@@ -35,7 +35,7 @@ const options = {
   }
 };
 
-const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+const date = new Date().toISOString().split('T')[0];
 const outputDir = 'audio';
 if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 const outputFile = path.join(outputDir, `brief-${date}.mp3`);
