@@ -18,8 +18,6 @@ const RSS_FILE = 'feed.xml';
 const audioUrl = `${REPO_URL}/${AUDIO_FILE}`;
 const fileSize = fs.statSync(AUDIO_FILE).size;
 const pubDate = new Date().toUTCString();
-
-// Podcast artwork — Brooklyn logo hosted in repo
 const ARTWORK_URL = `${REPO_URL}/artwork.jpg`;
 
 let existingItems = '';
@@ -35,11 +33,11 @@ const displayDate = d.toLocaleDateString('en-US', {
   timeZone: 'UTC'
 });
 
-// Clean description — first two sentences of brief
+// Clean description - first two sentences of brief
 const sentences = BRIEF_TEXT.split(/(?<=[.!?])\s+/);
 const description = sentences.slice(0, 2).join(' ');
 
-// Use ASCII dash to avoid encoding issues
+// Plain hyphen to avoid encoding issues
 const episodeTitle = `Morning Brief - ${displayDate}`;
 
 const newItem = `<item>
@@ -58,14 +56,14 @@ const rss = `<?xml version="1.0" encoding="UTF-8"?>
   xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>The Plug</title>
-    <description>Daily portfolio and market intelligence brief by JD</description>
+    <description>Daily Signals - No Noise</description>
     <language>en-us</language>
-    <itunes:author>JD</itunes:author>
+    <itunes:author>Daily Signals - No Noise</itunes:author>
     <itunes:image href="${ARTWORK_URL}"/>
     <itunes:category text="Business"/>
     <itunes:explicit>false</itunes:explicit>
     <itunes:owner>
-      <itunes:name>JD</itunes:name>
+      <itunes:name>The Plug</itunes:name>
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     ${newItem}
