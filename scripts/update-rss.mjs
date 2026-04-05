@@ -1,18 +1,21 @@
 import fs from 'fs';
-import path from 'path';
 
 const AUDIO_FILE = process.env.AUDIO_FILE;
 const BRIEF_DATE = process.env.BRIEF_DATE;
 const REPO_URL = process.env.REPO_URL;
 
 const BRIEF_FILE = process.env.BRIEF_TEXT_FILE || '/tmp/brief.txt';
-if (!fs.existsSync(BRIEF_FILE)) { console.error(`Brief file not found: ${BRIEF_FILE}`); process.exit(1); }
-const BRIEF_TEXT = fs.readFileSync(BRIEF_FILE, 'utf8').trim();
+const DESC_FILE = process.env.DESCRIPTION_FILE || '/tmp/description.txt';
 
+if (!fs.existsSync(BRIEF_FILE)) { console.error(`Brief file not found: ${BRIEF_FILE}`); process.exit(1); }
 if (!AUDIO_FILE || !BRIEF_DATE || !REPO_URL) {
   console.error('Missing required env vars: AUDIO_FILE, BRIEF_DATE, REPO_URL');
   process.exit(1);
 }
+
+const description = fs.existsSync(DESC_FILE)
+  ? fs.readFileSync(DESC_FILE, 'utf8').trim()
+  : 'Daily portfolio and market intelligence brief.';
 
 const RSS_FILE = 'feed.xml';
 const audioUrl = `${REPO_URL}/${AUDIO_FILE}`;
@@ -33,11 +36,6 @@ const displayDate = d.toLocaleDateString('en-US', {
   timeZone: 'UTC'
 });
 
-// Clean description - first two sentences of brief
-const sentences = BRIEF_TEXT.split(/(?<=[.!?])\s+/);
-const description = sentences.slice(0, 2).join(' ');
-
-// Plain hyphen to avoid encoding issues
 const episodeTitle = `Morning Brief - ${displayDate}`;
 
 const newItem = `<item>
@@ -72,5 +70,5 @@ const rss = `<?xml version="1.0" encoding="UTF-8"?>
 </rss>`;
 
 fs.writeFileSync(RSS_FILE, rss);
-console.log(`RSS updated: ${RSS_FILE}`);
+console.log(`RSS updated with description: "${description}"`);
 console.log(`Feed URL: ${REPO_URL}/feed.xml`);
