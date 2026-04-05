@@ -8,8 +8,6 @@ const AIRTABLE_BASE = 'appWojaxYR99bXC1f';
 if (!CLAUDE_API_KEY) { console.error('Missing CLAUDE_API_KEY'); process.exit(1); }
 if (!AIRTABLE_API_KEY) { console.error('Missing AIRTABLE_API_KEY'); process.exit(1); }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function httpsGet(url, headers = {}) {
   return new Promise((resolve, reject) => {
     const parsedUrl = new URL(url);
@@ -47,8 +45,7 @@ function httpsPost(hostname, path, headers, payload) {
   });
 }
 
-// Paginate through ALL Airtable records
-async function airtableGetAll(tableId, params = '') {
+async function airtableGetAll(tableId, params) {
   let allRecords = [];
   let cursor = null;
   do {
@@ -57,12 +54,9 @@ async function airtableGetAll(tableId, params = '') {
     const resp = await httpsGet(url, { Authorization: `Bearer ${AIRTABLE_API_KEY}` });
     allRecords = allRecords.concat(resp.records || []);
     cursor = resp.nextCursor || null;
-    console.log(`  Fetched ${allRecords.length} records so far... ${cursor ? 'more pages' : 'done'}`);
   } while (cursor);
   return allRecords;
 }
-
-// ── Data Fetching ─────────────────────────────────────────────────────────────
 
 async function getEthPrice() {
   try {
@@ -86,29 +80,26 @@ async function getFearGreed() {
 
 async function getPSFData() {
   const fields = [
-    'fldtiRIqznncRfJYG',
-    'fldUkwrxtS4AEr52W',
-    'fldHG3MCcyhkXknyH',
-    'fldWElDtJZRYTaZtD',
-    'fld6QnTv9CKHvglcX',
-    'fldWLVUqSCRJ4NtnQ',
-    'fldE5uO0nwZmgLQtF',
-    'fldFFts5ByR1EeYBk'
+    'fldUkwrxtS4AEr52W', // Action Type
+    'fldHG3MCcyhkXknyH', // Date
+    'fldWElDtJZRYTaZtD', // Position Value
+    'fld6QnTv9CKHvglcX', // Fee Value
+    'fldE5uO0nwZmgLQtF', // Fees Claimed
+    'fldFFts5ByR1EeYBk'  // Cycle ID
   ].map(f => `fields[]=${f}`).join('&');
 
-  const params = `${fields}&sort[0][field]=fldHG3MCcyhkXknyH&sort[0][direction]=asc`;
-  console.log('Fetching all Daily Actions records (paginating)...');
+  // Use filterByFormula to get only C8 records server-side
+  const filter = encodeURIComponent("OR(FIND('WETH-PRIMARY-C8', {Cycle ID}), FIND('HEDGE-C8', {Cycle ID}))");
+  const params = `${fields}&filterByFormula=${filter}&sort[0][field]=fldHG3MCcyhkXknyH&sort[0][direction]=asc`;
+
+  console.log('Fetching C8 records with server-side filter...');
   const records = await airtableGetAll('tblKsk0QnkOoKNLuk', params);
-  console.log(`Total Daily Actions records: ${records.length}`);
+  console.log(`C8 records found: ${records.length}`);
 
-  const c8Records = records.filter(r => {
-    const cid = r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '';
-    return cid.includes('WETH-PRIMARY-C8') || cid.includes('HEDGE-C8');
-  });
-  console.log(`C8 records found: ${c8Records.length}`);
+  const lpRecords = records.filter(r => (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('WETH-PRIMARY-C8'));
+  const hedgeRecords = records.filter(r => (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('HEDGE-C8'));
 
-  const lpRecords = c8Records.filter(r => (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('WETH-PRIMARY-C8'));
-  const hedgeRecords = c8Records.filter(r => (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('HEDGE-C8'));
+  console.log(`LP records: ${lpRecords.length}, Hedge records: ${hedgeRecords.length}`);
 
   const lpOpen = lpRecords.find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Reopen Position');
   const hedgeOpen = hedgeRecords.find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Reopen Position');
@@ -123,14 +114,13 @@ async function getPSFData() {
   const openDate = lpOpen?.cellValuesByFieldId?.fldHG3MCcyhkXknyH || '';
   const latestDate = lpLatest?.cellValuesByFieldId?.fldHG3MCcyhkXknyH || '';
 
-  console.log(`LP open: ${lpOpenVal}, LP now: ${lpNow}`);
-  console.log(`Hedge open: ${hedgeOpenVal}, Hedge now: ${hedgeNow}`);
-  console.log(`Pending fees: ${pendingFees}`);
+  console.log(`LP open: $${lpOpenVal}, LP now: $${lpNow}, Hedge open: $${hedgeOpenVal}, Hedge now: $${hedgeNow}`);
 
   const totalClaimed = lpRecords
     .filter(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Claim')
     .reduce((sum, r) => sum + (r.cellValuesByFieldId?.fldE5uO0nwZmgLQtF || 0), 0);
-  console.log(`Total claimed: ${totalClaimed}`);
+
+  console.log(`Pending fees: $${pendingFees}, Total claimed: $${totalClaimed}`);
 
   const totalFees = totalClaimed + pendingFees;
   const lpPnl = lpNow - lpOpenVal;
@@ -154,8 +144,6 @@ async function getLendingSnapshot() {
   const fields = [
     'fldFi5nwRXNC5n0pU',
     'fld5UpfU63qiYEZtp',
-    'fldJ7T452iqgQNiWb',
-    'fldTSqf1Yrxg7O0tr',
     'fldJLDy5yOHq8S6RS',
     'fldWHlp8HCuMYGc9e',
   ].map(f => `fields[]=${f}`).join('&');
@@ -172,11 +160,7 @@ async function getLendingSnapshot() {
     const action = r.cellValuesByFieldId?.fld5UpfU63qiYEZtp?.name || '';
     if (action === 'Rate Check' && !seen.has(pos)) {
       seen.add(pos);
-      latest.push({
-        position: pos,
-        supplyApy: r.cellValuesByFieldId?.fldJLDy5yOHq8S6RS,
-        borrowApy: r.cellValuesByFieldId?.fldWHlp8HCuMYGc9e,
-      });
+      latest.push({ position: pos, supplyApy: r.cellValuesByFieldId?.fldJLDy5yOHq8S6RS, borrowApy: r.cellValuesByFieldId?.fldWHlp8HCuMYGc9e });
     }
   }
   return latest;
@@ -217,25 +201,13 @@ function getZoneInfo(ethPrice) {
   if (ethPrice >= driftUpper || ethPrice <= driftLower) zone = 'Drift Zone';
   else if (ethPrice >= nearDriftUpper || ethPrice <= nearDriftLower) zone = 'Near Drift Zone';
   else zone = 'Normal Zone';
-  return {
-    zone,
-    distFromCenter: Math.round(ethPrice - center),
-    roomToNearDriftUp: Math.round(nearDriftUpper - ethPrice),
-    roomToNearDriftDown: Math.round(ethPrice - nearDriftLower)
-  };
+  return { zone, distFromCenter: Math.round(ethPrice - center), roomToNearDriftUp: Math.round(nearDriftUpper - ethPrice), roomToNearDriftDown: Math.round(ethPrice - nearDriftLower) };
 }
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log('Fetching all data...');
-
   const [prices, fearGreed, psf, lending, xstocks] = await Promise.all([
-    getEthPrice(),
-    getFearGreed(),
-    getPSFData(),
-    getLendingSnapshot(),
-    getXStocks()
+    getEthPrice(), getFearGreed(), getPSFData(), getLendingSnapshot(), getXStocks()
   ]);
 
   const zoneInfo = getZoneInfo(prices.eth || 2080);
@@ -243,10 +215,7 @@ async function main() {
   const virtualPos = lending.find(p => p.position.includes('VIRTUAL'));
 
   const dataSummary = {
-    date: new Date().toLocaleDateString('en-US', {
-      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-      timeZone: 'America/Los_Angeles'
-    }),
+    date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }),
     eth: { price: prices.eth, ...zoneInfo },
     btc: { price: prices.btc, wma200: 58000 },
     fearGreed,
@@ -268,73 +237,46 @@ async function main() {
 
   console.log('Data summary:', JSON.stringify(dataSummary, null, 2));
 
-  // ── Call Claude API ───────────────────────────────────────────────────────
-
   const systemPrompt = `You generate a daily morning audio brief for a DeFi portfolio manager named JD.
 Return a JSON object with exactly two fields:
 1. "brief": The full audio brief as pure conversational prose. No formatting, no line breaks, no markdown. Single flowing paragraph.
-2. "description": A 1-2 sentence episode description summarizing what was notable today. Shown in the podcast app. Smart headline tone — captures the key signal (zone status, strategy performance, market sentiment, notable position). Never start with "Good morning" or mention the date. Write in present tense.
+2. "description": A 1-2 sentence episode description summarizing what was notable today for the podcast app listing. Smart headline tone. Never start with "Good morning" or mention the date. Present tense.
 
 Rules for the brief:
 - Numbers spoken naturally: "two thousand and sixty dollars" not "$2,060"
 - Say "Eth" not "ETH", "Bitcoin" not "BTC"
 - Target 60-75 seconds when read aloud at 1.2x speed
 - Structure: date -> Eth price and zone -> PSF strategy P&L -> one thing to watch -> market sentiment -> "Have a good one."
-- For net delta: state LP direction and amount, hedge direction and amount, then net
-- State total fees, avg daily fee, net return including fees, annualized return
+- For net delta: state LP direction and dollar amount, hedge direction and dollar amount, then net
+- Always state: total fees, avg daily fee, net return including fees, annualized return
 - Lending stable = one sentence only
 - Never explain the strategy, just report numbers with judgment
 
-IMPORTANT: Return ONLY raw JSON. No markdown code fences, no backticks, no preamble. Start your response with { and end with }.`;
+IMPORTANT: Return ONLY raw JSON. No markdown, no backticks, no preamble. Start with { end with }.`;
 
-  const userPrompt = `Generate today's morning brief and episode description using this live data: ${JSON.stringify(dataSummary)}`;
-
-  const response = await httpsPost(
-    'api.anthropic.com',
-    '/v1/messages',
+  const response = await httpsPost('api.anthropic.com', '/v1/messages',
     { 'x-api-key': CLAUDE_API_KEY, 'anthropic-version': '2023-06-01' },
-    {
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1200,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }]
-    }
+    { model: 'claude-sonnet-4-20250514', max_tokens: 1200, system: systemPrompt, messages: [{ role: 'user', content: `Generate today's morning brief using this live data: ${JSON.stringify(dataSummary)}` }] }
   );
 
   let rawText = response.content?.[0]?.text;
-  if (!rawText) {
-    console.error('No response from Claude:', JSON.stringify(response));
-    process.exit(1);
-  }
-
-  // Strip markdown code fences if Claude added them despite instructions
+  if (!rawText) { console.error('No response from Claude:', JSON.stringify(response)); process.exit(1); }
   rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
 
   let parsed;
-  try {
-    parsed = JSON.parse(rawText);
-  } catch (e) {
-    console.error('Failed to parse Claude JSON response:', rawText.slice(0, 500));
-    process.exit(1);
-  }
+  try { parsed = JSON.parse(rawText); }
+  catch (e) { console.error('Failed to parse Claude JSON:', rawText.slice(0, 500)); process.exit(1); }
 
-  const briefText = parsed.brief;
-  const description = parsed.description;
-
-  if (!briefText || !description) {
-    console.error('Missing brief or description in response:', parsed);
-    process.exit(1);
-  }
+  const { brief: briefText, description } = parsed;
+  if (!briefText || !description) { console.error('Missing brief or description:', parsed); process.exit(1); }
 
   console.log('\nBrief:\n', briefText);
   console.log('\nDescription:\n', description);
 
   fs.writeFileSync('/tmp/brief.txt', briefText);
   fs.writeFileSync('/tmp/description.txt', description);
-  fs.appendFileSync(process.env.GITHUB_ENV || '/dev/null',
-    `BRIEF_TEXT_FILE=/tmp/brief.txt\nDESCRIPTION_FILE=/tmp/description.txt\n`);
-
-  console.log('Files saved.');
+  fs.appendFileSync(process.env.GITHUB_ENV || '/dev/null', `BRIEF_TEXT_FILE=/tmp/brief.txt\nDESCRIPTION_FILE=/tmp/description.txt\n`);
+  console.log('Done.');
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
