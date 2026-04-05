@@ -7,9 +7,13 @@ const REPO_URL = process.env.REPO_URL;
 const BRIEF_FILE = process.env.BRIEF_TEXT_FILE || '/tmp/brief.txt';
 const DESC_FILE = process.env.DESCRIPTION_FILE || '/tmp/description.txt';
 
-if (!fs.existsSync(BRIEF_FILE)) { console.error(`Brief file not found: ${BRIEF_FILE}`); process.exit(1); }
 if (!AUDIO_FILE || !BRIEF_DATE || !REPO_URL) {
   console.error('Missing required env vars: AUDIO_FILE, BRIEF_DATE, REPO_URL');
+  process.exit(1);
+}
+
+if (!fs.existsSync(BRIEF_FILE)) {
+  console.error(`Brief file not found: ${BRIEF_FILE}`);
   process.exit(1);
 }
 
@@ -30,12 +34,15 @@ if (fs.existsSync(RSS_FILE)) {
   if (match) existingItems = match.slice(0, 29).join('\n    ');
 }
 
-const d = new Date(BRIEF_DATE + 'T12:00:00Z');
+// BRIEF_DATE is always YYYY-MM-DD from the audio script — parse safely
+const [year, month, day] = BRIEF_DATE.split('-').map(Number);
+const d = new Date(Date.UTC(year, month - 1, day));
 const displayDate = d.toLocaleDateString('en-US', {
   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   timeZone: 'UTC'
 });
 
+// Plain hyphen — no encoding issues
 const episodeTitle = `Morning Brief - ${displayDate}`;
 
 const newItem = `<item>
@@ -70,5 +77,6 @@ const rss = `<?xml version="1.0" encoding="UTF-8"?>
 </rss>`;
 
 fs.writeFileSync(RSS_FILE, rss);
-console.log(`RSS updated with description: "${description}"`);
+console.log(`RSS updated. Episode: "${episodeTitle}"`);
+console.log(`Description: "${description}"`);
 console.log(`Feed URL: ${REPO_URL}/feed.xml`);
