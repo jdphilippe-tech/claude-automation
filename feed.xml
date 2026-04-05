@@ -1,13 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1_0.dtd">
+<rss version="2.0"
+  xmlns:itunes="http://www.itunes.com/dtds/podcast-1_0.dtd"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
-    <title>JD Morning Brief</title>
-    <description>Daily portfolio and market intelligence brief</description>
+    <title>The Plug</title>
+    <description>Daily portfolio and market intelligence brief by JD</description>
     <language>en-us</language>
     <itunes:author>JD</itunes:author>
+    <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     <itunes:category text="Business"/>
     <itunes:explicit>false</itunes:explicit>
+    <itunes:owner>
+      <itunes:name>JD</itunes:name>
+    </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
+    <item>
+      <title>Morning Brief - Sunday, April 5, 2026</title>
+      <description><![CDATA[Good morning JD, it's Sunday, April fifth, twenty twenty six. Eth is sitting in the Normal Zone at dead center with equal room of one hundred and one dollars to drift in either direction, giving us a perfectly balanced setup.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-05.mp3" length="899492" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-04-05</guid>
+      <pubDate>Sun, 05 Apr 2026 08:28:48 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
     <item>
       <title>Morning Brief â€” Sunday, April 5, 2026</title>
       <description><![CDATA[Good morning JD, it's Sunday, April fifth, twenty twenty-six. Eth is sitting in the Drift Zone this morning, about two thousand and eighty dollars below center with roughly two thousand one hundred an...]]></description>
@@ -15,6 +30,5 @@
       <guid isPermaLink="false">morning-brief-2026-04-05</guid>
       <pubDate>Sun, 05 Apr 2026 08:01:03 GMT</pubDate>
     </item>
-    
   </channel>
 </rss>
