@@ -80,14 +80,14 @@ async function getFearGreed() {
 
 async function getPSFData() {
   const fields = [
-    'fldtiRIqznncRfJYG', // Asset link
-    'fldUkwrxtS4AEr52W', // Action Type
-    'fldHG3MCcyhkXknyH', // Date
-    'fldWElDtJZRYTaZtD', // Position Value
-    'fld6QnTv9CKHvglcX', // Fee Value
-    'fldWLVUqSCRJ4NtnQ', // Deposit Amount
-    'fldE5uO0nwZmgLQtF', // Fees Claimed
-    'fldFFts5ByR1EeYBk'  // Cycle ID
+    'fldtiRIqznncRfJYG',
+    'fldUkwrxtS4AEr52W',
+    'fldHG3MCcyhkXknyH',
+    'fldWElDtJZRYTaZtD',
+    'fld6QnTv9CKHvglcX',
+    'fldWLVUqSCRJ4NtnQ',
+    'fldE5uO0nwZmgLQtF',
+    'fldFFts5ByR1EeYBk'
   ].map(f => `fields[]=${f}`).join('&');
 
   const params = `${fields}&sort[0][field]=fldHG3MCcyhkXknyH&sort[0][direction]=asc`;
@@ -96,7 +96,6 @@ async function getPSFData() {
 
   console.log(`Total Daily Actions records: ${records.length}`);
 
-  // Filter to C8 records only
   const c8Records = records.filter(r => {
     const cid = r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '';
     return cid.includes('WETH-PRIMARY-C8') || cid.includes('HEDGE-C8');
@@ -111,8 +110,6 @@ async function getPSFData() {
     (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('HEDGE-C8')
   );
 
-  console.log(`LP records: ${lpRecords.length}, Hedge records: ${hedgeRecords.length}`);
-
   const lpOpen = lpRecords.find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Reopen Position');
   const hedgeOpen = hedgeRecords.find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Reopen Position');
   const lpLatest = [...lpRecords].reverse().find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Fee Check');
@@ -126,10 +123,10 @@ async function getPSFData() {
   const openDate = lpOpen?.cellValuesByFieldId?.fldHG3MCcyhkXknyH || '';
   const latestDate = lpLatest?.cellValuesByFieldId?.fldHG3MCcyhkXknyH || '';
 
-  console.log(`LP open: ${lpOpenVal}, LP now: ${lpNow}, Hedge open: ${hedgeOpenVal}, Hedge now: ${hedgeNow}`);
-  console.log(`Pending fees: ${pendingFees}, Open date: ${openDate}, Latest date: ${latestDate}`);
+  console.log(`LP open: ${lpOpenVal}, LP now: ${lpNow}`);
+  console.log(`Hedge open: ${hedgeOpenVal}, Hedge now: ${hedgeNow}`);
+  console.log(`Pending fees: ${pendingFees}`);
 
-  // Sum all claimed fees from Claim actions
   const totalClaimed = lpRecords
     .filter(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Claim')
     .reduce((sum, r) => sum + (r.cellValuesByFieldId?.fldE5uO0nwZmgLQtF || 0), 0);
@@ -143,7 +140,6 @@ async function getPSFData() {
   const netInclFees = netDelta + totalFees;
   const totalDeployed = lpOpenVal + hedgeOpenVal;
 
-  // Time-normalized avg daily fee
   const openTs = new Date(openDate).getTime();
   const latestTs = new Date(latestDate).getTime();
   const hours = (latestTs - openTs) / 3600000;
@@ -161,19 +157,18 @@ async function getPSFData() {
 
 async function getLendingSnapshot() {
   const fields = [
-    'fldFi5nwRXNC5n0pU', // Lending Position
-    'fld5UpfU63qiYEZtp', // Action Type
-    'fldJ7T452iqgQNiWb', // Supply Value
-    'fldTSqf1Yrxg7O0tr', // Borrow Value
-    'fldJLDy5yOHq8S6RS', // Supply APY
-    'fldWHlp8HCuMYGc9e', // Borrow APY
+    'fldFi5nwRXNC5n0pU',
+    'fld5UpfU63qiYEZtp',
+    'fldJ7T452iqgQNiWb',
+    'fldTSqf1Yrxg7O0tr',
+    'fldJLDy5yOHq8S6RS',
+    'fldWHlp8HCuMYGc9e',
   ].map(f => `fields[]=${f}`).join('&');
 
   const params = `${fields}&sort[0][field]=fldxsDylRluE1PTJ7&sort[0][direction]=desc&maxRecords=20`;
   const resp = await airtableGet('tblFw52kzeTRvxTSM', params);
   const records = resp.records || [];
 
-  // Get latest rate check per position
   const seen = new Set();
   const latest = [];
   for (const r of records) {
@@ -195,10 +190,10 @@ async function getLendingSnapshot() {
 
 async function getXStocks() {
   const fields = [
-    'fldtiRIqznncRfJYG', // Asset
-    'fldUkwrxtS4AEr52W', // Action Type
-    'fldWElDtJZRYTaZtD', // Position Value
-    'fld6QnTv9CKHvglcX', // Fee Value
+    'fldtiRIqznncRfJYG',
+    'fldUkwrxtS4AEr52W',
+    'fldWElDtJZRYTaZtD',
+    'fld6QnTv9CKHvglcX',
   ].map(f => `fields[]=${f}`).join('&');
 
   const params = `${fields}&sort[0][field]=fldErSlMumagkJ12S&sort[0][direction]=desc&maxRecords=30`;
@@ -215,17 +210,11 @@ async function getXStocks() {
     const fees = r.cellValuesByFieldId?.fld6QnTv9CKHvglcX;
     if (action === 'Fee Check' && fees && !seen.has(asset) && xStockNames.some(t => asset.includes(t))) {
       seen.add(asset);
-      latest.push({
-        asset,
-        value: r.cellValuesByFieldId?.fldWElDtJZRYTaZtD,
-        fees
-      });
+      latest.push({ asset, value: r.cellValuesByFieldId?.fldWElDtJZRYTaZtD, fees });
     }
   }
   return latest;
 }
-
-// ── Band Zone ─────────────────────────────────────────────────────────────────
 
 function getZoneInfo(ethPrice) {
   const center = 2080, nearDriftUpper = 2181, nearDriftLower = 1979;
@@ -256,13 +245,7 @@ async function main() {
   ]);
 
   const zoneInfo = getZoneInfo(prices.eth || 2080);
-
-  // Most notable xStock by pending fees
-  const notablexStock = xstocks.length > 0
-    ? xstocks.sort((a, b) => b.fees - a.fees)[0]
-    : null;
-
-  // Check if any lending rate is unusual (VIRTUAL is the known high one)
+  const notablexStock = xstocks.length > 0 ? xstocks.sort((a, b) => b.fees - a.fees)[0] : null;
   const virtualPos = lending.find(p => p.position.includes('VIRTUAL'));
 
   const dataSummary = {
@@ -295,23 +278,25 @@ async function main() {
 
   console.log('Data summary:', JSON.stringify(dataSummary, null, 2));
 
-  // ── Call Claude API ───────────────────────────────────────────────────────
+  // ── Call Claude API — generate both brief and episode description ──────────
 
   const systemPrompt = `You generate a daily morning audio brief for a DeFi portfolio manager named JD.
-The brief is played via text-to-speech so it must be pure conversational prose with zero formatting.
-Rules:
-- Single unbroken paragraph, no line breaks between topics
+Return a JSON object with exactly two fields:
+1. "brief": The full audio brief as pure conversational prose — no formatting, no line breaks, no markdown. Single flowing paragraph.
+2. "description": A 1-2 sentence episode description that summarizes what was notable today. This is shown in the podcast app. It should feel like a smart headline — capturing the key signal of the day (zone status, strategy performance, market sentiment, or a notable position). Never start with "Good morning" or mention the date. Write it in present tense. Examples: "Eth holds Normal Zone as C8 fees average forty-eight dollars a day with the hedge nearly perfectly offsetting LP price drag. Fear and Greed sits at Extreme Fear eleven with Bitcoin stable above the two hundred week moving average." or "Eth drifts toward Near Drift Upper with the hedge carrying the strategy — total C8 return sits at two percent in thirteen days. Market sentiment remains Extreme Fear amid macro risk-off."
+
+Rules for the brief:
 - Numbers spoken naturally: "two thousand and sixty dollars" not "$2,060"
 - Say "Eth" not "ETH", "Bitcoin" not "BTC"
 - Target 60-75 seconds when read aloud at 1.2x speed
 - Structure: date → Eth price and zone → PSF strategy P&L → one thing to watch → market sentiment → "Have a good one."
 - For net delta: state LP direction and amount, hedge direction and amount, then net
-- State total fees, avg daily fee, net return including fees, and annualized return
-- If lending is stable say so in one sentence — do not list every position
-- Close with market sentiment: Fear and Greed number, Bitcoin price, one macro sentence, then "Have a good one."
-- Never explain the strategy — just report the numbers with context and judgment`;
+- State total fees, avg daily fee, net return including fees, annualized return
+- Lending stable = one sentence only
+- Never explain the strategy, just report numbers with judgment
+- Return ONLY valid JSON, no markdown, no code fences`;
 
-  const userPrompt = `Generate today's morning brief using this live data: ${JSON.stringify(dataSummary)}`;
+  const userPrompt = `Generate today's morning brief and episode description using this live data: ${JSON.stringify(dataSummary)}`;
 
   const response = await httpsPost(
     'api.anthropic.com',
@@ -322,23 +307,43 @@ Rules:
     },
     {
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+      max_tokens: 1200,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
     }
   );
 
-  const briefText = response.content?.[0]?.text;
-  if (!briefText) {
-    console.error('No brief text returned:', JSON.stringify(response));
+  const rawText = response.content?.[0]?.text;
+  if (!rawText) {
+    console.error('No response from Claude:', JSON.stringify(response));
     process.exit(1);
   }
 
-  console.log('\nBrief generated:\n', briefText);
+  let parsed;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch (e) {
+    console.error('Failed to parse Claude JSON response:', rawText.slice(0, 500));
+    process.exit(1);
+  }
+
+  const briefText = parsed.brief;
+  const description = parsed.description;
+
+  if (!briefText || !description) {
+    console.error('Missing brief or description in response:', parsed);
+    process.exit(1);
+  }
+
+  console.log('\nBrief:\n', briefText);
+  console.log('\nDescription:\n', description);
 
   fs.writeFileSync('/tmp/brief.txt', briefText);
-  fs.appendFileSync(process.env.GITHUB_ENV || '/dev/null', `BRIEF_TEXT_FILE=/tmp/brief.txt\n`);
-  console.log('Brief saved to /tmp/brief.txt');
+  fs.writeFileSync('/tmp/description.txt', description);
+  fs.appendFileSync(process.env.GITHUB_ENV || '/dev/null',
+    `BRIEF_TEXT_FILE=/tmp/brief.txt\nDESCRIPTION_FILE=/tmp/description.txt\n`);
+
+  console.log('Files saved.');
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
