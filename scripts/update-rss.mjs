@@ -3,11 +3,15 @@ import path from 'path';
 
 const AUDIO_FILE = process.env.AUDIO_FILE;
 const BRIEF_DATE = process.env.BRIEF_DATE;
-const BRIEF_TEXT = process.env.BRIEF_TEXT;
 const REPO_URL = process.env.REPO_URL;
 
-if (!AUDIO_FILE || !BRIEF_DATE || !BRIEF_TEXT || !REPO_URL) {
-  console.error('Missing required env vars');
+// Read brief text from file
+const BRIEF_FILE = process.env.BRIEF_TEXT_FILE || '/tmp/brief.txt';
+if (!fs.existsSync(BRIEF_FILE)) { console.error(`Brief file not found: ${BRIEF_FILE}`); process.exit(1); }
+const BRIEF_TEXT = fs.readFileSync(BRIEF_FILE, 'utf8').trim();
+
+if (!AUDIO_FILE || !BRIEF_DATE || !REPO_URL) {
+  console.error('Missing required env vars: AUDIO_FILE, BRIEF_DATE, REPO_URL');
   process.exit(1);
 }
 
