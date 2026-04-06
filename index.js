@@ -906,45 +906,33 @@ async function getRaydiumPositions() {
         // Raydium uses tick arrays (not individual ticks) — each array covers 60 ticks × tickSpacing
         // The tick array start index = floor(tick / (tickSpacing * 60)) * (tickSpacing * 60)
 
+        // TickState::LEN = 4+16+16+16+16+(16*3)+16+16+8+8+4 = 168 (from Raydium source)
+        // TickArrayState layout: disc(8) + pool_id(32) + start_tick_index(4) + ticks[60*168] + 1 + 115 = 10240
+        const TICK_SIZE = 168;
         const TICK_ARRAY_SIZE = 60;
-        const ticksPerArray = pool.tickSpacing * TICK_ARRAY_SIZE;
 
         function getTickArrayStart(tick, tickSpacing) {
           const tps = tickSpacing * TICK_ARRAY_SIZE;
+          // Use floor division that handles negative ticks correctly
           return Math.floor(tick / tps) * tps;
         }
 
-        function encodeTickArrayStartIndex(startIndex) {
-          // i32 little-endian as 4 bytes
+        // Tick array PDA seed uses start_index as big-endian i32 (confirmed from source: to_be_bytes())
+        function encodeTickArrayStartIndexBE(startIndex) {
           const buf = Buffer.alloc(4);
-          buf.writeInt32LE(startIndex);
+          buf.writeInt32BE(startIndex);
           return buf;
         }
 
-        // Derive tick array PDA: seeds = ["tick_array", pool_id_bytes, start_index_bytes]
-        // We need to fetch tick arrays and then find the specific tick offset within them
-        const lowerArrayStart = getTickArrayStart(pos.tickLower, pool.tickSpacing);
-        const upperArrayStart = getTickArrayStart(pos.tickUpper, pool.tickSpacing);
-
-        // Fetch both tick arrays in parallel using getProgramAccounts with memcmp
-        // TickArray layout: discriminator(8) + pool_id(32) + start_tick_index(i32) + ticks[60]
-        // Each tick: fee_growth_outside_0(u128=16) + fee_growth_outside_1(u128=16) + ... = 88 bytes total per tick
-        const TICK_SIZE = 88; // full tick struct size in Raydium CLMM
-        const TICK_ARRAY_ACCOUNT_SIZE = 8 + 32 + 4 + (TICK_SIZE * TICK_ARRAY_SIZE) + 115; // ~7627 bytes
-
         async function fetchTickArray(startIndex) {
-          // Use getProgramAccounts with memcmp: pool_id at offset 8, start_index at offset 40
-          const startIndexBuf = encodeTickArrayStartIndex(startIndex);
-          const startIndexBase58 = base58EncodeBytes(startIndexBuf);
-          // Actually Raydium stores the pool_id at offset 8 and start_tick_index as i32 at offset 40
-          // We filter by pool_id (32 bytes at offset 8) and start_tick_index (4 bytes at offset 40)
-          const poolIdBuf = base58ToBytes(pos.poolId);
-
+          // Filter by: pool_id at offset 8 (32 bytes), start_tick_index at offset 40 (4 bytes, BE)
+          const startIndexBuf = encodeTickArrayStartIndexBE(startIndex);
           const accounts = await solRpc('getProgramAccounts', [
             RAYDIUM_CLMM_PROGRAM,
             {
               encoding: 'base64',
               filters: [
+                { dataSize: 10240 },
                 { memcmp: { offset: 8,  bytes: pos.poolId } },
                 { memcmp: { offset: 40, bytes: base58EncodeBytes(startIndexBuf) } },
               ],
@@ -955,12 +943,15 @@ async function getRaydiumPositions() {
 
         let pendingYield = 0;
         try {
+          const lowerArrayStart = getTickArrayStart(pos.tickLower, pool.tickSpacing);
+          const upperArrayStart = getTickArrayStart(pos.tickUpper, pool.tickSpacing);
+
           const [lowerArrayAcc, upperArrayAcc] = await Promise.all([
             fetchTickArray(lowerArrayStart),
             lowerArrayStart === upperArrayStart ? Promise.resolve(null) : fetchTickArray(upperArrayStart),
           ]);
 
-          const upperArray = upperArrayAcc ?? lowerArrayAcc; // same array if ticks are close
+          const upperArray = upperArrayAcc ?? lowerArrayAcc;
 
           if (!lowerArrayAcc) {
             console.log(`  Tick array not found — using tokenFeesOwed only`);
@@ -968,19 +959,22 @@ async function getRaydiumPositions() {
             const pendingTokens1 = Number(pos.tokenFeesOwed1) / Math.pow(10, pool.decimals1);
             pendingYield = (price0 ?? 0) * pendingTokens0 + (price1 ?? 0) * pendingTokens1;
           } else {
-            // Parse fee_growth_outside from tick accounts
+            // Parse fee_growth_outside from tick array account
+            // TickState field offsets within each tick struct:
+            //   tick(4) + liq_net(16) + liq_gross(16) = 36 → fee_growth_outside_0
+            //   36 + 16 = 52 → fee_growth_outside_1
             function parseFeeGrowthOutside(accountData, tickIndex, arrayStartIndex) {
               const buf = Buffer.from(accountData, 'base64');
-              // TickArray layout: disc(8) + pool_id(32) + start_tick_index(4) = 44 bytes header
-              const HEADER = 44;
+              const HEADER = 44; // disc(8) + pool_id(32) + start_tick_index(4)
               const tickOffset = (tickIndex - arrayStartIndex) / pool.tickSpacing;
               if (tickOffset < 0 || tickOffset >= TICK_ARRAY_SIZE) return { fg0: 0n, fg1: 0n };
               const tickStart = HEADER + tickOffset * TICK_SIZE;
-              // Tick struct: fee_growth_outside_0_x64(u128) + fee_growth_outside_1_x64(u128) + ...
-              const fg0Lo = buf.readBigUInt64LE(tickStart);
-              const fg0Hi = buf.readBigUInt64LE(tickStart + 8);
-              const fg1Lo = buf.readBigUInt64LE(tickStart + 16);
-              const fg1Hi = buf.readBigUInt64LE(tickStart + 24);
+              const FG0_OFF = 36; // tick(4) + liq_net(16) + liq_gross(16)
+              const FG1_OFF = 52; // FG0_OFF + 16
+              const fg0Lo = buf.readBigUInt64LE(tickStart + FG0_OFF);
+              const fg0Hi = buf.readBigUInt64LE(tickStart + FG0_OFF + 8);
+              const fg1Lo = buf.readBigUInt64LE(tickStart + FG1_OFF);
+              const fg1Hi = buf.readBigUInt64LE(tickStart + FG1_OFF + 8);
               return {
                 fg0: fg0Lo | (fg0Hi << 64n),
                 fg1: fg1Lo | (fg1Hi << 64n),
