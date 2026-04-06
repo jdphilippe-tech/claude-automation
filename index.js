@@ -1,8 +1,9 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v26
-// Added: Suilend (SUI supply, wSOL supply, USDC borrow) via raw Sui RPC
-// No @suilend/sdk — avoids springsui-sdk ESM directory import bug
-// Retained: WETH/USDC Primary (Arbitrum), Moonwell (Base)
+// Daily Portfolio Check — GitHub Actions v27
+// Added: Raydium xStocks CLMM LP positions (Solana RPC, raw)
+//        Discovery mode via RAYDIUM_DRY_RUN=true (logs only, no Airtable writes)
+//        Once validated set RAYDIUM_DRY_RUN=false in repo vars to go live
+// Retained: WETH/USDC Primary (Arbitrum), Moonwell (Base), Suilend (Sui)
 // Schedule: 14:00 UTC = 7:00 AM PDT
 // ============================================================
 
@@ -15,15 +16,17 @@ const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
 
 const WALLET_EVM  = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
 const WALLET_SUI  = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
+const WALLET_SOL  = '5yiTWdskR7yd5RXvs7MJLqWsn6n7geM8SzvYjUpRHrTX';
 const WETH_POS_ID = 5384162n;
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 const SUI_RPC      = 'https://fullnode.mainnet.sui.io';
+const SOL_RPC      = process.env.SOL_RPC_URL ?? 'https://api.mainnet-beta.solana.com';
 
-// Suilend ObligationOwnerCap type — used to find obligation ID from wallet
-// We scan all owned objects and match by type string keyword
-// This avoids hardcoding the exact package address which may differ from docs
+// Set to false once numbers are validated against Raydium UI
+const RAYDIUM_DRY_RUN = (process.env.RAYDIUM_DRY_RUN ?? 'true') !== 'false';
+
 const OBLIGATION_CAP_KEYWORD = 'ObligationOwnerCap';
 
 const NOW_UTC = new Date().toISOString();
@@ -37,6 +40,7 @@ const F = {
   positionValue: 'fldWElDtJZRYTaZtD',
   revertPosVal:  'fldcciMBHm1kI0dL9',
   feeValue:      'fld6QnTv9CKHvglcX',
+  cycleId:       'fldFFts5ByR1EeYBk',
   notes:         'fldxWdSuQ09uhadFo',
 };
 
@@ -56,6 +60,25 @@ const LF = {
 // ---- Asset record IDs ----
 const ASSET = {
   wethPrimary: 'recbVsmOWh9YOWPBZ',
+  // Raydium xStocks — Assets table record IDs
+  // ⚠️ UPDATE CYCLE IDs below once positions are confirmed open
+  tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2'  },
+  nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1'  },
+  aaplx:  { recordId: 'recGF59dwIOnE8fm2',  cycleId: 'AAPLx-C1'  },
+  googlx: { recordId: 'recRxStry17D0ZGB5',  cycleId: 'GOOGLx-C1' },
+  crclx:  { recordId: 'recPq2Ee2MsoMa21S',  cycleId: 'CRCLx-C1'  },
+  spyx:   { recordId: 'rechX4b2anmi82enx',  cycleId: 'SPYx-C1'   },
+};
+
+// Map xStock token name keywords → asset key
+// Used to match pool tokens to the right Airtable record
+const XSTOCK_MAP = {
+  'TSLAx':  'tslax',
+  'NVDAx':  'nvdax',
+  'AAPLx':  'aaplx',
+  'GOOGLx': 'googlx',
+  'CRCLx':  'crclx',
+  'SPYx':   'spyx',
 };
 
 // ---- Lending position record IDs ----
@@ -101,7 +124,6 @@ async function fetchWithTimeout(url, options = {}, ms = 10000) {
   }
 }
 
-// Sui JSON-RPC helper
 async function suiRpc(method, params) {
   const { default: fetch } = await import('node-fetch');
   const res = await fetch(SUI_RPC, {
@@ -112,6 +134,19 @@ async function suiRpc(method, params) {
   if (!res.ok) { console.error(`[Sui RPC HTTP ${res.status}] ${method}`); return null; }
   const json = await res.json();
   if (json.error) { console.error(`[Sui RPC error] ${method}: ${json.error.message}`); return null; }
+  return json.result;
+}
+
+async function solRpc(method, params) {
+  const { default: fetch } = await import('node-fetch');
+  const res = await fetch(SOL_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  if (!res.ok) { console.error(`[Sol RPC HTTP ${res.status}] ${method}`); return null; }
+  const json = await res.json();
+  if (json.error) { console.error(`[Sol RPC error] ${method}: ${json.error.message}`); return null; }
   return json.result;
 }
 
@@ -129,8 +164,8 @@ async function airtableCreate(tableId, records) {
   return true;
 }
 
-function dailyRecord(assetId, inRange, extra = {}) {
-  return { [F.asset]: [assetId], [F.actionType]: 'Fee Check', [F.date]: NOW_UTC, [F.inRange]: inRange ? 'Yes' : 'No', ...extra };
+function dailyRecord(assetRecordId, inRange, extra = {}) {
+  return { [F.asset]: [assetRecordId], [F.actionType]: 'Fee Check', [F.date]: NOW_UTC, [F.inRange]: inRange ? 'Yes' : 'No', ...extra };
 }
 
 function lendingRecord(positionId, extra = {}) {
@@ -321,7 +356,6 @@ async function getMoonwellData() {
 
 // ============================================================
 // MODULE 3 — Suilend (Sui) via raw RPC
-// No SDK — avoids @suilend/springsui-sdk ESM directory import bug
 // ============================================================
 
 async function getSuilendData() {
@@ -329,8 +363,6 @@ async function getSuilendData() {
   const results = {};
 
   try {
-    // Step 1: Scan all owned objects and find ObligationOwnerCap by type keyword
-    // We can't use StructType filter because the exact package address varies
     let obligationId = null;
     let cursor = null;
 
@@ -359,22 +391,12 @@ async function getSuilendData() {
     }
 
     if (!obligationId) {
-      console.error('Suilend: no ObligationOwnerCap found. Logging all object types for debug:');
-      const debugPage = await suiRpc('suix_getOwnedObjects', [
-        WALLET_SUI,
-        { options: { showType: true } },
-        null,
-        20,
-      ]);
-      for (const obj of debugPage?.data ?? []) {
-        console.log(' -', obj.data?.type ?? 'unknown');
-      }
+      console.error('Suilend: no ObligationOwnerCap found.');
       return results;
     }
 
     console.log(`Suilend: obligation ${obligationId}`);
 
-    // Step 2: Fetch the obligation object
     const obligationObj    = await suiRpc('sui_getObject', [
       obligationId,
       { showContent: true, showType: true },
@@ -386,10 +408,8 @@ async function getSuilendData() {
       return results;
     }
 
-    // Log full structure on first run so we can see exact field names
     console.log('Obligation field keys:', Object.keys(obligationFields).join(', '));
 
-    // Step 3: Get prices and lending market reserves in parallel
     const lendingMarketId = obligationFields.lending_market_id?.id
       ?? obligationFields.lending_market_id;
 
@@ -402,11 +422,9 @@ async function getSuilendData() {
     const wsolPrice = priceData?.coins?.['coingecko:wrapped-solana']?.price ?? 0;
     console.log(`Prices: SUI $${suiPrice.toFixed(4)}, wSOL $${wsolPrice.toFixed(4)}`);
 
-    // Reserves are stored as a vector in the lending market object fields
     const lmFields = lendingMarketObj?.data?.content?.fields;
     const reserves  = lmFields?.reserves ?? [];
     console.log(`Lending market reserves: ${reserves.length} found`);
-
 
     const suilendAPYs = {};
     for (const reserveEntry of reserves) {
@@ -422,37 +440,21 @@ async function getSuilendData() {
       const key = isSUI ? 'SUI' : isWSOL ? 'WSOL' : 'USDC';
 
       if (!suilendAPYs[key]) {
-        // Config is Cell<ReserveConfig> — actual data at config.fields.element.fields
         const configEl = rf?.config?.fields?.element?.fields ?? {};
-
-        // Interest rate model: piecewise linear lookup using utils[] and aprs[] arrays
-        // interest_rate_utils: utilization breakpoints (scaled 1e18)
-        // interest_rate_aprs: APR at each breakpoint (scaled 1e18, annualized)
         const utils = configEl?.interest_rate_utils ?? [];
         const aprs  = configEl?.interest_rate_aprs  ?? [];
 
-
-        // borrowed_amount is a Decimal struct scaled by 1e18 (regardless of asset)
-        // available_amount is raw token units in native asset decimals
         const mintDec      = Number(rf?.mint_decimals ?? 6);
         const borrowedRaw  = BigInt(rf?.borrowed_amount?.fields?.value ?? 0);
-        const availableRaw = BigInt(rf?.available_amount ?? 0);
-
-        // Utilization = borrowed / total_deposits
-        // total_deposits = ctoken_supply (total issued cTokens = total deposits in native units)
-        // available_amount is NOT total deposits - borrowed, it's the liquid buffer only
-        const scale27    = 10n ** 27n;
-        const borrowedNative  = Number(borrowedRaw * 1000n / scale27) / 1000;
+        const scale27      = 10n ** 27n;
+        const borrowedNative     = Number(borrowedRaw * 1000n / scale27) / 1000;
         const ctokenSupplyNative = Number(BigInt(rf?.ctoken_supply ?? 0)) / Math.pow(10, mintDec);
-        const utilRate   = ctokenSupplyNative > 0 ? borrowedNative / ctokenSupplyNative : 0;
+        const utilRate           = ctokenSupplyNative > 0 ? borrowedNative / ctokenSupplyNative : 0;
 
-        // Interpolate borrow APR from the lookup table
         let borrowAprPerYear = 0;
         if (utils.length > 0 && aprs.length >= utils.length) {
-        // interest_rate_utils: utilization as percentages (0-100), NOT fractions
-        // interest_rate_aprs: APR in basis points (400 = 4%), NOT scaled by 1e18
-        const utilPoints = utils.map(u => Number(u) / 100);        // convert % to fraction
-        const aprPoints  = aprs.map(a => Number(a) / 10000);       // convert bps to decimal
+          const utilPoints = utils.map(u => Number(u) / 100);
+          const aprPoints  = aprs.map(a => Number(a) / 10000);
 
           if (utilRate <= utilPoints[0]) {
             borrowAprPerYear = aprPoints[0];
@@ -469,14 +471,11 @@ async function getSuilendData() {
           }
         }
 
-        // APR is already annualized — convert to APY via compound formula
-        // APR per second = borrowAprPerYear / 31536000
         const borrowRatePerSec = borrowAprPerYear / 31_536_000;
         const borrowAPY = borrowRatePerSec > 0
           ? ((1 + borrowRatePerSec) ** 31_536_000 - 1) * 100
           : null;
 
-        // Supply APY = borrow APY × utilization × (1 - spread_fee)
         const spreadFeeBps = Number(configEl?.spread_fee_bps ?? 0);
         const spreadFee    = spreadFeeBps / 10000;
         const supplyAPY    = borrowAPY != null
@@ -488,8 +487,6 @@ async function getSuilendData() {
       }
     }
 
-    // Step 4: Parse deposits
-    // Suilend obligation stores deposits as a dynamic field table — try common field names
     const depositList = obligationFields.deposits?.fields?.contents
       ?? obligationFields.collateral?.fields?.contents
       ?? obligationFields.deposits
@@ -499,9 +496,7 @@ async function getSuilendData() {
 
     for (const entry of depositList) {
       const d        = entry?.fields ?? entry;
-      const coinType = d?.coin_type?.fields?.name
-        ?? d?.reserve_array_index  // fallback — log and skip
-        ?? '';
+      const coinType = d?.coin_type?.fields?.name ?? '';
 
       const isSUI  = coinType.toLowerCase().includes('sui::sui');
       const isWSOL = coinType.toLowerCase().includes('b7844e28');
@@ -512,19 +507,15 @@ async function getSuilendData() {
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
       const supplyAPY = suilendAPYs[assetKey]?.supplyAPY ?? null;
 
-      // Token count: deposited_ctoken_amount in native mintDec units (stable, checkpointed)
-      // wSOL mintDec=8, SUI mintDec=9
       const mintDec2  = isSUI ? 9 : 8;
       const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
       const tokens    = Number(ctokenRaw) / Math.pow(10, mintDec2);
-      // USD: tokens × live market price (consistent with portfolio tracking)
       const supplyUSD = tokens * price;
 
       console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
     }
 
-    // Step 5: Parse borrows
     const borrowList = obligationFields.borrows?.fields?.contents
       ?? obligationFields.borrows
       ?? [];
@@ -538,21 +529,16 @@ async function getSuilendData() {
       const isUSDC = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
       if (!isUSDC) continue;
 
-      // borrowed_amount.fields.value is scaled by 1e24 (confirmed from raw data)
-      // raw: 313648890508183858160030809 / 1e24 = 313.65 ✓
-      // Note: supply market_value uses 1e18, borrow uses 1e24 — different scales
       const baRaw     = b?.borrowed_amount?.fields?.value ?? b?.borrowed_amount ?? '0';
       const baInt     = BigInt(String(baRaw).split('.')[0]);
-      const borrowUSD = Number(baInt / 1000000n) / 1e18;  // /1e24 via BigInt
+      const borrowUSD = Number(baInt / 1000000n) / 1e18;
       const tokens    = borrowUSD;
 
       const borrowPool = suilendAPYs['USDC'];
       const borrowAPY  = borrowPool?.borrowAPY ?? null;
 
-      // Include LTV-critical fields from obligation in notes
-      const depositedValueUsd    = Number(BigInt(obligationFields.deposited_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
-      const allowedBorrowValueUsd = Number(BigInt(obligationFields.allowed_borrow_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
-      const weightedBorrowValueUsd = Number(BigInt(obligationFields.weighted_borrowed_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
+      const depositedValueUsd      = Number(BigInt(obligationFields.deposited_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
+      const allowedBorrowValueUsd  = Number(BigInt(obligationFields.allowed_borrow_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
       const ltvPct = allowedBorrowValueUsd > 0 ? (borrowUSD / allowedBorrowValueUsd * 100).toFixed(1) : 'n/a';
       const notes  = `Collateral: $${depositedValueUsd.toFixed(2)} | Borrow Limit: $${allowedBorrowValueUsd.toFixed(2)} | LTV Used: ${ltvPct}%`;
 
@@ -568,21 +554,428 @@ async function getSuilendData() {
 }
 
 // ============================================================
+// MODULE 4 — Raydium xStocks CLMM (Solana)
+// ============================================================
+
+// Raydium CLMM program ID on mainnet
+const RAYDIUM_CLMM_PROGRAM = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
+
+// Q64.64 fixed point → float
+function sqrtPriceX64ToFloat(sqrtPriceX64Str) {
+  const val = BigInt(sqrtPriceX64Str);
+  // sqrtPrice is Q64.64: divide by 2^64
+  const Q64 = 2n ** 64n;
+  const intPart  = Number(val / Q64);
+  const fracPart = Number(val % Q64) / Number(Q64);
+  return intPart + fracPart;
+}
+
+// Tick → sqrt price as float
+function tickToSqrtPrice(tick) {
+  return Math.sqrt(1.0001 ** tick);
+}
+
+// Calculate token amounts from liquidity + tick bounds + current tick
+// Returns { amount0, amount1 } in raw token units (not USD)
+function calcAmounts(liquidity, tickLower, tickUpper, tickCurrent, sqrtPriceCurrent) {
+  const liq = Number(liquidity);
+  const sqrtLower   = tickToSqrtPrice(tickLower);
+  const sqrtUpper   = tickToSqrtPrice(tickUpper);
+  const sqrtCurrent = sqrtPriceCurrent ?? tickToSqrtPrice(tickCurrent);
+
+  const inRange = tickCurrent >= tickLower && tickCurrent < tickUpper;
+
+  let amount0 = 0, amount1 = 0;
+  if (inRange) {
+    amount0 = liq * (sqrtUpper - sqrtCurrent) / (sqrtCurrent * sqrtUpper);
+    amount1 = liq * (sqrtCurrent - sqrtLower);
+  } else if (tickCurrent < tickLower) {
+    amount0 = liq * (sqrtUpper - sqrtLower) / (sqrtLower * sqrtUpper);
+  } else {
+    amount1 = liq * (sqrtUpper - sqrtLower);
+  }
+
+  return { amount0, amount1, inRange };
+}
+
+// Parse a Raydium CLMM PersonalPositionState from raw base64 account data
+// Layout (all little-endian):
+//   8  bytes  discriminator
+//   32 bytes  nft_mint
+//   32 bytes  pool_id
+//   4  bytes  tick_lower_index  (i32)
+//   4  bytes  tick_upper_index  (i32)
+//   16 bytes  liquidity         (u128)
+//   16 bytes  fee_growth_inside_0_last_x64 (u128)
+//   16 bytes  fee_growth_inside_1_last_x64 (u128)
+//   8  bytes  token_fees_owed_0 (u64)
+//   8  bytes  token_fees_owed_1 (u64)
+//   ... reward fields follow (not needed for fee check)
+function parsePositionAccount(data) {
+  const buf = Buffer.from(data, 'base64');
+  let offset = 8; // skip discriminator
+
+  const nftMint = buf.slice(offset, offset + 32).toString('hex'); offset += 32;
+  const poolId  = buf.slice(offset, offset + 32).toString('hex'); offset += 32;
+
+  const tickLower = buf.readInt32LE(offset); offset += 4;
+  const tickUpper = buf.readInt32LE(offset); offset += 4;
+
+  // u128 little-endian: two 64-bit halves
+  const liqLo  = buf.readBigUInt64LE(offset);     offset += 8;
+  const liqHi  = buf.readBigUInt64LE(offset);     offset += 8;
+  const liquidity = liqLo | (liqHi << 64n);
+
+  const feeGrowth0Lo = buf.readBigUInt64LE(offset); offset += 8;
+  const feeGrowth0Hi = buf.readBigUInt64LE(offset); offset += 8;
+  const feeGrowthInside0Last = feeGrowth0Lo | (feeGrowth0Hi << 64n);
+
+  const feeGrowth1Lo = buf.readBigUInt64LE(offset); offset += 8;
+  const feeGrowth1Hi = buf.readBigUInt64LE(offset); offset += 8;
+  const feeGrowthInside1Last = feeGrowth1Lo | (feeGrowth1Hi << 64n);
+
+  const tokenFeesOwed0 = buf.readBigUInt64LE(offset); offset += 8;
+  const tokenFeesOwed1 = buf.readBigUInt64LE(offset); offset += 8;
+
+  return {
+    poolId: base58FromHex(poolId),
+    nftMint: base58FromHex(nftMint),
+    tickLower,
+    tickUpper,
+    liquidity,
+    feeGrowthInside0Last,
+    feeGrowthInside1Last,
+    tokenFeesOwed0,
+    tokenFeesOwed1,
+  };
+}
+
+// Parse Raydium CLMM PoolState — we only need the fields relevant to price + fees
+// Layout offset reference (all LE):
+//   8   discriminator
+//   1   amm_config bump
+//   32  amm_config
+//   32  creator
+//   32  token_mint_0
+//   32  token_mint_1
+//   32  token_vault_0
+//   32  token_vault_1
+//   32  observation_key
+//   1   mint_decimals_0
+//   1   mint_decimals_1
+//   2   tick_spacing
+//   16  liquidity
+//   16  sqrt_price_x64      ← current price
+//   4   tick_current        ← current tick (i32)
+//   2   observation_index
+//   2   observation_update_duration
+//   16  fee_growth_global_0_x64
+//   16  fee_growth_global_1_x64
+//   8   protocol_fees_token_0
+//   8   protocol_fees_token_1
+//   ... swap volumes etc
+function parsePoolAccount(data) {
+  const buf = Buffer.from(data, 'base64');
+  let offset = 8;
+
+  offset += 1 + 32 + 32; // bump + amm_config + creator
+
+  const mint0Hex = buf.slice(offset, offset + 32).toString('hex'); offset += 32;
+  const mint1Hex = buf.slice(offset, offset + 32).toString('hex'); offset += 32;
+
+  offset += 32 + 32 + 32; // vault0, vault1, observation_key
+
+  const decimals0 = buf.readUInt8(offset); offset += 1;
+  const decimals1 = buf.readUInt8(offset); offset += 1;
+
+  const tickSpacing = buf.readUInt16LE(offset); offset += 2;
+
+  // skip pool liquidity (16 bytes)
+  offset += 16;
+
+  // sqrt_price_x64 (u128 LE)
+  const sqrtPriceLo = buf.readBigUInt64LE(offset); offset += 8;
+  const sqrtPriceHi = buf.readBigUInt64LE(offset); offset += 8;
+  const sqrtPriceX64 = sqrtPriceLo | (sqrtPriceHi << 64n);
+
+  const tickCurrent = buf.readInt32LE(offset); offset += 4;
+
+  offset += 2 + 2; // observation_index, observation_update_duration
+
+  // fee_growth_global_0_x64 (u128 LE)
+  const fg0Lo = buf.readBigUInt64LE(offset); offset += 8;
+  const fg0Hi = buf.readBigUInt64LE(offset); offset += 8;
+  const feeGrowthGlobal0 = fg0Lo | (fg0Hi << 64n);
+
+  // fee_growth_global_1_x64 (u128 LE)
+  const fg1Lo = buf.readBigUInt64LE(offset); offset += 8;
+  const fg1Hi = buf.readBigUInt64LE(offset); offset += 8;
+  const feeGrowthGlobal1 = fg1Lo | (fg1Hi << 64n);
+
+  return {
+    mint0: base58FromHex(mint0Hex),
+    mint1: base58FromHex(mint1Hex),
+    decimals0,
+    decimals1,
+    tickSpacing,
+    sqrtPriceX64,
+    tickCurrent,
+    feeGrowthGlobal0,
+    feeGrowthGlobal1,
+  };
+}
+
+// Calculate uncollected fees from fee growth fields
+// Standard CLMM formula: fees_owed = (feeGrowthGlobal - feeGrowthInsideLast) × liquidity / Q64
+// Note: this is a simplified version — full precision requires tick account fee_growth_outside values
+// For daily monitoring this gives a close approximation; exact values require tick account reads
+function calcPendingFees(feeGrowthGlobal, feeGrowthInsideLast, tokenFeesOwed, liquidity) {
+  const Q64 = 2n ** 64n;
+  // Handle wraparound (u128 overflow)
+  const U128_MAX = 2n ** 128n;
+  let delta = (feeGrowthGlobal - feeGrowthInsideLast + U128_MAX) % U128_MAX;
+  const accumulated = Number(delta * liquidity / Q64);
+  const alreadyOwed = Number(tokenFeesOwed);
+  return accumulated + alreadyOwed;
+}
+
+// Minimal base58 decode/encode — enough to convert 32-byte hex pubkeys
+// Uses the standard Bitcoin/Solana base58 alphabet
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function base58FromHex(hex) {
+  let num = BigInt('0x' + hex);
+  let result = '';
+  while (num > 0n) {
+    result = BASE58_ALPHABET[Number(num % 58n)] + result;
+    num = num / 58n;
+  }
+  // Leading zeros → leading '1's
+  for (let i = 0; i < hex.length; i += 2) {
+    if (hex[i] === '0' && hex[i+1] === '0') result = '1' + result;
+    else break;
+  }
+  return result;
+}
+
+async function getRaydiumPositions() {
+  console.log(`\n--- Raydium xStocks CLMM ${RAYDIUM_DRY_RUN ? '[DRY RUN]' : '[LIVE]'} ---`);
+  const results = [];
+
+  try {
+    // Step 1: Get all token accounts — filter for CLMM position NFTs (amount=1, decimals=0)
+    const tokenAccounts = await solRpc('getTokenAccountsByOwner', [
+      WALLET_SOL,
+      { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
+      { encoding: 'jsonParsed' },
+    ]);
+
+    if (!tokenAccounts?.value) {
+      console.error('Raydium: could not fetch token accounts');
+      return results;
+    }
+
+    // Position NFTs: exactly 1 token, 0 decimals
+    const positionNfts = tokenAccounts.value.filter(acc => {
+      const info = acc.account.data.parsed.info;
+      return info.tokenAmount.amount === '1' && info.tokenAmount.decimals === 0;
+    });
+
+    console.log(`Found ${positionNfts.length} position NFT(s) in wallet`);
+
+    if (positionNfts.length === 0) {
+      console.log('Raydium: no position NFTs found — nothing to log');
+      return results;
+    }
+
+    // Step 2: For each NFT mint, find the Raydium CLMM personal position account
+    // The position account is a PDA derived from: [POSITION_SEED, nft_mint]
+    // We query by owner = RAYDIUM_CLMM_PROGRAM and filter by mint in the data
+    // Simplest approach: getProgramAccounts with dataSize filter + memcmp on nft_mint bytes
+    const allMints = positionNfts.map(acc => acc.account.data.parsed.info.mint);
+    console.log(`NFT mints: ${allMints.join(', ')}`);
+
+    for (const nftMint of allMints) {
+      try {
+        // Decode nft_mint to bytes for memcmp filter
+        // Position account layout: 8 (disc) + 32 (nft_mint) starts at offset 8
+        const mintBytes = base58ToBytes(nftMint);
+        const mintHex   = Buffer.from(mintBytes).toString('base64');
+
+        const programAccounts = await solRpc('getProgramAccounts', [
+          RAYDIUM_CLMM_PROGRAM,
+          {
+            encoding: 'base64',
+            filters: [
+              { dataSize: 340 }, // PersonalPositionState is ~340 bytes
+              { memcmp: { offset: 8, bytes: nftMint } }, // nft_mint at offset 8
+            ],
+          },
+        ]);
+
+        if (!programAccounts || programAccounts.length === 0) {
+          console.log(`  ${nftMint.slice(0,8)}...: no position account found (skipping)`);
+          continue;
+        }
+
+        const posAccount = programAccounts[0];
+        const posData    = posAccount.account.data[0]; // base64 encoded
+        const pos        = parsePositionAccount(posData);
+
+        console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
+
+        // Step 3: Fetch the pool account
+        const poolAccountRes = await solRpc('getAccountInfo', [
+          pos.poolId,
+          { encoding: 'base64' },
+        ]);
+
+        if (!poolAccountRes?.value?.data) {
+          console.error(`  Pool ${pos.poolId.slice(0,8)}...: could not fetch account data`);
+          continue;
+        }
+
+        const poolData = poolAccountRes.value.data[0];
+        const pool     = parsePoolAccount(poolData);
+
+        console.log(`  Pool: mint0=${pool.mint0.slice(0,8)}... mint1=${pool.mint1.slice(0,8)}... tick=${pool.tickCurrent} dec0=${pool.decimals0} dec1=${pool.decimals1}`);
+
+        // Step 4: Get token prices from DeFi Llama
+        const priceKeys = `solana:${pool.mint0},solana:${pool.mint1}`;
+        const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${priceKeys}`);
+        const price0    = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
+        const price1    = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
+
+        console.log(`  Prices: mint0=$${price0?.toFixed(4) ?? 'n/a'}, mint1=$${price1?.toFixed(4) ?? 'n/a'}`);
+
+        // Step 5: Calculate position value
+        const sqrtPriceFloat = sqrtPriceX64ToFloat(pool.sqrtPriceX64.toString());
+        const { amount0, amount1, inRange } = calcAmounts(
+          pos.liquidity,
+          pos.tickLower,
+          pos.tickUpper,
+          pool.tickCurrent,
+          sqrtPriceFloat
+        );
+
+        const tokens0 = amount0 / Math.pow(10, pool.decimals0);
+        const tokens1 = amount1 / Math.pow(10, pool.decimals1);
+
+        const value0  = price0 != null ? tokens0 * price0 : null;
+        const value1  = price1 != null ? tokens1 * price1 : null;
+        const positionValue = (value0 ?? 0) + (value1 ?? 0);
+
+        console.log(`  Amounts: ${tokens0.toFixed(6)} token0 ($${value0?.toFixed(2) ?? '?'}) + ${tokens1.toFixed(6)} token1 ($${value1?.toFixed(2) ?? '?'})`);
+        console.log(`  Position value: $${positionValue.toFixed(2)}, in range: ${inRange}`);
+
+        // Step 6: Calculate pending fees (simplified — fee_growth_global approach)
+        // token0 = xStock (e.g. TSLAx), token1 = USDC
+        const pendingRaw0 = calcPendingFees(
+          pool.feeGrowthGlobal0, pos.feeGrowthInside0Last, pos.tokenFeesOwed0, pos.liquidity
+        );
+        const pendingRaw1 = calcPendingFees(
+          pool.feeGrowthGlobal1, pos.feeGrowthInside1Last, pos.tokenFeesOwed1, pos.liquidity
+        );
+
+        const pendingTokens0 = pendingRaw0 / Math.pow(10, pool.decimals0);
+        const pendingTokens1 = pendingRaw1 / Math.pow(10, pool.decimals1);
+        const pendingUSD0    = price0 != null ? pendingTokens0 * price0 : 0;
+        const pendingUSD1    = price1 != null ? pendingTokens1 * price1 : 0;
+        const pendingYield   = pendingUSD0 + pendingUSD1;
+
+        console.log(`  Pending fees: ${pendingTokens0.toFixed(6)} token0 + ${pendingTokens1.toFixed(6)} USDC = $${pendingYield.toFixed(4)}`);
+
+        // Step 7: Match to known xStock asset
+        // mint1 should always be USDC; mint0 is the xStock
+        // We identify by looking up the token symbol via DeFi Llama metadata
+        // For now, log the mint and let the first run tell us which is which
+        const assetKey = resolveXStockAsset(pool.mint0, pool.mint1);
+        console.log(`  Resolved asset key: ${assetKey ?? 'UNKNOWN'}`);
+
+        results.push({
+          assetKey,
+          nftMint,
+          poolId: pos.poolId,
+          mint0: pool.mint0,
+          mint1: pool.mint1,
+          positionValue,
+          pendingYield,
+          inRange,
+          tickCurrent: pool.tickCurrent,
+          tickLower: pos.tickLower,
+          tickUpper: pos.tickUpper,
+        });
+
+      } catch (e) {
+        console.error(`  Error processing NFT ${nftMint.slice(0,8)}...: ${e.message}`);
+      }
+    }
+
+  } catch (e) {
+    console.error(`Raydium fatal: ${e.message}`);
+  }
+
+  return results;
+}
+
+// Resolve which xStock asset a position belongs to
+// On first discovery run this will log unknown — we update the map after seeing the mints
+// Known USDC mint on Solana: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+const USDC_MINT_SOL  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+// ⚠️ POPULATE after first discovery run — map xStock mint → ASSET key
+// These will be logged in the Actions output on first run
+const XSTOCK_MINT_MAP = {
+  // 'MINT_ADDRESS': 'tslax',
+  // 'MINT_ADDRESS': 'nvdax',
+  // etc.
+};
+
+function resolveXStockAsset(mint0, mint1) {
+  // mint1 should be USDC, mint0 should be the xStock
+  const xStockMint = mint0 === USDC_MINT_SOL ? mint1 : mint0;
+  return XSTOCK_MINT_MAP[xStockMint] ?? null;
+}
+
+// base58 → Uint8Array — needed for memcmp filters
+function base58ToBytes(str) {
+  let num = 0n;
+  for (const char of str) {
+    const idx = BASE58_ALPHABET.indexOf(char);
+    if (idx < 0) throw new Error(`Invalid base58 char: ${char}`);
+    num = num * 58n + BigInt(idx);
+  }
+  const bytes = [];
+  while (num > 0n) {
+    bytes.unshift(Number(num & 0xffn));
+    num >>= 8n;
+  }
+  // Pad to 32 bytes
+  while (bytes.length < 32) bytes.unshift(0);
+  return new Uint8Array(bytes);
+}
+
+// ============================================================
 // MAIN
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v26 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v27 — ${NOW_UTC} ======`);
+  if (RAYDIUM_DRY_RUN) {
+    console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium data will be logged but NOT written to Airtable');
+  }
 
-  const [wethRes, moonwellRes, suilendRes] = await Promise.allSettled([
+  const [wethRes, moonwellRes, suilendRes, raydiumRes] = await Promise.allSettled([
     getWethPosition(),
     getMoonwellData(),
     getSuilendData(),
+    getRaydiumPositions(),
   ]);
 
-  const weth     = wethRes.value     ?? null;
-  const moonwell = moonwellRes.value ?? null;
-  const suilend  = suilendRes.value  ?? null;
+  const weth     = wethRes.status     === 'fulfilled' ? wethRes.value     : null;
+  const moonwell = moonwellRes.status === 'fulfilled' ? moonwellRes.value : null;
+  const suilend  = suilendRes.status  === 'fulfilled' ? suilendRes.value  : null;
+  const raydium  = raydiumRes.status  === 'fulfilled' ? raydiumRes.value  : [];
 
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
@@ -643,6 +1036,51 @@ async function main() {
       const ok = await airtableCreate(LENDING_TABLE, batch);
       if (ok) { written += batch.length; console.log(`✓ Suilend: ${batch.length} records`); }
     }
+  }
+
+  // Raydium xStocks
+  if (raydium.length > 0) {
+    console.log(`\nRaydium — ${raydium.length} position(s) found`);
+
+    if (RAYDIUM_DRY_RUN) {
+      console.log('DRY RUN — printing results, skipping Airtable write:');
+      for (const pos of raydium) {
+        console.log(`  ${pos.assetKey ?? 'UNKNOWN'} | mint0: ${pos.mint0} | value: $${pos.positionValue.toFixed(2)} | yield: $${pos.pendingYield.toFixed(4)} | inRange: ${pos.inRange}`);
+      }
+      console.log('\n⚠️  ACTION REQUIRED after this run:');
+      console.log('  1. Check the mint0 addresses above and map them in XSTOCK_MINT_MAP');
+      console.log('  2. Confirm position values match Raydium UI');
+      console.log('  3. Confirm pending yield matches Raydium UI');
+      console.log('  4. Set RAYDIUM_DRY_RUN=false in GitHub repo variables to go live');
+    } else {
+      // Live write — only write positions that have a resolved asset key
+      const batch = [];
+      for (const pos of raydium) {
+        if (!pos.assetKey || !ASSET[pos.assetKey]) {
+          console.warn(`  Skipping unresolved position (mint0: ${pos.mint0})`);
+          continue;
+        }
+        const { recordId, cycleId } = ASSET[pos.assetKey];
+        batch.push(dailyRecord(recordId, pos.inRange, {
+          [F.positionValue]: pos.positionValue,
+          [F.revertPosVal]:  pos.positionValue,
+          [F.feeValue]:      pos.pendingYield,
+          [F.cycleId]:       cycleId,
+          [F.notes]:         `Tick: ${pos.tickCurrent} | Range: [${pos.tickLower}, ${pos.tickUpper}]`,
+        }));
+        console.log(`  Queued ${pos.assetKey}: $${pos.positionValue.toFixed(2)}, yield: $${pos.pendingYield.toFixed(4)}, inRange: ${pos.inRange}`);
+      }
+      if (batch.length > 0) {
+        // Batch in chunks of 10 (Airtable limit)
+        for (let i = 0; i < batch.length; i += 10) {
+          const ok = await airtableCreate(DAILY_TABLE, batch.slice(i, i + 10));
+          if (ok) written += Math.min(10, batch.length - i);
+        }
+        console.log(`✓ Raydium: ${batch.length} records written`);
+      }
+    }
+  } else {
+    console.log('Raydium: no positions returned');
   }
 
   console.log(`\n====== Complete — ${written} records written ======`);
