@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, April 6, 2026</title>
+      <description><![CDATA[PSF strategy sits in cash as extreme fear reading of 13 creates potential setup opportunities in crypto markets.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-06.mp3" length="814646" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-04-06</guid>
+      <pubDate>Mon, 06 Apr 2026 16:11:22 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Sunday, April 5, 2026</title>
       <description><![CDATA[Eth holds steady in normal zone while PSF strategy remains fully in cash. Extreme fear reading suggests potential opportunities ahead.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-05.mp3" length="684661" type="audio/mpeg"/>
