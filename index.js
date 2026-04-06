@@ -763,25 +763,42 @@ async function getRaydiumPositions() {
   const results = [];
 
   try {
-    // Step 1: Get all token accounts — filter for CLMM position NFTs (amount=1, decimals=0)
-    const tokenAccounts = await solRpc('getTokenAccountsByOwner', [
-      WALLET_SOL,
-      { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
-      { encoding: 'jsonParsed' },
+    // Step 1: Get all token accounts — query BOTH token programs
+    // Raydium CLMM position NFTs may use Token-2022 (TokenzQdBNbLqP5VgrFoSmeiKTcdYeScV8)
+    // rather than the legacy Token program (TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA)
+    const [legacyAccounts, token2022Accounts] = await Promise.all([
+      solRpc('getTokenAccountsByOwner', [
+        WALLET_SOL,
+        { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
+        { encoding: 'jsonParsed' },
+      ]),
+      solRpc('getTokenAccountsByOwner', [
+        WALLET_SOL,
+        { programId: 'TokenzQdBNbLqP5VgrFoSmeiKTcdYeScV8' },
+        { encoding: 'jsonParsed' },
+      ]),
     ]);
 
-    if (!tokenAccounts?.value) {
-      console.error('Raydium: could not fetch token accounts');
+    const allAccounts = [
+      ...(legacyAccounts?.value ?? []),
+      ...(token2022Accounts?.value ?? []),
+    ];
+
+    console.log(`Token accounts: ${legacyAccounts?.value?.length ?? 0} legacy + ${token2022Accounts?.value?.length ?? 0} Token-2022`);
+
+    if (allAccounts.length === 0) {
+      console.error('Raydium: could not fetch token accounts from either program');
       return results;
     }
 
     // Position NFTs: exactly 1 token, 0 decimals
-    const positionNfts = tokenAccounts.value.filter(acc => {
-      const info = acc.account.data.parsed.info;
+    const positionNfts = allAccounts.filter(acc => {
+      const info = acc.account.data.parsed?.info;
+      if (!info) return false;
       return info.tokenAmount.amount === '1' && info.tokenAmount.decimals === 0;
     });
 
-    console.log(`Found ${positionNfts.length} position NFT(s) in wallet`);
+    console.log(`Found ${positionNfts.length} position NFT(s) in wallet (amount=1, decimals=0)`);
 
     if (positionNfts.length === 0) {
       console.log('Raydium: no position NFTs found — nothing to log');
