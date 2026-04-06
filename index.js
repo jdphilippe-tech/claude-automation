@@ -848,7 +848,9 @@ async function getRaydiumPositions() {
         const posData = programAccounts[0].account.data[0];
         const pos     = parsePositionAccount(posData);
 
-        console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
+        console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}`);
+        console.log(`  Pool ID (full): ${pos.poolId}`);
+        console.log(`  NFT mint (verify): ${pos.nftMint}`);
 
         // Delay between positions to let Helius recover after getProgramAccounts
         await new Promise(r => setTimeout(r, 2000));
@@ -858,7 +860,7 @@ async function getRaydiumPositions() {
         for (let attempt = 1; attempt <= 3; attempt++) {
           poolAccountRes = await solRpc('getAccountInfo', [pos.poolId, { encoding: 'base64' }]);
           if (poolAccountRes?.value?.data) break;
-          console.log(`  Pool ${pos.poolId.slice(0,8)}...: attempt ${attempt} failed, retrying in 3s...`);
+          console.log(`  Pool ${pos.poolId}: attempt ${attempt} failed — error above`);
           await new Promise(r => setTimeout(r, 3000));
         }
 
