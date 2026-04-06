@@ -60,14 +60,14 @@ const LF = {
 // ---- Asset record IDs ----
 const ASSET = {
   wethPrimary: 'recbVsmOWh9YOWPBZ',
-  // Raydium xStocks — Assets table record IDs
-  // ⚠️ UPDATE CYCLE IDs below once positions are confirmed open
-  tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2'  },
-  nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1'  },
-  aaplx:  { recordId: 'recGF59dwIOnE8fm2',  cycleId: 'AAPLx-C1'  },
-  googlx: { recordId: 'recRxStry17D0ZGB5',  cycleId: 'GOOGLx-C1' },
-  crclx:  { recordId: 'recPq2Ee2MsoMa21S',  cycleId: 'CRCLx-C1'  },
-  spyx:   { recordId: 'rechX4b2anmi82enx',  cycleId: 'SPYx-C1'   },
+  // Raydium xStocks — NFT mint addresses from Raydium UI + Airtable record IDs
+  // ⚠️ UPDATE CYCLE IDs once confirmed with you
+  tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2',  nftMint: '7R5JFSuXL23epYJmX6LhzbM2Nce39at4maWD7NeFK4tU' },
+  nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1',  nftMint: 'J7qm9jifiKg7CyWDbmdDUNokhgs7JvwZmy2jnJ7qmN5Z' },
+  aaplx:  { recordId: 'recGF59dwIOnE8fm2',  cycleId: 'AAPLx-C1',  nftMint: '2NsZvobR13JuYbkYTt5EK1XyyEJh3xB8621FhUW3LYKp' },
+  googlx: { recordId: 'recRxStry17D0ZGB5',  cycleId: 'GOOGLx-C1', nftMint: '2jznFFq36gfhUsWRzkEigGBY8hDqHBv4W6CdtsSGArWx' },
+  crclx:  { recordId: 'recPq2Ee2MsoMa21S',  cycleId: 'CRCLx-C1',  nftMint: 'AZHgbQL6dfBodYN5yHvNbvwWVYXvRGeqYRbd8ni9NfWq' },
+  spyx:   { recordId: 'rechX4b2anmi82enx',  cycleId: 'SPYx-C1',   nftMint: 'HgcTrL1Tb57ZrycTbhcBgRviFcWrfSiJRWSmwELXSyrj' },
 };
 
 // Map xStock token name keywords → asset key
@@ -783,52 +783,23 @@ async function getRaydiumPositions() {
     //   72-103: owner (wallet pubkey) ← filter here
     console.log(`Scanning Raydium CLMM for positions owned by ${WALLET_SOL.slice(0,8)}...`);
 
-    // Raydium CLMM positions are PDAs derived from the NFT mint — no owner field stored.
-    // We find positions by: wallet owns NFT → NFT mint → position PDA (nft_mint at offset 9 in account)
-    // Actual PersonalPositionState::LEN = 281 (from source: 8+1+32+32+4+4+16+16+16+8+8+72+64)
-    //
-    // Step 1a: Get all wallet token accounts and log them for inspection
-    const tokenAccounts = await solRpc('getTokenAccountsByOwner', [
-      WALLET_SOL,
-      { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
-      { encoding: 'jsonParsed' },
-    ]);
+    // NFT mints are hardcoded from Raydium UI — bypasses wallet scanning entirely.
+    // Position PDAs are derived from: seeds=[POSITION_SEED, nft_mint], program=RAYDIUM_CLMM_PROGRAM
+    // We fetch each position account directly using getAccountInfo on the derived PDA.
 
-    const allTokenAccs = tokenAccounts?.value ?? [];
-    console.log(`Wallet token accounts (${allTokenAccs.length} total):`);
-    for (const acc of allTokenAccs) {
-      const info = acc.account.data.parsed.info;
-      console.log(`  mint: ${info.mint} | amount: ${info.tokenAmount.amount} | decimals: ${info.tokenAmount.decimals}`);
-    }
+    // Build list of positions from ASSET config
+    const xstockPositions = Object.entries(ASSET)
+      .filter(([, v]) => typeof v === 'object' && v.nftMint)
+      .map(([key, v]) => ({ key, ...v }));
 
-    // NFT candidates: amount=1, decimals=0
-    const nftAccounts = allTokenAccs.filter(acc => {
-      const info = acc.account.data.parsed.info;
-      return info.tokenAmount.amount === '1' && info.tokenAmount.decimals === 0;
-    });
-    console.log(`NFT candidates (amount=1, decimals=0): ${nftAccounts.length}`);
+    console.log(`Processing ${xstockPositions.length} hardcoded xStock positions`);
 
-    // Step 1b: Also query CLMM program for all accounts with correct dataSize=281
-    // and log total count — helps confirm whether positions exist at all
-    const allPositionAccounts = await solRpc('getProgramAccounts', [
-      RAYDIUM_CLMM_PROGRAM,
-      { encoding: 'base64', filters: [{ dataSize: 281 }] },
-    ]);
-    console.log(`Total CLMM PersonalPositionState accounts (dataSize=281): ${allPositionAccounts?.length ?? 'error'}`);
-
-    if (nftAccounts.length === 0) {
-      console.log('No NFT position tokens found in wallet. Positions may use a different ownership model.');
-      console.log('Check the mint addresses logged above against your Raydium positions.');
-      return results;
-    }
-
-    // Step 2: For each NFT mint, find position account by memcmp on nft_mint at offset 9
-    // Layout: discriminator(8) + bump(1) + nft_mint(32) → nft_mint starts at offset 9
-    const nftMints = nftAccounts.map(acc => acc.account.data.parsed.info.mint);
-    console.log(`NFT mints to check: ${nftMints.join(', ')}`);
-
-    for (const nftMint of nftMints) {
+    for (const posConfig of xstockPositions) {
+      const { key, nftMint, recordId, cycleId } = posConfig;
       try {
+        // Find position account by memcmp on nft_mint at offset 9 in PersonalPositionState
+        // Layout: discriminator(8) + bump(1) + nft_mint(32 starting at byte 9)
+        // dataSize=281 confirmed from source: 8+1+32+32+4+4+16+16+16+8+8+72+64
         const programAccounts = await solRpc('getProgramAccounts', [
           RAYDIUM_CLMM_PROGRAM,
           {
@@ -841,13 +812,27 @@ async function getRaydiumPositions() {
         ]);
 
         if (!programAccounts || programAccounts.length === 0) {
-          console.log(`  ${nftMint.slice(0,8)}...: no position account found at dataSize=281`);
-          continue;
+          // Try offset 8 as fallback (no bump byte in some versions)
+          console.log(`  ${key}: not found at offset 9, trying offset 8...`);
+          const fallback = await solRpc('getProgramAccounts', [
+            RAYDIUM_CLMM_PROGRAM,
+            {
+              encoding: 'base64',
+              filters: [
+                { dataSize: 281 },
+                { memcmp: { offset: 8, bytes: nftMint } },
+              ],
+            },
+          ]);
+          if (!fallback || fallback.length === 0) {
+            console.log(`  ${key}: no position account found at offset 8 or 9`);
+            continue;
+          }
+          programAccounts.push(...fallback);
         }
 
-        const posAccount = programAccounts[0];
-        const posData    = posAccount.account.data[0];
-        const pos        = parsePositionAccount(posData);
+        const posData = programAccounts[0].account.data[0];
+        const pos     = parsePositionAccount(posData);
 
         console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
 
