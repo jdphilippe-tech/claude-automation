@@ -783,39 +783,71 @@ async function getRaydiumPositions() {
     //   72-103: owner (wallet pubkey) ← filter here
     console.log(`Scanning Raydium CLMM for positions owned by ${WALLET_SOL.slice(0,8)}...`);
 
-    const positionAccounts = await solRpc('getProgramAccounts', [
-      RAYDIUM_CLMM_PROGRAM,
-      {
-        encoding: 'base64',
-        filters: [
-          { dataSize: 340 },
-          { memcmp: { offset: 72, bytes: WALLET_SOL } },
-        ],
-      },
+    // Raydium CLMM positions are PDAs derived from the NFT mint — no owner field stored.
+    // We find positions by: wallet owns NFT → NFT mint → position PDA (nft_mint at offset 9 in account)
+    // Actual PersonalPositionState::LEN = 281 (from source: 8+1+32+32+4+4+16+16+16+8+8+72+64)
+    //
+    // Step 1a: Get all wallet token accounts and log them for inspection
+    const tokenAccounts = await solRpc('getTokenAccountsByOwner', [
+      WALLET_SOL,
+      { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
+      { encoding: 'jsonParsed' },
     ]);
 
-    if (!positionAccounts) {
-      console.error('Raydium: getProgramAccounts returned null — check SOL_RPC_URL');
+    const allTokenAccs = tokenAccounts?.value ?? [];
+    console.log(`Wallet token accounts (${allTokenAccs.length} total):`);
+    for (const acc of allTokenAccs) {
+      const info = acc.account.data.parsed.info;
+      console.log(`  mint: ${info.mint} | amount: ${info.tokenAmount.amount} | decimals: ${info.tokenAmount.decimals}`);
+    }
+
+    // NFT candidates: amount=1, decimals=0
+    const nftAccounts = allTokenAccs.filter(acc => {
+      const info = acc.account.data.parsed.info;
+      return info.tokenAmount.amount === '1' && info.tokenAmount.decimals === 0;
+    });
+    console.log(`NFT candidates (amount=1, decimals=0): ${nftAccounts.length}`);
+
+    // Step 1b: Also query CLMM program for all accounts with correct dataSize=281
+    // and log total count — helps confirm whether positions exist at all
+    const allPositionAccounts = await solRpc('getProgramAccounts', [
+      RAYDIUM_CLMM_PROGRAM,
+      { encoding: 'base64', filters: [{ dataSize: 281 }] },
+    ]);
+    console.log(`Total CLMM PersonalPositionState accounts (dataSize=281): ${allPositionAccounts?.length ?? 'error'}`);
+
+    if (nftAccounts.length === 0) {
+      console.log('No NFT position tokens found in wallet. Positions may use a different ownership model.');
+      console.log('Check the mint addresses logged above against your Raydium positions.');
       return results;
     }
 
-    console.log(`Found ${positionAccounts.length} position account(s) owned by wallet`);
+    // Step 2: For each NFT mint, find position account by memcmp on nft_mint at offset 9
+    // Layout: discriminator(8) + bump(1) + nft_mint(32) → nft_mint starts at offset 9
+    const nftMints = nftAccounts.map(acc => acc.account.data.parsed.info.mint);
+    console.log(`NFT mints to check: ${nftMints.join(', ')}`);
 
-    if (positionAccounts.length === 0) {
-      // Fallback: log total dataSize=340 account count for debugging layout assumptions
-      console.log('Raydium: no positions at offset 72 — running fallback count');
-      const fallback = await solRpc('getProgramAccounts', [
-        RAYDIUM_CLMM_PROGRAM,
-        { encoding: 'base64', filters: [{ dataSize: 340 }] },
-      ]);
-      console.log(`Total CLMM accounts with dataSize=340: ${fallback?.length ?? 'error'}`);
-      return results;
-    }
-
-    for (const posAccount of positionAccounts) {
+    for (const nftMint of nftMints) {
       try {
-        const posData = posAccount.account.data[0];
-        const pos     = parsePositionAccount(posData);
+        const programAccounts = await solRpc('getProgramAccounts', [
+          RAYDIUM_CLMM_PROGRAM,
+          {
+            encoding: 'base64',
+            filters: [
+              { dataSize: 281 },
+              { memcmp: { offset: 9, bytes: nftMint } },
+            ],
+          },
+        ]);
+
+        if (!programAccounts || programAccounts.length === 0) {
+          console.log(`  ${nftMint.slice(0,8)}...: no position account found at dataSize=281`);
+          continue;
+        }
+
+        const posAccount = programAccounts[0];
+        const posData    = posAccount.account.data[0];
+        const pos        = parsePositionAccount(posData);
 
         console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
 
