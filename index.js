@@ -846,11 +846,25 @@ async function getRaydiumPositions() {
         }
 
         const posData = programAccounts[0].account.data[0];
-        const pos     = parsePositionAccount(posData);
 
-        console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}`);
+        // RAW HEX DUMP — log first 160 bytes to determine actual field layout
+        const rawBuf = Buffer.from(posData, 'base64');
+        console.log(`  Raw account size: ${rawBuf.length} bytes`);
+        console.log(`  Bytes 0-7   (discriminator): ${rawBuf.slice(0,8).toString('hex')}`);
+        console.log(`  Byte  8     (bump?):          ${rawBuf.slice(8,9).toString('hex')}`);
+        console.log(`  Bytes 9-40  (nft_mint?):      ${rawBuf.slice(9,41).toString('hex')}`);
+        console.log(`  Bytes 41-72 (pool_id?):       ${rawBuf.slice(41,73).toString('hex')}`);
+        console.log(`  Bytes 73-76 (tick_lower?):    ${rawBuf.slice(73,77).toString('hex')} = ${rawBuf.readInt32LE(73)}`);
+        console.log(`  Bytes 77-80 (tick_upper?):    ${rawBuf.slice(77,81).toString('hex')} = ${rawBuf.readInt32LE(77)}`);
+        // Also try without bump byte
+        console.log(`  Bytes 8-39  (nft_mint no bump?): ${rawBuf.slice(8,40).toString('hex')}`);
+        console.log(`  Bytes 40-71 (pool_id no bump?):  ${rawBuf.slice(40,72).toString('hex')}`);
+        console.log(`  Bytes 72-75 (tick_lower no bump?): ${rawBuf.slice(72,76).toString('hex')} = ${rawBuf.readInt32LE(72)}`);
+
+        const pos = parsePositionAccount(posData);
+        console.log(`  Parsed: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}`);
         console.log(`  Pool ID (full): ${pos.poolId}`);
-        console.log(`  NFT mint (verify): ${pos.nftMint}`);
+        console.log(`  NFT mint: ${pos.nftMint}`);
 
         // Delay between positions to let Helius recover after getProgramAccounts
         await new Promise(r => setTimeout(r, 2000));
