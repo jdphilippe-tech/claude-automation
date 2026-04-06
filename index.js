@@ -935,6 +935,12 @@ async function getRaydiumPositions() {
             { encoding: 'base64' },
           ]);
 
+          // Debug: log what we got back
+          const val0 = multiRes?.value?.[0];
+          const val1 = multiRes?.value?.[1];
+          console.log(`  getMultipleAccounts: val[0]=${val0 === null ? 'null' : val0 === undefined ? 'undefined' : 'has data ('+val0?.data?.[0]?.slice(0,10)+'...)'}`);
+          if (!sameArray) console.log(`  getMultipleAccounts: val[1]=${val1 === null ? 'null' : val1 === undefined ? 'undefined' : 'has data'}`);
+
           const lowerAccData = multiRes?.value?.[0]?.data?.[0] ?? null;
           const upperAccData = sameArray ? lowerAccData : (multiRes?.value?.[1]?.data?.[0] ?? null);
 
