@@ -1,68 +1,57 @@
 name: Daily Portfolio Check
-
 on:
   schedule:
     - cron: '0 14 * * *'   # 14:00 UTC = 7:00 AM PDT  (summer)
                             # Change to '0 15 * * *' in November (PST)
                             # Change back to '0 14 * * *' in March (PDT)
   workflow_dispatch:        # Allows manual trigger from GitHub Actions UI
-
 jobs:
   daily-check:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - name: Install dependencies
         run: npm install
-
       - name: Run daily portfolio check
         env:
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
           BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          SOL_RPC_URL: ${{ secrets.SOL_RPC_URL }}
+          RAYDIUM_DRY_RUN: ${{ vars.RAYDIUM_DRY_RUN }}
         run: node index.js
-
   morning-brief:
     runs-on: ubuntu-latest
-    needs: daily-check        # Waits for portfolio check to finish first
+    needs: daily-check
+    if: github.event_name == 'schedule'
     permissions:
       contents: write
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - name: Install dependencies
         run: npm install
-
       - name: Generate brief text via Claude API
         env:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
         run: node scripts/generate-brief.mjs
-
       - name: Convert brief to audio via ElevenLabs
         env:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
         run: node scripts/morning-brief-audio.mjs
-
       - name: Update RSS feed
         env:
           REPO_URL: https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main
         run: node scripts/update-rss.mjs
-
       - name: Commit and push audio + RSS
         run: |
           git config user.name "github-actions[bot]"
