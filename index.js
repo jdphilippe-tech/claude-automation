@@ -763,170 +763,48 @@ async function getRaydiumPositions() {
   const results = [];
 
   try {
-    // Step 1: Get all token accounts — query BOTH token programs
-    // Raydium CLMM position NFTs may use Token-2022 (TokenzQdBNbLqP5VgrFoSmeiKTcdYeScV8)
-    // rather than the legacy Token program (TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA)
-    const [legacyAccounts, token2022Accounts] = await Promise.all([
-      solRpc('getTokenAccountsByOwner', [
-        WALLET_SOL,
-        { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
-        { encoding: 'jsonParsed' },
-      ]),
-      solRpc('getTokenAccountsByOwner', [
-        WALLET_SOL,
-        { programId: 'TokenzQdBNbLqP5VgrFoSmeiKTcdYeScV8' },
-        { encoding: 'jsonParsed' },
-      ]),
+    // Step 1: Query Raydium CLMM program directly for position accounts owned by this wallet
+    // PersonalPositionState layout (all LE):
+    //   0-7:   discriminator
+    //   8-39:  nft_mint (unique position ID)
+    //   40-71: pool_id
+    //   72-103: owner (wallet pubkey) ← filter here
+    console.log(`Scanning Raydium CLMM for positions owned by ${WALLET_SOL.slice(0,8)}...`);
+
+    const positionAccounts = await solRpc('getProgramAccounts', [
+      RAYDIUM_CLMM_PROGRAM,
+      {
+        encoding: 'base64',
+        filters: [
+          { dataSize: 340 },
+          { memcmp: { offset: 72, bytes: WALLET_SOL } },
+        ],
+      },
     ]);
 
-    const allAccounts = [
-      ...(legacyAccounts?.value ?? []),
-      ...(token2022Accounts?.value ?? []),
-    ];
-
-    console.log(`Token accounts: ${legacyAccounts?.value?.length ?? 0} legacy + ${token2022Accounts?.value?.length ?? 0} Token-2022`);
-
-    if (allAccounts.length === 0) {
-      console.error('Raydium: could not fetch token accounts from either program');
+    if (!positionAccounts) {
+      console.error('Raydium: getProgramAccounts returned null — check SOL_RPC_URL');
       return results;
     }
 
-    // Position NFTs: exactly 1 token, 0 decimals
-    const positionNfts = allAccounts.filter(acc => {
-      const info = acc.account.data.parsed?.info;
-      if (!info) return false;
-      return info.tokenAmount.amount === '1' && info.tokenAmount.decimals === 0;
-    });
+    console.log(`Found ${positionAccounts.length} position account(s) owned by wallet`);
 
-    console.log(`Found ${positionNfts.length} position NFT(s) in wallet (amount=1, decimals=0)`);
-
-    if (positionNfts.length === 0) {
-      console.log('Raydium: no position NFTs found — nothing to log');
+    if (positionAccounts.length === 0) {
+      // Fallback: log total dataSize=340 account count for debugging layout assumptions
+      console.log('Raydium: no positions at offset 72 — running fallback count');
+      const fallback = await solRpc('getProgramAccounts', [
+        RAYDIUM_CLMM_PROGRAM,
+        { encoding: 'base64', filters: [{ dataSize: 340 }] },
+      ]);
+      console.log(`Total CLMM accounts with dataSize=340: ${fallback?.length ?? 'error'}`);
       return results;
     }
 
-    // Step 2: For each NFT mint, find the Raydium CLMM personal position account
-    // The position account is a PDA derived from: [POSITION_SEED, nft_mint]
-    // We query by owner = RAYDIUM_CLMM_PROGRAM and filter by mint in the data
-    // Simplest approach: getProgramAccounts with dataSize filter + memcmp on nft_mint bytes
-    const allMints = positionNfts.map(acc => acc.account.data.parsed.info.mint);
-    console.log(`NFT mints: ${allMints.join(', ')}`);
-
-    for (const nftMint of allMints) {
+    for (const posAccount of positionAccounts) {
       try {
-        // Decode nft_mint to bytes for memcmp filter
-        // Position account layout: 8 (disc) + 32 (nft_mint) starts at offset 8
-        const mintBytes = base58ToBytes(nftMint);
-        const mintHex   = Buffer.from(mintBytes).toString('base64');
+        const posData = posAccount.account.data[0];
+        const pos     = parsePositionAccount(posData);
 
-        const programAccounts = await solRpc('getProgramAccounts', [
-          RAYDIUM_CLMM_PROGRAM,
-          {
-            encoding: 'base64',
-            filters: [
-              { dataSize: 340 }, // PersonalPositionState is ~340 bytes
-              { memcmp: { offset: 8, bytes: nftMint } }, // nft_mint at offset 8
-            ],
-          },
-        ]);
-
-        if (!programAccounts || programAccounts.length === 0) {
-          console.log(`  ${nftMint.slice(0,8)}...: no position account found (skipping)`);
-          continue;
-        }
-
-        const posAccount = programAccounts[0];
-        const posData    = posAccount.account.data[0]; // base64 encoded
-        const pos        = parsePositionAccount(posData);
-
-        console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
-
-        // Step 3: Fetch the pool account
-        const poolAccountRes = await solRpc('getAccountInfo', [
-          pos.poolId,
-          { encoding: 'base64' },
-        ]);
-
-        if (!poolAccountRes?.value?.data) {
-          console.error(`  Pool ${pos.poolId.slice(0,8)}...: could not fetch account data`);
-          continue;
-        }
-
-        const poolData = poolAccountRes.value.data[0];
-        const pool     = parsePoolAccount(poolData);
-
-        console.log(`  Pool: mint0=${pool.mint0.slice(0,8)}... mint1=${pool.mint1.slice(0,8)}... tick=${pool.tickCurrent} dec0=${pool.decimals0} dec1=${pool.decimals1}`);
-
-        // Step 4: Get token prices from DeFi Llama
-        const priceKeys = `solana:${pool.mint0},solana:${pool.mint1}`;
-        const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${priceKeys}`);
-        const price0    = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
-        const price1    = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
-
-        console.log(`  Prices: mint0=$${price0?.toFixed(4) ?? 'n/a'}, mint1=$${price1?.toFixed(4) ?? 'n/a'}`);
-
-        // Step 5: Calculate position value
-        const sqrtPriceFloat = sqrtPriceX64ToFloat(pool.sqrtPriceX64.toString());
-        const { amount0, amount1, inRange } = calcAmounts(
-          pos.liquidity,
-          pos.tickLower,
-          pos.tickUpper,
-          pool.tickCurrent,
-          sqrtPriceFloat
-        );
-
-        const tokens0 = amount0 / Math.pow(10, pool.decimals0);
-        const tokens1 = amount1 / Math.pow(10, pool.decimals1);
-
-        const value0  = price0 != null ? tokens0 * price0 : null;
-        const value1  = price1 != null ? tokens1 * price1 : null;
-        const positionValue = (value0 ?? 0) + (value1 ?? 0);
-
-        console.log(`  Amounts: ${tokens0.toFixed(6)} token0 ($${value0?.toFixed(2) ?? '?'}) + ${tokens1.toFixed(6)} token1 ($${value1?.toFixed(2) ?? '?'})`);
-        console.log(`  Position value: $${positionValue.toFixed(2)}, in range: ${inRange}`);
-
-        // Step 6: Calculate pending fees (simplified — fee_growth_global approach)
-        // token0 = xStock (e.g. TSLAx), token1 = USDC
-        const pendingRaw0 = calcPendingFees(
-          pool.feeGrowthGlobal0, pos.feeGrowthInside0Last, pos.tokenFeesOwed0, pos.liquidity
-        );
-        const pendingRaw1 = calcPendingFees(
-          pool.feeGrowthGlobal1, pos.feeGrowthInside1Last, pos.tokenFeesOwed1, pos.liquidity
-        );
-
-        const pendingTokens0 = pendingRaw0 / Math.pow(10, pool.decimals0);
-        const pendingTokens1 = pendingRaw1 / Math.pow(10, pool.decimals1);
-        const pendingUSD0    = price0 != null ? pendingTokens0 * price0 : 0;
-        const pendingUSD1    = price1 != null ? pendingTokens1 * price1 : 0;
-        const pendingYield   = pendingUSD0 + pendingUSD1;
-
-        console.log(`  Pending fees: ${pendingTokens0.toFixed(6)} token0 + ${pendingTokens1.toFixed(6)} USDC = $${pendingYield.toFixed(4)}`);
-
-        // Step 7: Match to known xStock asset
-        // mint1 should always be USDC; mint0 is the xStock
-        // We identify by looking up the token symbol via DeFi Llama metadata
-        // For now, log the mint and let the first run tell us which is which
-        const assetKey = resolveXStockAsset(pool.mint0, pool.mint1);
-        console.log(`  Resolved asset key: ${assetKey ?? 'UNKNOWN'}`);
-
-        results.push({
-          assetKey,
-          nftMint,
-          poolId: pos.poolId,
-          mint0: pool.mint0,
-          mint1: pool.mint1,
-          positionValue,
-          pendingYield,
-          inRange,
-          tickCurrent: pool.tickCurrent,
-          tickLower: pos.tickLower,
-          tickUpper: pos.tickUpper,
-        });
-
-      } catch (e) {
-        console.error(`  Error processing NFT ${nftMint.slice(0,8)}...: ${e.message}`);
-      }
-    }
 
   } catch (e) {
     console.error(`Raydium fatal: ${e.message}`);
