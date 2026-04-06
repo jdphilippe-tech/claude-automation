@@ -625,10 +625,15 @@ function calcAmounts(liquidity, tickLower, tickUpper, tickCurrent, sqrtPriceCurr
 //   ... reward fields follow (not needed for fee check)
 function parsePositionAccount(data) {
   const buf = Buffer.from(data, 'base64');
-  let offset = 8; // skip discriminator
+  let offset = 8; // skip discriminator (8 bytes)
+  offset += 1;    // skip bump (u8)
 
-  const nftMint = buf.slice(offset, offset + 32).toString('hex'); offset += 32;
-  const poolId  = buf.slice(offset, offset + 32).toString('hex'); offset += 32;
+  const nftMintBytes = buf.slice(offset, offset + 32); offset += 32;
+  const poolIdBytes  = buf.slice(offset, offset + 32); offset += 32;
+
+  // Use bytes directly for base58 encoding — avoids BigInt leading zero loss
+  const nftMint = base58EncodeBytes(nftMintBytes);
+  const poolId  = base58EncodeBytes(poolIdBytes);
 
   const tickLower = buf.readInt32LE(offset); offset += 4;
   const tickUpper = buf.readInt32LE(offset); offset += 4;
@@ -692,8 +697,8 @@ function parsePoolAccount(data) {
 
   offset += 1 + 32 + 32; // bump + amm_config + creator
 
-  const mint0Hex = buf.slice(offset, offset + 32).toString('hex'); offset += 32;
-  const mint1Hex = buf.slice(offset, offset + 32).toString('hex'); offset += 32;
+  const mint0Bytes = buf.slice(offset, offset + 32); offset += 32;
+  const mint1Bytes = buf.slice(offset, offset + 32); offset += 32;
 
   offset += 32 + 32 + 32; // vault0, vault1, observation_key
 
@@ -725,8 +730,8 @@ function parsePoolAccount(data) {
   const feeGrowthGlobal1 = fg1Lo | (fg1Hi << 64n);
 
   return {
-    mint0: base58FromHex(mint0Hex),
-    mint1: base58FromHex(mint1Hex),
+    mint0: base58EncodeBytes(mint0Bytes),
+    mint1: base58EncodeBytes(mint1Bytes),
     decimals0,
     decimals1,
     tickSpacing,
@@ -756,15 +761,24 @@ function calcPendingFees(feeGrowthGlobal, feeGrowthInsideLast, tokenFeesOwed, li
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function base58FromHex(hex) {
-  let num = BigInt('0x' + hex);
+  return base58EncodeBytes(Buffer.from(hex, 'hex'));
+}
+
+// Correct base58 encoding from a Buffer/Uint8Array
+// Handles leading zero bytes as leading '1' characters
+function base58EncodeBytes(bytes) {
+  let num = 0n;
+  for (const b of bytes) {
+    num = num * 256n + BigInt(b);
+  }
   let result = '';
   while (num > 0n) {
     result = BASE58_ALPHABET[Number(num % 58n)] + result;
     num = num / 58n;
   }
-  // Leading zeros → leading '1's
-  for (let i = 0; i < hex.length; i += 2) {
-    if (hex[i] === '0' && hex[i+1] === '0') result = '1' + result;
+  // Each leading zero byte → leading '1'
+  for (const b of bytes) {
+    if (b === 0) result = '1' + result;
     else break;
   }
   return result;
