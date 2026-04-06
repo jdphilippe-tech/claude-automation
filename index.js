@@ -805,6 +805,80 @@ async function getRaydiumPositions() {
         const posData = posAccount.account.data[0];
         const pos     = parsePositionAccount(posData);
 
+        console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
+
+        // Fetch the pool account
+        const poolAccountRes = await solRpc('getAccountInfo', [
+          pos.poolId,
+          { encoding: 'base64' },
+        ]);
+
+        if (!poolAccountRes?.value?.data) {
+          console.error(`  Pool ${pos.poolId.slice(0,8)}...: could not fetch account data`);
+          continue;
+        }
+
+        const pool = parsePoolAccount(poolAccountRes.value.data[0]);
+
+        console.log(`  Pool: mint0=${pool.mint0.slice(0,8)}... mint1=${pool.mint1.slice(0,8)}... tick=${pool.tickCurrent} dec0=${pool.decimals0} dec1=${pool.decimals1}`);
+
+        // Get token prices from DeFi Llama
+        const priceKeys = `solana:${pool.mint0},solana:${pool.mint1}`;
+        const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${priceKeys}`);
+        const price0    = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
+        const price1    = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
+
+        console.log(`  Prices: mint0=$${price0?.toFixed(4) ?? 'n/a'}, mint1=$${price1?.toFixed(4) ?? 'n/a'}`);
+
+        // Calculate position value
+        const sqrtPriceFloat = sqrtPriceX64ToFloat(pool.sqrtPriceX64.toString());
+        const { amount0, amount1, inRange } = calcAmounts(
+          pos.liquidity, pos.tickLower, pos.tickUpper, pool.tickCurrent, sqrtPriceFloat
+        );
+
+        const tokens0 = amount0 / Math.pow(10, pool.decimals0);
+        const tokens1 = amount1 / Math.pow(10, pool.decimals1);
+        const value0  = price0 != null ? tokens0 * price0 : null;
+        const value1  = price1 != null ? tokens1 * price1 : null;
+        const positionValue = (value0 ?? 0) + (value1 ?? 0);
+
+        console.log(`  Amounts: ${tokens0.toFixed(6)} token0 ($${value0?.toFixed(2) ?? '?'}) + ${tokens1.toFixed(6)} token1 ($${value1?.toFixed(2) ?? '?'})`);
+        console.log(`  Position value: $${positionValue.toFixed(2)}, in range: ${inRange}`);
+
+        // Calculate pending fees
+        const pendingRaw0 = calcPendingFees(pool.feeGrowthGlobal0, pos.feeGrowthInside0Last, pos.tokenFeesOwed0, pos.liquidity);
+        const pendingRaw1 = calcPendingFees(pool.feeGrowthGlobal1, pos.feeGrowthInside1Last, pos.tokenFeesOwed1, pos.liquidity);
+        const pendingTokens0 = pendingRaw0 / Math.pow(10, pool.decimals0);
+        const pendingTokens1 = pendingRaw1 / Math.pow(10, pool.decimals1);
+        const pendingUSD0    = price0 != null ? pendingTokens0 * price0 : 0;
+        const pendingUSD1    = price1 != null ? pendingTokens1 * price1 : 0;
+        const pendingYield   = pendingUSD0 + pendingUSD1;
+
+        console.log(`  Pending fees: ${pendingTokens0.toFixed(6)} token0 + ${pendingTokens1.toFixed(6)} USDC = $${pendingYield.toFixed(4)}`);
+
+        // Resolve asset key
+        const assetKey = resolveXStockAsset(pool.mint0, pool.mint1);
+        console.log(`  Resolved asset key: ${assetKey ?? 'UNKNOWN (add mint to XSTOCK_MINT_MAP)'}`);
+        console.log(`  mint0 (xStock): ${pool.mint0}`);
+        console.log(`  mint1 (USDC?):  ${pool.mint1}`);
+
+        results.push({
+          assetKey,
+          poolId: pos.poolId,
+          mint0: pool.mint0,
+          mint1: pool.mint1,
+          positionValue,
+          pendingYield,
+          inRange,
+          tickCurrent: pool.tickCurrent,
+          tickLower: pos.tickLower,
+          tickUpper: pos.tickUpper,
+        });
+
+      } catch (e) {
+        console.error(`  Error processing position: ${e.message}`);
+      }
+    }
 
   } catch (e) {
     console.error(`Raydium fatal: ${e.message}`);
