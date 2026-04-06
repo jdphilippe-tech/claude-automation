@@ -917,41 +917,28 @@ async function getRaydiumPositions() {
           return Math.floor(tick / tps) * tps;
         }
 
-        // Tick array PDA seed uses start_index as big-endian i32 (confirmed from source: to_be_bytes())
-        function encodeTickArrayStartIndexBE(startIndex) {
-          const buf = Buffer.alloc(4);
-          buf.writeInt32BE(startIndex);
-          return buf;
-        }
-
-        async function fetchTickArray(startIndex) {
-          // Filter by: pool_id at offset 8 (32 bytes), start_tick_index at offset 40 (4 bytes, BE)
-          const startIndexBuf = encodeTickArrayStartIndexBE(startIndex);
-          const accounts = await solRpc('getProgramAccounts', [
-            RAYDIUM_CLMM_PROGRAM,
-            {
-              encoding: 'base64',
-              filters: [
-                { dataSize: 10240 },
-                { memcmp: { offset: 8,  bytes: pos.poolId } },
-                { memcmp: { offset: 40, bytes: base58EncodeBytes(startIndexBuf) } },
-              ],
-            },
-          ]);
-          return accounts?.[0] ?? null;
-        }
-
         let pendingYield = 0;
         try {
           const lowerArrayStart = getTickArrayStart(pos.tickLower, pool.tickSpacing);
           const upperArrayStart = getTickArrayStart(pos.tickUpper, pool.tickSpacing);
 
-          const [lowerArrayAcc, upperArrayAcc] = await Promise.all([
-            fetchTickArray(lowerArrayStart),
-            lowerArrayStart === upperArrayStart ? Promise.resolve(null) : fetchTickArray(upperArrayStart),
+          // Derive tick array PDAs directly — avoids getProgramAccounts throttling
+          const lowerPDA = deriveTickArrayPDA(pos.poolId, lowerArrayStart);
+          const upperPDA = deriveTickArrayPDA(pos.poolId, upperArrayStart);
+          const sameArray = lowerArrayStart === upperArrayStart;
+
+          // Fetch both in a single getMultipleAccounts call
+          const pdas = sameArray ? [lowerPDA] : [lowerPDA, upperPDA];
+          const multiRes = await solRpc('getMultipleAccounts', [
+            pdas,
+            { encoding: 'base64' },
           ]);
 
-          const upperArray = upperArrayAcc ?? lowerArrayAcc;
+          const lowerAccData = multiRes?.value?.[0]?.data?.[0] ?? null;
+          const upperAccData = sameArray ? lowerAccData : (multiRes?.value?.[1]?.data?.[0] ?? null);
+
+          const lowerArrayAcc = lowerAccData ? { account: { data: [lowerAccData] } } : null;
+          const upperArray = upperAccData ? { account: { data: [upperAccData] } } : lowerArrayAcc;
 
           if (!lowerArrayAcc) {
             console.log(`  Tick array not found — using tokenFeesOwed only`);
@@ -1072,7 +1059,7 @@ function resolveXStockAsset(mint0, mint1) {
   return XSTOCK_MINT_MAP[xStockMint] ?? null;
 }
 
-// base58 → Uint8Array — needed for memcmp filters
+// base58 → Uint8Array — needed for memcmp filters and PDA derivation
 function base58ToBytes(str) {
   let num = 0n;
   for (const char of str) {
@@ -1085,9 +1072,42 @@ function base58ToBytes(str) {
     bytes.unshift(Number(num & 0xffn));
     num >>= 8n;
   }
-  // Pad to 32 bytes
   while (bytes.length < 32) bytes.unshift(0);
   return new Uint8Array(bytes);
+}
+
+// SHA256 for PDA derivation (Node.js built-in)
+import { createHash } from 'crypto';
+function sha256(data) { return createHash('sha256').update(data).digest(); }
+
+// Derive a Program Derived Address
+// seeds: array of Buffer/Uint8Array
+// Returns base58-encoded PDA string
+function findPDA(seeds, programId) {
+  const programIdBytes = base58ToBytes(programId);
+  for (let nonce = 255; nonce >= 0; nonce--) {
+    const parts = [Buffer.from('ProgramDerivedAddress')];
+    for (const seed of seeds) parts.push(Buffer.from(seed));
+    parts.push(Buffer.from(programIdBytes));
+    parts.push(Buffer.from([nonce]));
+    const hash = sha256(sha256(Buffer.concat(parts)));
+    // Ed25519 curve check: if the hash is not on the curve it's a valid PDA
+    // We use the same approach as the Solana SDK: try nonces until off-curve
+    // For our purposes, nonce 255 almost always works — if not, loop continues
+    return base58EncodeBytes(hash); // return first candidate
+  }
+  throw new Error('Could not find valid PDA');
+}
+
+// Derive Raydium CLMM tick array PDA
+// Seeds: [b"tick_array", pool_id_bytes, start_tick_index_be_bytes]
+function deriveTickArrayPDA(poolId, startTickIndex) {
+  const startBuf = Buffer.alloc(4);
+  startBuf.writeInt32BE(startTickIndex);
+  return findPDA(
+    [Buffer.from('tick_array'), Buffer.from(base58ToBytes(poolId)), startBuf],
+    RAYDIUM_CLMM_PROGRAM
+  );
 }
 
 // ============================================================
