@@ -62,12 +62,12 @@ const ASSET = {
   wethPrimary: 'recbVsmOWh9YOWPBZ',
   // Raydium xStocks — NFT mint addresses from Raydium UI + Airtable record IDs
   // ⚠️ UPDATE CYCLE IDs once confirmed with you
-  tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2',  nftMint: '7R5JFSuXL23epYJmX6LhzbM2Nce39at4maWD7NeFK4tU' },
-  nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1',  nftMint: 'J7qm9jifiKg7CyWDbmdDUNokhgs7JvwZmy2jnJ7qmN5Z' },
-  aaplx:  { recordId: 'recGF59dwIOnE8fm2',  cycleId: 'AAPLx-C1',  nftMint: '2NsZvobR13JuYbkYTt5EK1XyyEJh3xB8621FhUW3LYKp' },
-  googlx: { recordId: 'recRxStry17D0ZGB5',  cycleId: 'GOOGLx-C1', nftMint: '2jznFFq36gfhUsWRzkEigGBY8hDqHBv4W6CdtsSGArWx' },
-  crclx:  { recordId: 'recPq2Ee2MsoMa21S',  cycleId: 'CRCLx-C1',  nftMint: 'AZHgbQL6dfBodYN5yHvNbvwWVYXvRGeqYRbd8ni9NfWq' },
-  spyx:   { recordId: 'rechX4b2anmi82enx',  cycleId: 'SPYx-C1',   nftMint: 'HgcTrL1Tb57ZrycTbhcBgRviFcWrfSiJRWSmwELXSyrj' },
+  tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2',  nftMint: '7R5JFSuXL23epYJmX6LhzbM2Nce39at4maWD7NeFK4tU', poolId: '8aDaBQkTrS6HVMjyc6EZebgdiaXhLYGriDWKWWp1NpFF' },
+  nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1',  nftMint: 'J7qm9jifiKg7CyWDbmdDUNokhgs7JvwZmy2jnJ7qmN5Z', poolId: '4KqQN6u1pFKroFE2jVEhoepAMRKPcuAzWVDCgm9zRBYN' },
+  aaplx:  { recordId: 'recGF59dwIOnE8fm2',  cycleId: 'AAPLx-C1',  nftMint: '2NsZvobR13JuYbkYTt5EK1XyyEJh3xB8621FhUW3LYKp', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
+  googlx: { recordId: 'recRxStry17D0ZGB5',  cycleId: 'GOOGLx-C1', nftMint: '2jznFFq36gfhUsWRzkEigGBY8hDqHBv4W6CdtsSGArWx', poolId: 'B8YAwjGYk6qidWzGBXMAxP7nYfG8g74EZ3Y4gFSsobRw' },
+  crclx:  { recordId: 'recPq2Ee2MsoMa21S',  cycleId: 'CRCLx-C1',  nftMint: 'AZHgbQL6dfBodYN5yHvNbvwWVYXvRGeqYRbd8ni9NfWq', poolId: 'G39wywquKbHK8F2wZZZFX3fcsyG91VCCbbr6WEVp5axy' },
+  spyx:   { recordId: 'rechX4b2anmi82enx',  cycleId: 'SPYx-C1',   nftMint: 'HgcTrL1Tb57ZrycTbhcBgRviFcWrfSiJRWSmwELXSyrj', poolId: '6truu3rZuiB9rKQg4VYC3Dt3QwV7DgwGqXrYUcrvnDDE' },
 };
 
 // Map xStock token name keywords → asset key
@@ -848,25 +848,10 @@ async function getRaydiumPositions() {
         }
 
         const posData = programAccounts[0].account.data[0];
-
-        // RAW HEX DUMP — log first 160 bytes to determine actual field layout
-        const rawBuf = Buffer.from(posData, 'base64');
-        console.log(`  Raw account size: ${rawBuf.length} bytes`);
-        console.log(`  Bytes 0-7   (discriminator): ${rawBuf.slice(0,8).toString('hex')}`);
-        console.log(`  Byte  8     (bump?):          ${rawBuf.slice(8,9).toString('hex')}`);
-        console.log(`  Bytes 9-40  (nft_mint?):      ${rawBuf.slice(9,41).toString('hex')}`);
-        console.log(`  Bytes 41-72 (pool_id?):       ${rawBuf.slice(41,73).toString('hex')}`);
-        console.log(`  Bytes 73-76 (tick_lower?):    ${rawBuf.slice(73,77).toString('hex')} = ${rawBuf.readInt32LE(73)}`);
-        console.log(`  Bytes 77-80 (tick_upper?):    ${rawBuf.slice(77,81).toString('hex')} = ${rawBuf.readInt32LE(77)}`);
-        // Also try without bump byte
-        console.log(`  Bytes 8-39  (nft_mint no bump?): ${rawBuf.slice(8,40).toString('hex')}`);
-        console.log(`  Bytes 40-71 (pool_id no bump?):  ${rawBuf.slice(40,72).toString('hex')}`);
-        console.log(`  Bytes 72-75 (tick_lower no bump?): ${rawBuf.slice(72,76).toString('hex')} = ${rawBuf.readInt32LE(72)}`);
-
         const pos = parsePositionAccount(posData);
-        console.log(`  Parsed: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}`);
-        console.log(`  Pool ID (full): ${pos.poolId}`);
-        console.log(`  NFT mint: ${pos.nftMint}`);
+        // Override poolId with hardcoded value from ASSET config — bypasses runtime base58 encoding
+        pos.poolId = posConfig.poolId;
+        console.log(`  ${key}: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
 
         // Delay between positions to let Helius recover after getProgramAccounts
         await new Promise(r => setTimeout(r, 2000));
