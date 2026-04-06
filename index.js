@@ -511,9 +511,9 @@ function parsePoolAccount(data) {
   const mint1Bytes = buf.slice(105, 137);
   const dec0       = buf.readUInt8(233);
   const dec1       = buf.readUInt8(234);
-  const sqrtLo     = buf.readBigUInt64LE(238);
-  const sqrtHi     = buf.readBigUInt64LE(246);
-  const tickCurrent = buf.readInt32LE(254);
+  const sqrtLo     = buf.readBigUInt64LE(253);
+  const sqrtHi     = buf.readBigUInt64LE(261);
+  const tickCurrent = buf.readInt32LE(269);
   return {
     mint0: base58EncodeBytes(Array.from(mint0Bytes)),
     mint1: base58EncodeBytes(Array.from(mint1Bytes)),
