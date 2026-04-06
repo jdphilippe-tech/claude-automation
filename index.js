@@ -766,7 +766,9 @@ function base58FromHex(hex) {
 
 // Correct base58 encoding from a Buffer/Uint8Array
 // Handles leading zero bytes as leading '1' characters
-function base58EncodeBytes(bytes) {
+function base58EncodeBytes(input) {
+  // Normalize to plain array — Buffer.slice() can behave unexpectedly in BigInt loops
+  const bytes = Array.from(input);
   let num = 0n;
   for (const b of bytes) {
     num = num * 256n + BigInt(b);
