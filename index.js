@@ -836,17 +836,20 @@ async function getRaydiumPositions() {
 
         console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
 
-        // Small delay between positions to avoid Helius rate limits
-        await new Promise(r => setTimeout(r, 500));
+        // Delay between positions to let Helius recover after getProgramAccounts
+        await new Promise(r => setTimeout(r, 2000));
 
-        // Fetch the pool account
-        const poolAccountRes = await solRpc('getAccountInfo', [
-          pos.poolId,
-          { encoding: 'base64' },
-        ]);
+        // Fetch the pool account — retry up to 3 times with backoff if null
+        let poolAccountRes = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          poolAccountRes = await solRpc('getAccountInfo', [pos.poolId, { encoding: 'base64' }]);
+          if (poolAccountRes?.value?.data) break;
+          console.log(`  Pool ${pos.poolId.slice(0,8)}...: attempt ${attempt} failed, retrying in 3s...`);
+          await new Promise(r => setTimeout(r, 3000));
+        }
 
         if (!poolAccountRes?.value?.data) {
-          console.error(`  Pool ${pos.poolId.slice(0,8)}...: could not fetch account data`);
+          console.error(`  Pool ${pos.poolId.slice(0,8)}...: could not fetch account data after retries`);
           continue;
         }
 
