@@ -836,6 +836,9 @@ async function getRaydiumPositions() {
 
         console.log(`  Position: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
 
+        // Small delay between positions to avoid Helius rate limits
+        await new Promise(r => setTimeout(r, 500));
+
         // Fetch the pool account
         const poolAccountRes = await solRpc('getAccountInfo', [
           pos.poolId,
