@@ -926,6 +926,7 @@ async function getRaydiumPositions() {
           const lowerPDA = deriveTickArrayPDA(pos.poolId, lowerArrayStart);
           const upperPDA = deriveTickArrayPDA(pos.poolId, upperArrayStart);
           const sameArray = lowerArrayStart === upperArrayStart;
+          console.log(`  Tick arrays: lower[${lowerArrayStart}]=${lowerPDA.slice(0,8)}... upper[${upperArrayStart}]=${sameArray ? 'same' : upperPDA.slice(0,8)+'...'}`);
 
           // Fetch both in a single getMultipleAccounts call
           const pdas = sameArray ? [lowerPDA] : [lowerPDA, upperPDA];
@@ -1080,9 +1081,57 @@ function base58ToBytes(str) {
 import { createHash } from 'crypto';
 function sha256(data) { return createHash('sha256').update(data).digest(); }
 
-// Derive a Program Derived Address
-// seeds: array of Buffer/Uint8Array
-// Returns base58-encoded PDA string
+// Ed25519 curve parameters for PDA off-curve check
+const _p = (2n ** 255n) - 19n;
+const _d = (() => {
+  // d = -121665/121666 mod p
+  function _inv(a, m) {
+    let [or, r, os, s] = [a, m, 1n, 0n];
+    while (r !== 0n) { const q = or / r; [or, r] = [r, or - q * r]; [os, s] = [s, os - q * s]; }
+    return ((os % m) + m) % m;
+  }
+  return (-121665n * _inv(121666n, _p) + _p) % _p;
+})();
+
+function _modPow(b, e, m) {
+  let r = 1n; b = b % m;
+  while (e > 0n) { if (e & 1n) r = r * b % m; e >>= 1n; b = b * b % m; }
+  return r;
+}
+
+// Returns true if the 32-byte array is a valid ed25519 curve point
+function _isOnEd25519Curve(bytes) {
+  try {
+    const arr = Array.from(bytes);
+    const signBit = (arr[31] & 0x80) !== 0;
+    arr[31] &= 0x7f;
+    let y = 0n;
+    for (let i = 31; i >= 0; i--) y = y * 256n + BigInt(arr[i]);
+    if (y >= _p) return false;
+    const y2 = y * y % _p;
+    const u = (y2 - 1n + _p) % _p;
+    const v = (_d * y2 + 1n) % _p;
+    if (v === 0n) return u === 0n;
+    function _inv2(a) {
+      let [or, r, os, s] = [a, _p, 1n, 0n];
+      while (r !== 0n) { const q = or / r; [or, r] = [r, or - q * r]; [os, s] = [s, os - q * s]; }
+      return ((os % _p) + _p) % _p;
+    }
+    const x2 = u * _inv2(v) % _p;
+    if (x2 === 0n) return !signBit;
+    let x = _modPow(x2, (_p + 3n) / 8n, _p);
+    if (x * x % _p !== x2) {
+      const sqrtM1 = _modPow(2n, (_p - 1n) / 4n, _p);
+      x = x * sqrtM1 % _p;
+      if (x * x % _p !== x2) return false;
+    }
+    if ((x & 1n) !== (signBit ? 1n : 0n)) x = _p - x;
+    return true;
+  } catch { return false; }
+}
+
+// Derive a Program Derived Address with proper ed25519 off-curve check
+// seeds: array of Buffer/Uint8Array. Returns base58-encoded PDA string.
 function findPDA(seeds, programId) {
   const programIdBytes = base58ToBytes(programId);
   for (let nonce = 255; nonce >= 0; nonce--) {
@@ -1091,10 +1140,7 @@ function findPDA(seeds, programId) {
     parts.push(Buffer.from(programIdBytes));
     parts.push(Buffer.from([nonce]));
     const hash = sha256(sha256(Buffer.concat(parts)));
-    // Ed25519 curve check: if the hash is not on the curve it's a valid PDA
-    // We use the same approach as the Solana SDK: try nonces until off-curve
-    // For our purposes, nonce 255 almost always works — if not, loop continues
-    return base58EncodeBytes(hash); // return first candidate
+    if (!_isOnEd25519Curve(hash)) return base58EncodeBytes(hash);
   }
   throw new Error('Could not find valid PDA');
 }
