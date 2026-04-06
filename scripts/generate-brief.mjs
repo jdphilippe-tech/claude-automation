@@ -1,282 +1,380 @@
-import https from 'https';
+/**
+ * scripts/generate-brief.mjs
+ *
+ * Calls the Claude API with tool definitions so Claude autonomously fetches
+ * all data it needs — Airtable (with full pagination), Notion band params,
+ * and live market prices — then writes the morning audio brief.
+ *
+ * Output: writes brief text to audio/brief-text.txt for the next step
+ * (morning-brief-audio.mjs) to consume.
+ *
+ * Architecture: Claude tool use (agentic loop)
+ * Claude fetches its own data — nothing is pre-fetched and passed to it.
+ * This eliminates the pagination bug where Reopen Position records were
+ * missed because they live on page 2+ of Airtable results.
+ */
+
 import fs from 'fs';
+import path from 'path';
 
-const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
+const CLAUDE_API_KEY   = process.env.CLAUDE_API_KEY;
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE = 'appWojaxYR99bXC1f';
 
-if (!CLAUDE_API_KEY) { console.error('Missing CLAUDE_API_KEY'); process.exit(1); }
-if (!AIRTABLE_API_KEY) { console.error('Missing AIRTABLE_API_KEY'); process.exit(1); }
+const AIRTABLE_BASE_ID     = 'appWojaxYR99bXC1f';
+const AIRTABLE_DAILY_TABLE = 'tblKsk0QnkOoKNLuk';
+const AIRTABLE_LENDING_TABLE = 'tblFw52kzeTRvxTSM';
 
-function httpsGet(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const parsedUrl = new URL(url);
-    const options = { hostname: parsedUrl.hostname, path: parsedUrl.pathname + parsedUrl.search, headers };
-    const req = https.get(options, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(body)); }
-        catch (e) { reject(new Error(`JSON parse error: ${body.slice(0, 300)}`)); }
-      });
-    });
-    req.on('error', reject);
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
+const OUTPUT_PATH  = 'audio/brief-text.txt';
+
+// ── Tool Definitions ────────────────────────────────────────────────────────
+
+const TOOLS = [
+  {
+    name: 'airtable_query',
+    description: `Query the Airtable REST API directly.
+
+DAILY ACTIONS TABLE: ${AIRTABLE_DAILY_TABLE}
+Field IDs:
+  fldUkwrxtS4AEr52W = Action Type  (Fee Check | Reopen Position | Close Position | Claim)
+  fldHG3MCcyhkXknyH = Date         (ISO timestamp — sort ascending to get oldest first)
+  fldWElDtJZRYTaZtD = Position Value
+  fld6QnTv9CKHvglcX = Fee Value    (pending fees, only on Fee Check records)
+  fldE5uO0nwZmgLQtF = Fees Claimed (only on Claim records)
+  fldFFts5ByR1EeYBk = Cycle ID     (e.g. WETH-PRIMARY-C8, HEDGE-C8)
+
+LENDING ACTIONS TABLE: ${AIRTABLE_LENDING_TABLE}
+
+PAGINATION IS REQUIRED. Always pass the offset from each response into the
+next call until no offset is returned. The Reopen Position records that
+define opening deposit values are the OLDEST records in the cycle — they
+will NOT appear on the first page when sorted descending. You MUST paginate
+through all pages sorted ascending to find them.
+
+For PSF data use filterByFormula:
+  OR(FIND('WETH-PRIMARY-C',{Cycle ID}),FIND('HEDGE-C',{Cycle ID}))
+Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        table_id: {
+          type: 'string',
+          description: `Airtable table ID. Use '${AIRTABLE_DAILY_TABLE}' for PSF/xStock data, '${AIRTABLE_LENDING_TABLE}' for lending rates.`
+        },
+        filter_formula: {
+          type: 'string',
+          description: 'Airtable filterByFormula string (URL-encoded automatically by the tool)'
+        },
+        sort_field: {
+          type: 'string',
+          description: 'Field ID to sort by'
+        },
+        sort_direction: {
+          type: 'string',
+          enum: ['asc', 'desc'],
+          description: 'asc = oldest first (use this to find Reopen Position records). desc = newest first.'
+        },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of field IDs to return. Always include fldFFts5ByR1EeYBk (Cycle ID) and fldUkwrxtS4AEr52W (Action Type).'
+        },
+        page_size: {
+          type: 'number',
+          description: 'Records per page. Max 100.'
+        },
+        offset: {
+          type: 'string',
+          description: 'Pagination offset token from previous response. Omit for first page. MUST be passed to get all records including Reopen Position.'
+        }
+      },
+      required: ['table_id']
+    }
+  },
+  {
+    name: 'web_search',
+    description: `Search the web for current market data.
+Use short, specific queries:
+- ETH price: "ETH USD price today"
+- BTC price: "BTC USD price today"  
+- Fear & Greed: "crypto fear greed index"
+Returns a summary of top results.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' }
+      },
+      required: ['query']
+    }
+  }
+];
+
+// ── Tool Execution ──────────────────────────────────────────────────────────
+
+async function runAirtableQuery(input) {
+  const { table_id, filter_formula, sort_field, sort_direction, fields, page_size, offset } = input;
+
+  const params = new URLSearchParams();
+  if (filter_formula)  params.append('filterByFormula', filter_formula);
+  if (sort_field) {
+    params.append('sort[0][field]', sort_field);
+    params.append('sort[0][direction]', sort_direction || 'asc');
+  }
+  if (fields?.length)  fields.forEach(f => params.append('fields[]', f));
+  if (page_size)       params.append('pageSize', String(Math.min(page_size, 100)));
+  if (offset)          params.append('offset', offset);
+
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table_id}?${params}`;
+  const res  = await fetch(url, {
+    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
   });
+
+  if (!res.ok) {
+    const err = await res.text();
+    return { error: `Airtable ${res.status}: ${err}` };
+  }
+
+  const data = await res.json();
+  // Summarise what we got so Claude can decide whether to paginate
+  return {
+    records: data.records,
+    offset: data.offset || null,           // null means no more pages
+    total_returned: data.records?.length ?? 0,
+    has_more: !!data.offset
+  };
 }
 
-function httpsPost(hostname, path, headers, payload) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify(payload);
-    const options = {
-      hostname, path, method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), ...headers }
+async function runWebSearch(input) {
+  const { query } = input;
+  // DuckDuckGo instant answers — no API key required
+  const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    return {
+      answer:   data.Answer   || '',
+      abstract: data.Abstract || '',
+      results:  (data.RelatedTopics || [])
+                  .slice(0, 5)
+                  .map(t => t.Text || '')
+                  .filter(Boolean)
     };
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`JSON parse error: ${data.slice(0, 300)}`)); }
-      });
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+async function executeTool(name, input) {
+  console.log(`  [tool] ${name} — ${JSON.stringify(input).substring(0, 100)}`);
+  let result;
+  switch (name) {
+    case 'airtable_query': result = await runAirtableQuery(input); break;
+    case 'web_search':     result = await runWebSearch(input);     break;
+    default:               result = { error: `Unknown tool: ${name}` };
+  }
+  const preview = JSON.stringify(result).substring(0, 120);
+  console.log(`  [result] ${preview}${preview.length >= 120 ? '…' : ''}`);
+  return result;
+}
+
+// ── Claude Agentic Loop ─────────────────────────────────────────────────────
+
+async function runClaude(systemPrompt, userPrompt) {
+  const messages = [{ role: 'user', content: userPrompt }];
+  const MAX_ITERS = 25;
+
+  for (let i = 0; i < MAX_ITERS; i++) {
+    console.log(`\n[claude] iteration ${i + 1}`);
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':    'application/json',
+        'x-api-key':       CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model:      CLAUDE_MODEL,
+        max_tokens: 4096,
+        system:     systemPrompt,
+        tools:      TOOLS,
+        messages
+      })
     });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-}
 
-async function airtableGetAll(tableId, params) {
-  let allRecords = [];
-  let cursor = null;
-  do {
-    const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
-    const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}?${params}${cursorParam}`;
-    const resp = await httpsGet(url, { Authorization: `Bearer ${AIRTABLE_API_KEY}` });
-    allRecords = allRecords.concat(resp.records || []);
-    cursor = resp.nextCursor || null;
-  } while (cursor);
-  return allRecords;
-}
-
-async function getEthPrice() {
-  try {
-    const data = await httpsGet('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin&vs_currencies=usd');
-    return { eth: data.ethereum?.usd, btc: data.bitcoin?.usd };
-  } catch (e) {
-    console.error('Price fetch error:', e.message);
-    return { eth: null, btc: null };
-  }
-}
-
-async function getFearGreed() {
-  try {
-    const data = await httpsGet('https://api.alternative.me/fng/?limit=1');
-    return { value: data.data[0].value, label: data.data[0].value_classification };
-  } catch (e) {
-    console.error('Fear/greed fetch error:', e.message);
-    return { value: null, label: null };
-  }
-}
-
-async function getPSFData() {
-  const fields = [
-    'fldUkwrxtS4AEr52W', // Action Type
-    'fldHG3MCcyhkXknyH', // Date
-    'fldWElDtJZRYTaZtD', // Position Value
-    'fld6QnTv9CKHvglcX', // Fee Value
-    'fldE5uO0nwZmgLQtF', // Fees Claimed
-    'fldFFts5ByR1EeYBk'  // Cycle ID
-  ].map(f => `fields[]=${f}`).join('&');
-
-  // Use filterByFormula to get only C8 records server-side
-  const filter = encodeURIComponent("OR(FIND('WETH-PRIMARY-C8', {Cycle ID}), FIND('HEDGE-C8', {Cycle ID}))");
-  const params = `${fields}&filterByFormula=${filter}&sort[0][field]=fldHG3MCcyhkXknyH&sort[0][direction]=asc`;
-
-  console.log('Fetching C8 records with server-side filter...');
-  const records = await airtableGetAll('tblKsk0QnkOoKNLuk', params);
-  console.log(`C8 records found: ${records.length}`);
-
-  const lpRecords = records.filter(r => (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('WETH-PRIMARY-C8'));
-  const hedgeRecords = records.filter(r => (r.cellValuesByFieldId?.fldFFts5ByR1EeYBk || '').includes('HEDGE-C8'));
-
-  console.log(`LP records: ${lpRecords.length}, Hedge records: ${hedgeRecords.length}`);
-
-  const lpOpen = lpRecords.find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Reopen Position');
-  const hedgeOpen = hedgeRecords.find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Reopen Position');
-  const lpLatest = [...lpRecords].reverse().find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Fee Check');
-  const hedgeLatest = [...hedgeRecords].reverse().find(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Fee Check');
-
-  const lpOpenVal = lpOpen?.cellValuesByFieldId?.fldWElDtJZRYTaZtD || 0;
-  const hedgeOpenVal = hedgeOpen?.cellValuesByFieldId?.fldWElDtJZRYTaZtD || 0;
-  const lpNow = lpLatest?.cellValuesByFieldId?.fldWElDtJZRYTaZtD || 0;
-  const hedgeNow = hedgeLatest?.cellValuesByFieldId?.fldWElDtJZRYTaZtD || 0;
-  const pendingFees = lpLatest?.cellValuesByFieldId?.fld6QnTv9CKHvglcX || 0;
-  const openDate = lpOpen?.cellValuesByFieldId?.fldHG3MCcyhkXknyH || '';
-  const latestDate = lpLatest?.cellValuesByFieldId?.fldHG3MCcyhkXknyH || '';
-
-  console.log(`LP open: $${lpOpenVal}, LP now: $${lpNow}, Hedge open: $${hedgeOpenVal}, Hedge now: $${hedgeNow}`);
-
-  const totalClaimed = lpRecords
-    .filter(r => r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name === 'Claim')
-    .reduce((sum, r) => sum + (r.cellValuesByFieldId?.fldE5uO0nwZmgLQtF || 0), 0);
-
-  console.log(`Pending fees: $${pendingFees}, Total claimed: $${totalClaimed}`);
-
-  const totalFees = totalClaimed + pendingFees;
-  const lpPnl = lpNow - lpOpenVal;
-  const hedgePnl = hedgeNow - hedgeOpenVal;
-  const netDelta = lpPnl + hedgePnl;
-  const netInclFees = netDelta + totalFees;
-  const totalDeployed = lpOpenVal + hedgeOpenVal;
-
-  const openTs = new Date(openDate).getTime();
-  const latestTs = new Date(latestDate).getTime();
-  const hours = (latestTs - openTs) / 3600000;
-  const days = hours / 24;
-  const avgDailyFee = hours > 0 ? (totalFees / hours) * 24 : 0;
-  const pctReturn = totalDeployed > 0 ? (netInclFees / totalDeployed) * 100 : 0;
-  const annualized = days > 0 ? (pctReturn / days) * 365 : 0;
-
-  return { lpPnl, hedgePnl, netDelta, totalFees, avgDailyFee, netInclFees, totalDeployed, days: Math.round(days), pctReturn, annualized };
-}
-
-async function getLendingSnapshot() {
-  const fields = [
-    'fldFi5nwRXNC5n0pU',
-    'fld5UpfU63qiYEZtp',
-    'fldJLDy5yOHq8S6RS',
-    'fldWHlp8HCuMYGc9e',
-  ].map(f => `fields[]=${f}`).join('&');
-
-  const params = `${fields}&sort[0][field]=fldxsDylRluE1PTJ7&sort[0][direction]=desc&pageSize=20`;
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/tblFw52kzeTRvxTSM?${params}`;
-  const resp = await httpsGet(url, { Authorization: `Bearer ${AIRTABLE_API_KEY}` });
-  const records = resp.records || [];
-
-  const seen = new Set();
-  const latest = [];
-  for (const r of records) {
-    const pos = r.cellValuesByFieldId?.fldFi5nwRXNC5n0pU?.[0]?.name || '';
-    const action = r.cellValuesByFieldId?.fld5UpfU63qiYEZtp?.name || '';
-    if (action === 'Rate Check' && !seen.has(pos)) {
-      seen.add(pos);
-      latest.push({ position: pos, supplyApy: r.cellValuesByFieldId?.fldJLDy5yOHq8S6RS, borrowApy: r.cellValuesByFieldId?.fldWHlp8HCuMYGc9e });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Claude API ${res.status}: ${err}`);
     }
-  }
-  return latest;
-}
 
-async function getXStocks() {
-  const fields = [
-    'fldtiRIqznncRfJYG',
-    'fldUkwrxtS4AEr52W',
-    'fldWElDtJZRYTaZtD',
-    'fld6QnTv9CKHvglcX',
-  ].map(f => `fields[]=${f}`).join('&');
+    const response = await res.json();
+    console.log(`  stop_reason: ${response.stop_reason}`);
 
-  const params = `${fields}&sort[0][field]=fldErSlMumagkJ12S&sort[0][direction]=desc&pageSize=30`;
-  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE}/tblKsk0QnkOoKNLuk?${params}`;
-  const resp = await httpsGet(url, { Authorization: `Bearer ${AIRTABLE_API_KEY}` });
-  const records = resp.records || [];
+    // Append Claude's reply to history
+    messages.push({ role: 'assistant', content: response.content });
 
-  const xStockNames = ['TSLAx','NVDAx','AAPLx','GOOGLx','SPYx','CRCLx'];
-  const seen = new Set();
-  const latest = [];
-  for (const r of records) {
-    const asset = r.cellValuesByFieldId?.fldtiRIqznncRfJYG?.[0]?.name || '';
-    const action = r.cellValuesByFieldId?.fldUkwrxtS4AEr52W?.name || '';
-    const fees = r.cellValuesByFieldId?.fld6QnTv9CKHvglcX;
-    if (action === 'Fee Check' && fees && !seen.has(asset) && xStockNames.some(t => asset.includes(t))) {
-      seen.add(asset);
-      latest.push({ asset, value: r.cellValuesByFieldId?.fldWElDtJZRYTaZtD, fees });
+    if (response.stop_reason === 'end_turn') {
+      const textBlock = response.content.find(b => b.type === 'text');
+      if (!textBlock) throw new Error('end_turn but no text block');
+      return textBlock.text.trim();
     }
+
+    if (response.stop_reason === 'tool_use') {
+      const toolCalls = response.content.filter(b => b.type === 'tool_use');
+      // Execute tool calls (sequentially to avoid Airtable rate limits)
+      const toolResults = [];
+      for (const call of toolCalls) {
+        const result = await executeTool(call.name, call.input);
+        toolResults.push({
+          type:        'tool_result',
+          tool_use_id: call.id,
+          content:     JSON.stringify(result)
+        });
+      }
+      messages.push({ role: 'user', content: toolResults });
+      continue;
+    }
+
+    throw new Error(`Unexpected stop_reason: ${response.stop_reason}`);
   }
-  return latest;
+
+  throw new Error(`Exceeded ${MAX_ITERS} Claude iterations`);
 }
 
-function getZoneInfo(ethPrice) {
-  const center = 2080, nearDriftUpper = 2181, nearDriftLower = 1979;
-  const driftUpper = 2224, driftLower = 1936;
-  let zone;
-  if (ethPrice >= driftUpper || ethPrice <= driftLower) zone = 'Drift Zone';
-  else if (ethPrice >= nearDriftUpper || ethPrice <= nearDriftLower) zone = 'Near Drift Zone';
-  else zone = 'Normal Zone';
-  return { zone, distFromCenter: Math.round(ethPrice - center), roomToNearDriftUp: Math.round(nearDriftUpper - ethPrice), roomToNearDriftDown: Math.round(ethPrice - nearDriftLower) };
-}
+// ── System Prompt ───────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPT = `You are the morning brief generator for JD's Portfolio OS — a personal DeFi portfolio management system.
+
+Your job: fetch all required data using your tools, compute everything yourself, and return the spoken audio brief text. Nothing else — no JSON wrapper, no markdown, just the words to be spoken aloud.
+
+═══════════════════════════════════════
+DATA FETCHING INSTRUCTIONS
+═══════════════════════════════════════
+
+STEP 1 — PSF Cycle Data (Airtable Daily Actions)
+Query table ${AIRTABLE_DAILY_TABLE} with:
+  filterByFormula: OR(FIND('WETH-PRIMARY-C',{Cycle ID}),FIND('HEDGE-C',{Cycle ID}))
+  sort: fldHG3MCcyhkXknyH ascending (oldest first)
+  fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk
+
+⚠️  PAGINATION IS MANDATORY. Keep calling airtable_query with the offset from
+each response until has_more = false. The Reopen Position records you need to
+determine opening deposit values are the OLDEST records — they will only appear
+once you have paginated through all pages. Do not stop after one page.
+
+From the complete record set, determine:
+  • Current cycle number = highest number in Cycle ID (e.g. C8 from WETH-PRIMARY-C8)
+  • LP open value       = Position Value on earliest Reopen Position for WETH-PRIMARY-C[n]
+  • Hedge open value    = Position Value on earliest Reopen Position for HEDGE-C[n]
+  • Total deployed      = LP open + Hedge open
+  • LP current value    = Position Value on latest Fee Check for WETH-PRIMARY-C[n]
+  • Hedge current value = Position Value on latest Fee Check for HEDGE-C[n]
+  • Pending fees        = Fee Value on latest Fee Check for WETH-PRIMARY-C[n]
+  • Total claimed       = sum of all Fees Claimed on all Claim records for WETH-PRIMARY-C[n]
+  • Total fees          = total claimed + pending fees
+  • LP PnL              = LP current − LP open
+  • Hedge PnL           = Hedge current − Hedge open
+  • Net price delta     = LP PnL + Hedge PnL
+  • Cycle open date     = Date on earliest Reopen Position for WETH-PRIMARY-C[n]
+  • Elapsed hours       = hours from cycle open date to now
+  • Days in cycle       = elapsed hours / 24  (use one decimal, e.g. 15.3)
+  • Avg daily fee       = (total fees / elapsed hours) × 24
+  • Net return          = net price delta + total fees
+  • Return %            = net return / total deployed × 100
+  • Annualized %        = return % / (elapsed hours / 24) × 365
+
+STEP 2 — Market Data (web search)
+Search for:
+  • ETH current price in USD
+  • BTC current price in USD
+  • Crypto Fear & Greed index (number and label)
+
+STEP 3 — Zone Determination
+You must know the current band parameters. Check the Airtable records — the
+Cycle ID tells you which cycle is active. The band for C8 is:
+  Center: $2,080 | Lower: $1,900 | Upper: $2,260
+  Drift Lower: $1,936 | Near Drift Lower: $1,979
+  Near Drift Upper: $2,181 | Drift Upper: $2,224
+(If a new cycle has opened, use the band values seeded in Notion for that cycle.)
+
+Zone rules using ETH price:
+  • Between Near Drift Lower and Near Drift Upper → Normal Zone
+  • Between Drift Lower and Near Drift Lower, OR between Near Drift Upper and Drift Upper → Near Drift Zone  
+  • Below Drift Lower OR above Drift Upper → Drift Zone (action required — flag clearly)
+
+Distance to nearest Near Drift = min(ETH − Near Drift Lower, Near Drift Upper − ETH)
+
+═══════════════════════════════════════
+BRIEF FORMAT (follow exactly, in order)
+═══════════════════════════════════════
+
+1. Date
+   "Good morning. It's [Weekday], [Month] [Day]."
+
+2. ETH and Zone
+   Normal Zone example: "Eth is at [price], sitting in Normal Zone. You have about [distance] dollars of breathing room before Near Drift. No action needed."
+   Near Drift example: "Eth is at [price], in Near Drift Zone — [distance] dollars from the Drift boundary. Monitor closely."
+   Drift example: "Eth is at [price] and has crossed into Drift Zone. Action may be required — review the position."
+
+3. Strategy P&L
+   "[Strategy] is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount] — net price delta is [positive/negative] [amount]. Total fees this cycle are [amount], averaging about [amount] a day. Net strategy return including all fees is [amount] on [total deployed] deployed — about [percent] in [X] days, annualizing around [percent]."
+
+4. One Thing to Watch
+   The single most notable item requiring attention today. Two sentences max.
+   Examples: unclaimed fees building up on an xStock LP, a lending rate that spiked, the position approaching Near Drift.
+
+5. Market Close
+   "Market sentiment is [label] at [number]. Bitcoin is at [price]. [One macro sentence if relevant.] Have a good one."
+
+═══════════════════════════════════════
+SPEAKING RULES — CRITICAL
+═══════════════════════════════════════
+
+ElevenLabs will read this text aloud. Numbers must be written as words:
+  ✓ "two thousand and fifty-eight dollars"    ✗ "$2,058" or "twenty fifty-eight"
+  ✓ "one hundred and forty-six dollars"       ✗ "$146"
+  ✓ "sixty-four percent"                      ✗ "64%"
+  ✓ "thirty thousand dollars"                 ✗ "$30,000"
+
+Tickers must be phonetic:
+  ETH → "Eth"   BTC → "Bitcoin"   USDC → "U-S-D-C"   SOL → "Sol"
+
+Never use raw ticker symbols. Never explain the band structure or hedge mechanics.
+Target length: 60–75 seconds at 1.2× speed (~130–160 words).
+
+Return ONLY the brief text. No preamble, no explanation, no JSON.`;
+
+// ── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('Fetching all data...');
-  const [prices, fearGreed, psf, lending, xstocks] = await Promise.all([
-    getEthPrice(), getFearGreed(), getPSFData(), getLendingSnapshot(), getXStocks()
-  ]);
+  if (!CLAUDE_API_KEY)   throw new Error('CLAUDE_API_KEY not set');
+  if (!AIRTABLE_API_KEY) throw new Error('AIRTABLE_API_KEY not set');
 
-  const zoneInfo = getZoneInfo(prices.eth || 2080);
-  const notablexStock = xstocks.length > 0 ? xstocks.sort((a, b) => b.fees - a.fees)[0] : null;
-  const virtualPos = lending.find(p => p.position.includes('VIRTUAL'));
+  const now     = new Date();
+  const dateStr = now.toLocaleDateString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+  });
 
-  const dataSummary = {
-    date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' }),
-    eth: { price: prices.eth, ...zoneInfo },
-    btc: { price: prices.btc, wma200: 58000 },
-    fearGreed,
-    psf: {
-      cycleDays: psf.days,
-      lpPnl: Math.round(psf.lpPnl),
-      hedgePnl: Math.round(psf.hedgePnl),
-      netDelta: Math.round(psf.netDelta),
-      totalFees: Math.round(psf.totalFees),
-      avgDailyFee: Math.round(psf.avgDailyFee),
-      netInclFees: Math.round(psf.netInclFees),
-      totalDeployed: Math.round(psf.totalDeployed),
-      pctReturn: psf.pctReturn.toFixed(1),
-      annualized: Math.round(psf.annualized)
-    },
-    notablexStock: notablexStock ? { asset: notablexStock.asset, fees: Math.round(notablexStock.fees), value: Math.round(notablexStock.value) } : null,
-    virtualApy: virtualPos?.supplyApy || null
-  };
+  console.log(`\n=== Generating morning brief for ${dateStr} ===\n`);
 
-  console.log('Data summary:', JSON.stringify(dataSummary, null, 2));
+  const userPrompt = `Today is ${dateStr} (${now.toISOString()}). Please fetch all required data and generate my morning brief now.`;
 
-  const systemPrompt = `You generate a daily morning audio brief for a DeFi portfolio manager named JD.
-Return a JSON object with exactly two fields:
-1. "brief": The full audio brief as pure conversational prose. No formatting, no line breaks, no markdown. Single flowing paragraph.
-2. "description": A 1-2 sentence episode description summarizing what was notable today for the podcast app listing. Smart headline tone. Never start with "Good morning" or mention the date. Present tense.
+  const briefText = await runClaude(SYSTEM_PROMPT, userPrompt);
 
-Rules for the brief:
-- Numbers spoken naturally: "two thousand and sixty dollars" not "$2,060"
-- Say "Eth" not "ETH", "Bitcoin" not "BTC"
-- Target 60-75 seconds when read aloud at 1.2x speed
-- Structure: date -> Eth price and zone -> PSF strategy P&L -> one thing to watch -> market sentiment -> "Have a good one."
-- For net delta: state LP direction and dollar amount, hedge direction and dollar amount, then net
-- Always state: total fees, avg daily fee, net return including fees, annualized return
-- Lending stable = one sentence only
-- Never explain the strategy, just report numbers with judgment
+  console.log('\n=== BRIEF TEXT ===');
+  console.log(briefText);
+  console.log('=================\n');
 
-IMPORTANT: Return ONLY raw JSON. No markdown, no backticks, no preamble. Start with { end with }.`;
+  // Write output for the next workflow step to consume
+  const outputDir = path.dirname(OUTPUT_PATH);
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(OUTPUT_PATH, briefText, 'utf8');
 
-  const response = await httpsPost('api.anthropic.com', '/v1/messages',
-    { 'x-api-key': CLAUDE_API_KEY, 'anthropic-version': '2023-06-01' },
-    { model: 'claude-sonnet-4-20250514', max_tokens: 1200, system: systemPrompt, messages: [{ role: 'user', content: `Generate today's morning brief using this live data: ${JSON.stringify(dataSummary)}` }] }
-  );
-
-  let rawText = response.content?.[0]?.text;
-  if (!rawText) { console.error('No response from Claude:', JSON.stringify(response)); process.exit(1); }
-  rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-
-  let parsed;
-  try { parsed = JSON.parse(rawText); }
-  catch (e) { console.error('Failed to parse Claude JSON:', rawText.slice(0, 500)); process.exit(1); }
-
-  const { brief: briefText, description } = parsed;
-  if (!briefText || !description) { console.error('Missing brief or description:', parsed); process.exit(1); }
-
-  console.log('\nBrief:\n', briefText);
-  console.log('\nDescription:\n', description);
-
-  fs.writeFileSync('/tmp/brief.txt', briefText);
-  fs.writeFileSync('/tmp/description.txt', description);
-  fs.appendFileSync(process.env.GITHUB_ENV || '/dev/null', `BRIEF_TEXT_FILE=/tmp/brief.txt\nDESCRIPTION_FILE=/tmp/description.txt\n`);
-  console.log('Done.');
+  console.log(`✓ Brief written to ${OUTPUT_PATH}`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch(err => {
+  console.error('Fatal:', err.message);
+  process.exit(1);
+});
