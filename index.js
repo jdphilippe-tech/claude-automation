@@ -137,17 +137,29 @@ async function suiRpc(method, params) {
   return json.result;
 }
 
-async function solRpc(method, params) {
+async function solRpc(method, params, retries = 4, delayMs = 3000) {
   const { default: fetch } = await import('node-fetch');
-  const res = await fetch(SOL_RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  if (!res.ok) { console.error(`[Sol RPC HTTP ${res.status}] ${method}`); return null; }
-  const json = await res.json();
-  if (json.error) { console.error(`[Sol RPC error] ${method}: ${json.error.message}`); return null; }
-  return json.result;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const res = await fetch(SOL_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    });
+    if (!res.ok) { console.error(`[Sol RPC HTTP ${res.status}] ${method}`); return null; }
+    const json = await res.json();
+    if (!json.error) return json.result;
+    const msg = json.error.message ?? '';
+    const retryable = msg.includes('overloaded') || msg.includes('too many') || msg.includes('rate') || msg.includes('429');
+    if (retryable && attempt < retries) {
+      const wait = delayMs * attempt;
+      console.log(`[Sol RPC] ${method} overloaded — retry ${attempt}/${retries - 1} in ${wait}ms...`);
+      await new Promise(r => setTimeout(r, wait));
+    } else {
+      console.error(`[Sol RPC error] ${method}: ${msg}`);
+      return null;
+    }
+  }
+  return null;
 }
 
 async function airtableCreate(tableId, records) {
