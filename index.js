@@ -1,8 +1,6 @@
 // ============================================================
 // Daily Portfolio Check — GitHub Actions v27
-// Added: Raydium xStocks CLMM LP positions (Solana RPC, raw)
-//        Discovery mode via RAYDIUM_DRY_RUN=true (logs only, no Airtable writes)
-//        Once validated set RAYDIUM_DRY_RUN=false in repo vars to go live
+// Raydium xStocks CLMM: position value + in-range status (pending yield = Phase 2)
 // Retained: WETH/USDC Primary (Arbitrum), Moonwell (Base), Suilend (Sui)
 // Schedule: 14:00 UTC = 7:00 AM PDT
 // ============================================================
@@ -16,7 +14,6 @@ const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
 
 const WALLET_EVM  = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
 const WALLET_SUI  = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
-const WALLET_SOL  = '5yiTWdskR7yd5RXvs7MJLqWsn6n7geM8SzvYjUpRHrTX';
 const WETH_POS_ID = 5384162n;
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
@@ -24,10 +21,11 @@ const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 const SUI_RPC      = 'https://fullnode.mainnet.sui.io';
 const SOL_RPC      = process.env.SOL_RPC_URL ?? 'https://api.mainnet-beta.solana.com';
 
-// Set to false once numbers are validated against Raydium UI
+// Set RAYDIUM_DRY_RUN=false in GitHub repo Variables to go live
 const RAYDIUM_DRY_RUN = (process.env.RAYDIUM_DRY_RUN ?? 'true') !== 'false';
 
 const OBLIGATION_CAP_KEYWORD = 'ObligationOwnerCap';
+const RAYDIUM_CLMM_PROGRAM   = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
 
 const NOW_UTC = new Date().toISOString();
 
@@ -60,25 +58,14 @@ const LF = {
 // ---- Asset record IDs ----
 const ASSET = {
   wethPrimary: 'recbVsmOWh9YOWPBZ',
-  // Raydium xStocks — NFT mint addresses from Raydium UI + Airtable record IDs
-  // ⚠️ UPDATE CYCLE IDs once confirmed with you
+  // Raydium xStocks — all data confirmed from Raydium UI and dry runs
+  // ⚠️ UPDATE cycleId once Cycle IDs are seeded in Airtable
   tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2',  nftMint: '7R5JFSuXL23epYJmX6LhzbM2Nce39at4maWD7NeFK4tU', poolId: '8aDaBQkTrS6HVMjyc6EZebgdiaXhLYGriDWKWWp1NpFF' },
   nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1',  nftMint: 'J7qm9jifiKg7CyWDbmdDUNokhgs7JvwZmy2jnJ7qmN5Z', poolId: '4KqQN6u1pFKroFE2jVEhoepAMRKPcuAzWVDCgm9zRBYN' },
-  aaplx:  { recordId: 'recGF59dwIOnE8fm2',  cycleId: 'AAPLx-C1',  nftMint: '2NsZvobR13JuYbkYTt5EK1XyyEJh3xB8621FhUW3LYKp', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
-  googlx: { recordId: 'recRxStry17D0ZGB5',  cycleId: 'GOOGLx-C1', nftMint: '2jznFFq36gfhUsWRzkEigGBY8hDqHBv4W6CdtsSGArWx', poolId: 'B8YAwjGYk6qidWzGBXMAxP7nYfG8g74EZ3Y4gFSsobRw' },
-  crclx:  { recordId: 'recPq2Ee2MsoMa21S',  cycleId: 'CRCLx-C1',  nftMint: 'AZHgbQL6dfBodYN5yHvNbvwWVYXvRGeqYRbd8ni9NfWq', poolId: 'G39wywquKbHK8F2wZZZFX3fcsyG91VCCbbr6WEVp5axy' },
-  spyx:   { recordId: 'rechX4b2anmi82enx',  cycleId: 'SPYx-C1',   nftMint: 'HgcTrL1Tb57ZrycTbhcBgRviFcWrfSiJRWSmwELXSyrj', poolId: '6truu3rZuiB9rKQg4VYC3Dt3QwV7DgwGqXrYUcrvnDDE' },
-};
-
-// Map xStock token name keywords → asset key
-// Used to match pool tokens to the right Airtable record
-const XSTOCK_MAP = {
-  'TSLAx':  'tslax',
-  'NVDAx':  'nvdax',
-  'AAPLx':  'aaplx',
-  'GOOGLx': 'googlx',
-  'CRCLx':  'crclx',
-  'SPYx':   'spyx',
+  aaplx:  { recordId: 'recGF59dwIOnE8fm2', cycleId: 'AAPLx-C1',  nftMint: '2NsZvobR13JuYbkYTt5EK1XyyEJh3xB8621FhUW3LYKp', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
+  googlx: { recordId: 'recRxStry17D0ZGB5', cycleId: 'GOOGLx-C1', nftMint: '2jznFFq36gfhUsWRzkEigGBY8hDqHBv4W6CdtsSGArWx', poolId: 'B8YAwjGYk6qidWzGBXMAxP7nYfG8g74EZ3Y4gFSsobRw' },
+  crclx:  { recordId: 'recPq2Ee2MsoMa21S', cycleId: 'CRCLx-C1',  nftMint: 'AZHgbQL6dfBodYN5yHvNbvwWVYXvRGeqYRbd8ni9NfWq', poolId: 'G39wywquKbHK8F2wZZZFX3fcsyG91VCCbbr6WEVp5axy' },
+  spyx:   { recordId: 'rechX4b2anmi82enx', cycleId: 'SPYx-C1',   nftMint: 'HgcTrL1Tb57ZrycTbhcBgRviFcWrfSiJRWSmwELXSyrj', poolId: '6truu3rZuiB9rKQg4VYC3Dt3QwV7DgwGqXrYUcrvnDDE' },
 };
 
 // ---- Lending position record IDs ----
@@ -277,27 +264,19 @@ async function getMoonwellData() {
   try {
     const comptroller = new ethers.Contract(COMPTROLLER, comptrollerABI, provider);
     oracle = new ethers.Contract(await comptroller.oracle(), oracleABI, provider);
-  } catch (e) {
-    console.error(`Oracle: ${e.message}`);
-  }
+  } catch (e) { console.error(`Oracle: ${e.message}`); }
 
   const mtokenMarkets  = MARKETS.filter(m => m.method === 'mtoken');
-  const llamaPriceData = await fetchWithTimeout(
-    `https://coins.llama.fi/prices/current/${mtokenMarkets.map(m => `base:${m.underlyingAddr}`).join(',')}`
-  );
+  const llamaPriceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${mtokenMarkets.map(m => `base:${m.underlyingAddr}`).join(',')}`);
   const prices = {};
   if (llamaPriceData?.coins) {
-    for (const [k, v] of Object.entries(llamaPriceData.coins)) {
-      prices[k.split(':')[1].toLowerCase()] = v.price;
-    }
+    for (const [k, v] of Object.entries(llamaPriceData.coins)) prices[k.split(':')[1].toLowerCase()] = v.price;
   }
 
   const llamaPoolsData = await fetchWithTimeout('https://yields.llama.fi/pools');
   const moonwellPools  = {};
   if (llamaPoolsData?.data) {
-    const basePools = llamaPoolsData.data.filter(
-      p => p.project === 'moonwell-lending' && p.chain === 'Base'
-    );
+    const basePools = llamaPoolsData.data.filter(p => p.project === 'moonwell-lending' && p.chain === 'Base');
     for (const pool of basePools) {
       const sym = pool.symbol?.toUpperCase();
       if (sym === 'ETH')     moonwellPools['moonwellETH']    = pool;
@@ -311,8 +290,7 @@ async function getMoonwellData() {
   for (const market of MARKETS) {
     try {
       const mToken    = new ethers.Contract(market.mAddr, mTokenABI, provider);
-      const pool      = moonwellPools[market.key];
-      const supplyAPY = pool?.apy ?? null;
+      const supplyAPY = moonwellPools[market.key]?.apy ?? null;
 
       if (market.method === 'oracle' && oracle) {
         const oracleRaw = await oracle.getUnderlyingPrice(market.mAddr);
@@ -326,16 +304,8 @@ async function getMoonwellData() {
       } else if (market.method === 'mtoken') {
         const price = prices[market.underlyingAddr?.toLowerCase()] ?? null;
         if (!price) { console.error(`${market.key}: no price`); continue; }
-
-        const [mBalRaw, exchRaw] = await Promise.all([
-          mToken.balanceOf(WALLET_EVM),
-          mToken.exchangeRateStored(),
-        ]);
-
-        const mBalBig    = BigInt(mBalRaw.toString());
-        const exchBig    = BigInt(exchRaw.toString());
-        const divisor    = BigInt(10) ** BigInt(18 + market.underlyingDec);
-        const underlying = Number(mBalBig * exchBig / divisor);
+        const [mBalRaw, exchRaw] = await Promise.all([mToken.balanceOf(WALLET_EVM), mToken.exchangeRateStored()]);
+        const underlying = Number(BigInt(mBalRaw.toString()) * BigInt(exchRaw.toString()) / (BigInt(10) ** BigInt(18 + market.underlyingDec)));
         const supplyUSD  = underlying * price;
         console.log(`${market.key}: ${underlying.toFixed(4)} tokens × $${price.toFixed(4)} = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2)}%`);
         if (supplyUSD > 0.01) results[market.key] = { type: 'supply', supplyUSD, tokens: underlying, supplyAPY };
@@ -343,24 +313,16 @@ async function getMoonwellData() {
       } else if (market.method === 'borrow') {
         const borrowRaw = await mToken.borrowBalanceStored(WALLET_EVM);
         const borrowUSD = Number(borrowRaw) / Math.pow(10, market.underlyingDec);
-        const tokens    = borrowUSD;
-
         let borrowAPY = null;
         try {
           const rateRaw    = await mToken.borrowRatePerTimestamp();
           const ratePerSec = Number(rateRaw) / 1e18;
           borrowAPY        = ((1 + ratePerSec) ** 31_536_000 - 1) * 100;
-        } catch (e) {
-          console.error(`borrowRatePerTimestamp failed: ${e.message.slice(0, 60)}`);
-        }
-
+        } catch (e) { console.error(`borrowRatePerTimestamp failed: ${e.message.slice(0, 60)}`); }
         console.log(`${market.key}: borrow $${borrowUSD.toFixed(2)} | borrowAPY: ${borrowAPY?.toFixed(2)}%`);
-        if (borrowUSD > 0.01) results[market.key] = { type: 'borrow', borrowUSD, tokens, borrowAPY };
+        if (borrowUSD > 0.01) results[market.key] = { type: 'borrow', borrowUSD, tokens: borrowUSD, borrowAPY };
       }
-
-    } catch (e) {
-      console.error(`${market.key}: ${e.message.slice(0, 80)}`);
-    }
+    } catch (e) { console.error(`${market.key}: ${e.message.slice(0, 80)}`); }
   }
 
   return results;
@@ -375,56 +337,32 @@ async function getSuilendData() {
   const results = {};
 
   try {
-    let obligationId = null;
-    let cursor = null;
-
+    let obligationId = null, cursor = null;
     outer: while (true) {
-      const page = await suiRpc('suix_getOwnedObjects', [
-        WALLET_SUI,
-        { options: { showType: true, showContent: true } },
-        cursor,
-        50,
-      ]);
-
+      const page = await suiRpc('suix_getOwnedObjects', [WALLET_SUI, { options: { showType: true, showContent: true } }, cursor, 50]);
       if (!page?.data?.length) break;
-
       for (const obj of page.data) {
-        const objType = obj.data?.type ?? '';
-        if (objType.includes(OBLIGATION_CAP_KEYWORD)) {
-          console.log(`Suilend: found cap type: ${objType}`);
+        if ((obj.data?.type ?? '').includes(OBLIGATION_CAP_KEYWORD)) {
+          console.log(`Suilend: found cap type: ${obj.data.type}`);
           const fields = obj.data?.content?.fields;
           obligationId = fields?.obligation_id ?? fields?.obligationId;
           break outer;
         }
       }
-
       if (!page.hasNextPage) break;
       cursor = page.nextCursor;
     }
 
-    if (!obligationId) {
-      console.error('Suilend: no ObligationOwnerCap found.');
-      return results;
-    }
-
+    if (!obligationId) { console.error('Suilend: no ObligationOwnerCap found.'); return results; }
     console.log(`Suilend: obligation ${obligationId}`);
 
-    const obligationObj    = await suiRpc('sui_getObject', [
-      obligationId,
-      { showContent: true, showType: true },
-    ]);
+    const obligationObj    = await suiRpc('sui_getObject', [obligationId, { showContent: true, showType: true }]);
     const obligationFields = obligationObj?.data?.content?.fields;
-
-    if (!obligationFields) {
-      console.error('Suilend: could not read obligation fields');
-      return results;
-    }
+    if (!obligationFields) { console.error('Suilend: could not read obligation fields'); return results; }
 
     console.log('Obligation field keys:', Object.keys(obligationFields).join(', '));
 
-    const lendingMarketId = obligationFields.lending_market_id?.id
-      ?? obligationFields.lending_market_id;
-
+    const lendingMarketId = obligationFields.lending_market_id?.id ?? obligationFields.lending_market_id;
     const [priceData, lendingMarketObj] = await Promise.all([
       fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:sui,coingecko:wrapped-solana'),
       suiRpc('sui_getObject', [lendingMarketId, { showContent: true }]),
@@ -434,732 +372,219 @@ async function getSuilendData() {
     const wsolPrice = priceData?.coins?.['coingecko:wrapped-solana']?.price ?? 0;
     console.log(`Prices: SUI $${suiPrice.toFixed(4)}, wSOL $${wsolPrice.toFixed(4)}`);
 
-    const lmFields = lendingMarketObj?.data?.content?.fields;
-    const reserves  = lmFields?.reserves ?? [];
+    const reserves = lendingMarketObj?.data?.content?.fields?.reserves ?? [];
     console.log(`Lending market reserves: ${reserves.length} found`);
 
     const suilendAPYs = {};
     for (const reserveEntry of reserves) {
       const rf       = reserveEntry?.fields ?? reserveEntry;
       const coinType = rf?.coin_type?.fields?.name ?? rf?.coinType ?? '';
-
       const isSUI  = coinType.toLowerCase().includes('sui::sui');
       const isWSOL = coinType.toLowerCase().includes('b7844e28');
       const isUSDC = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
-
       if (!isSUI && !isWSOL && !isUSDC) continue;
-
       const key = isSUI ? 'SUI' : isWSOL ? 'WSOL' : 'USDC';
+      if (suilendAPYs[key]) continue;
 
-      if (!suilendAPYs[key]) {
-        const configEl = rf?.config?.fields?.element?.fields ?? {};
-        const utils = configEl?.interest_rate_utils ?? [];
-        const aprs  = configEl?.interest_rate_aprs  ?? [];
+      const configEl = rf?.config?.fields?.element?.fields ?? {};
+      const utils    = configEl?.interest_rate_utils ?? [];
+      const aprs     = configEl?.interest_rate_aprs  ?? [];
+      const mintDec  = Number(rf?.mint_decimals ?? 6);
+      const borrowedNative     = Number(BigInt(rf?.borrowed_amount?.fields?.value ?? 0) * 1000n / 10n ** 27n) / 1000;
+      const ctokenSupplyNative = Number(BigInt(rf?.ctoken_supply ?? 0)) / Math.pow(10, mintDec);
+      const utilRate           = ctokenSupplyNative > 0 ? borrowedNative / ctokenSupplyNative : 0;
 
-        const mintDec      = Number(rf?.mint_decimals ?? 6);
-        const borrowedRaw  = BigInt(rf?.borrowed_amount?.fields?.value ?? 0);
-        const scale27      = 10n ** 27n;
-        const borrowedNative     = Number(borrowedRaw * 1000n / scale27) / 1000;
-        const ctokenSupplyNative = Number(BigInt(rf?.ctoken_supply ?? 0)) / Math.pow(10, mintDec);
-        const utilRate           = ctokenSupplyNative > 0 ? borrowedNative / ctokenSupplyNative : 0;
-
-        let borrowAprPerYear = 0;
-        if (utils.length > 0 && aprs.length >= utils.length) {
-          const utilPoints = utils.map(u => Number(u) / 100);
-          const aprPoints  = aprs.map(a => Number(a) / 10000);
-
-          if (utilRate <= utilPoints[0]) {
-            borrowAprPerYear = aprPoints[0];
-          } else if (utilRate >= utilPoints[utilPoints.length - 1]) {
-            borrowAprPerYear = aprPoints[aprPoints.length - 1];
-          } else {
-            for (let i = 1; i < utilPoints.length; i++) {
-              if (utilRate <= utilPoints[i]) {
-                const t = (utilRate - utilPoints[i-1]) / (utilPoints[i] - utilPoints[i-1]);
-                borrowAprPerYear = aprPoints[i-1] + t * (aprPoints[i] - aprPoints[i-1]);
-                break;
-              }
+      let borrowAprPerYear = 0;
+      if (utils.length > 0 && aprs.length >= utils.length) {
+        const utilPoints = utils.map(u => Number(u) / 100);
+        const aprPoints  = aprs.map(a => Number(a) / 10000);
+        if (utilRate <= utilPoints[0]) { borrowAprPerYear = aprPoints[0]; }
+        else if (utilRate >= utilPoints[utilPoints.length - 1]) { borrowAprPerYear = aprPoints[aprPoints.length - 1]; }
+        else {
+          for (let i = 1; i < utilPoints.length; i++) {
+            if (utilRate <= utilPoints[i]) {
+              const t = (utilRate - utilPoints[i-1]) / (utilPoints[i] - utilPoints[i-1]);
+              borrowAprPerYear = aprPoints[i-1] + t * (aprPoints[i] - aprPoints[i-1]);
+              break;
             }
           }
         }
-
-        const borrowRatePerSec = borrowAprPerYear / 31_536_000;
-        const borrowAPY = borrowRatePerSec > 0
-          ? ((1 + borrowRatePerSec) ** 31_536_000 - 1) * 100
-          : null;
-
-        const spreadFeeBps = Number(configEl?.spread_fee_bps ?? 0);
-        const spreadFee    = spreadFeeBps / 10000;
-        const supplyAPY    = borrowAPY != null
-          ? borrowAPY * utilRate * (1 - spreadFee)
-          : null;
-
-        suilendAPYs[key] = { supplyAPY, borrowAPY };
-        console.log(`Reserve ${key}: util=${(utilRate*100).toFixed(1)}%, borrowAPY=${borrowAPY?.toFixed(2) ?? 'n/a'}%, supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       }
+
+      const borrowRatePerSec = borrowAprPerYear / 31_536_000;
+      const borrowAPY = borrowRatePerSec > 0 ? ((1 + borrowRatePerSec) ** 31_536_000 - 1) * 100 : null;
+      const spreadFee = Number(configEl?.spread_fee_bps ?? 0) / 10000;
+      const supplyAPY = borrowAPY != null ? borrowAPY * utilRate * (1 - spreadFee) : null;
+      suilendAPYs[key] = { supplyAPY, borrowAPY };
+      console.log(`Reserve ${key}: util=${(utilRate*100).toFixed(1)}%, borrowAPY=${borrowAPY?.toFixed(2) ?? 'n/a'}%, supplyAPY=${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
     }
 
-    const depositList = obligationFields.deposits?.fields?.contents
-      ?? obligationFields.collateral?.fields?.contents
-      ?? obligationFields.deposits
-      ?? [];
-
+    const depositList = obligationFields.deposits?.fields?.contents ?? obligationFields.collateral?.fields?.contents ?? obligationFields.deposits ?? [];
     console.log(`Deposits raw count: ${depositList.length}`);
-
     for (const entry of depositList) {
       const d        = entry?.fields ?? entry;
       const coinType = d?.coin_type?.fields?.name ?? '';
-
       const isSUI  = coinType.toLowerCase().includes('sui::sui');
       const isWSOL = coinType.toLowerCase().includes('b7844e28');
       if (!isSUI && !isWSOL) continue;
-
       const assetKey  = isSUI ? 'SUI' : 'WSOL';
       const price     = isSUI ? suiPrice : wsolPrice;
       const lposKey   = isSUI ? 'suilendSUI' : 'suilendWSOL';
-      const supplyAPY = suilendAPYs[assetKey]?.supplyAPY ?? null;
-
-      const mintDec2  = isSUI ? 9 : 8;
-      const ctokenRaw = BigInt(d?.deposited_ctoken_amount ?? 0);
-      const tokens    = Number(ctokenRaw) / Math.pow(10, mintDec2);
+      const tokens    = Number(BigInt(d?.deposited_ctoken_amount ?? 0)) / Math.pow(10, isSUI ? 9 : 8);
       const supplyUSD = tokens * price;
-
-      console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${supplyAPY?.toFixed(2) ?? 'n/a'}%`);
-      results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY };
+      console.log(`suilend${assetKey}: ${tokens.toFixed(4)} tokens = $${supplyUSD.toFixed(2)} | supplyAPY: ${suilendAPYs[assetKey]?.supplyAPY?.toFixed(2) ?? 'n/a'}%`);
+      results[lposKey] = { type: 'supply', supplyUSD, tokens, supplyAPY: suilendAPYs[assetKey]?.supplyAPY ?? null };
     }
 
-    const borrowList = obligationFields.borrows?.fields?.contents
-      ?? obligationFields.borrows
-      ?? [];
-
+    const borrowList = obligationFields.borrows?.fields?.contents ?? obligationFields.borrows ?? [];
     console.log(`Borrows raw count: ${borrowList.length}`);
-
     for (const entry of borrowList) {
       const b        = entry?.fields ?? entry;
       const coinType = b?.coin_type?.fields?.name ?? '';
-
-      const isUSDC = coinType.toLowerCase().includes('usdc') || coinType.toLowerCase().includes('dba346');
-      if (!isUSDC) continue;
-
-      const baRaw     = b?.borrowed_amount?.fields?.value ?? b?.borrowed_amount ?? '0';
-      const baInt     = BigInt(String(baRaw).split('.')[0]);
+      if (!coinType.toLowerCase().includes('usdc') && !coinType.toLowerCase().includes('dba346')) continue;
+      const baInt     = BigInt(String(b?.borrowed_amount?.fields?.value ?? '0').split('.')[0]);
       const borrowUSD = Number(baInt / 1000000n) / 1e18;
-      const tokens    = borrowUSD;
-
-      const borrowPool = suilendAPYs['USDC'];
-      const borrowAPY  = borrowPool?.borrowAPY ?? null;
-
-      const depositedValueUsd      = Number(BigInt(obligationFields.deposited_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
-      const allowedBorrowValueUsd  = Number(BigInt(obligationFields.allowed_borrow_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
+      const borrowAPY = suilendAPYs['USDC']?.borrowAPY ?? null;
+      const depositedValueUsd     = Number(BigInt(obligationFields.deposited_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
+      const allowedBorrowValueUsd = Number(BigInt(obligationFields.allowed_borrow_value_usd?.fields?.value ?? 0) / 10000n) / 1e14;
       const ltvPct = allowedBorrowValueUsd > 0 ? (borrowUSD / allowedBorrowValueUsd * 100).toFixed(1) : 'n/a';
       const notes  = `Collateral: $${depositedValueUsd.toFixed(2)} | Borrow Limit: $${allowedBorrowValueUsd.toFixed(2)} | LTV Used: ${ltvPct}%`;
-
       console.log(`suilendBorrow: borrow $${borrowUSD.toFixed(2)} | borrowAPY: ${borrowAPY?.toFixed(2) ?? 'n/a'}% | ${notes}`);
-      results['suilendBorrow'] = { type: 'borrow', borrowUSD, tokens, borrowAPY, notes };
+      results['suilendBorrow'] = { type: 'borrow', borrowUSD, tokens: borrowUSD, borrowAPY, notes };
     }
-
-  } catch (e) {
-    console.error(`Suilend fatal: ${e.message}`);
-  }
+  } catch (e) { console.error(`Suilend fatal: ${e.message}`); }
 
   return results;
 }
 
 // ============================================================
 // MODULE 4 — Raydium xStocks CLMM (Solana)
+// Logs: position value + in-range status
+// Pending yield deferred to Phase 2 (tick array PDA derivation)
 // ============================================================
 
-// Raydium CLMM program ID on mainnet
-const RAYDIUM_CLMM_PROGRAM = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
-
-// Q64.64 fixed point → float
-function sqrtPriceX64ToFloat(sqrtPriceX64Str) {
-  const val = BigInt(sqrtPriceX64Str);
-  // sqrtPrice is Q64.64: divide by 2^64
-  const Q64 = 2n ** 64n;
-  const intPart  = Number(val / Q64);
-  const fracPart = Number(val % Q64) / Number(Q64);
-  return intPart + fracPart;
-}
-
-// Tick → sqrt price as float
-function tickToSqrtPrice(tick) {
-  return Math.sqrt(1.0001 ** tick);
-}
-
-// Calculate token amounts from liquidity + tick bounds + current tick
-// Returns { amount0, amount1 } in raw token units (not USD)
-function calcAmounts(liquidity, tickLower, tickUpper, tickCurrent, sqrtPriceCurrent) {
-  const liq = Number(liquidity);
-  const sqrtLower   = tickToSqrtPrice(tickLower);
-  const sqrtUpper   = tickToSqrtPrice(tickUpper);
-  const sqrtCurrent = sqrtPriceCurrent ?? tickToSqrtPrice(tickCurrent);
-
-  const inRange = tickCurrent >= tickLower && tickCurrent < tickUpper;
-
-  let amount0 = 0, amount1 = 0;
-  if (inRange) {
-    amount0 = liq * (sqrtUpper - sqrtCurrent) / (sqrtCurrent * sqrtUpper);
-    amount1 = liq * (sqrtCurrent - sqrtLower);
-  } else if (tickCurrent < tickLower) {
-    amount0 = liq * (sqrtUpper - sqrtLower) / (sqrtLower * sqrtUpper);
-  } else {
-    amount1 = liq * (sqrtUpper - sqrtLower);
-  }
-
-  return { amount0, amount1, inRange };
-}
-
-// Parse a Raydium CLMM PersonalPositionState from raw base64 account data
-// Layout (all little-endian):
-//   8  bytes  discriminator
-//   32 bytes  nft_mint
-//   32 bytes  pool_id
-//   4  bytes  tick_lower_index  (i32)
-//   4  bytes  tick_upper_index  (i32)
-//   16 bytes  liquidity         (u128)
-//   16 bytes  fee_growth_inside_0_last_x64 (u128)
-//   16 bytes  fee_growth_inside_1_last_x64 (u128)
-//   8  bytes  token_fees_owed_0 (u64)
-//   8  bytes  token_fees_owed_1 (u64)
-//   ... reward fields follow (not needed for fee check)
-function parsePositionAccount(data) {
-  const buf = Buffer.from(data, 'base64');
-  let offset = 8; // skip discriminator (8 bytes)
-  offset += 1;    // skip bump (u8)
-
-  const nftMintBytes = buf.slice(offset, offset + 32); offset += 32;
-  const poolIdBytes  = buf.slice(offset, offset + 32); offset += 32;
-
-  // Use bytes directly for base58 encoding — avoids BigInt leading zero loss
-  const nftMint = base58EncodeBytes(nftMintBytes);
-  const poolId  = base58EncodeBytes(poolIdBytes);
-
-  const tickLower = buf.readInt32LE(offset); offset += 4;
-  const tickUpper = buf.readInt32LE(offset); offset += 4;
-
-  // u128 little-endian: two 64-bit halves
-  const liqLo  = buf.readBigUInt64LE(offset);     offset += 8;
-  const liqHi  = buf.readBigUInt64LE(offset);     offset += 8;
-  const liquidity = liqLo | (liqHi << 64n);
-
-  const feeGrowth0Lo = buf.readBigUInt64LE(offset); offset += 8;
-  const feeGrowth0Hi = buf.readBigUInt64LE(offset); offset += 8;
-  const feeGrowthInside0Last = feeGrowth0Lo | (feeGrowth0Hi << 64n);
-
-  const feeGrowth1Lo = buf.readBigUInt64LE(offset); offset += 8;
-  const feeGrowth1Hi = buf.readBigUInt64LE(offset); offset += 8;
-  const feeGrowthInside1Last = feeGrowth1Lo | (feeGrowth1Hi << 64n);
-
-  const tokenFeesOwed0 = buf.readBigUInt64LE(offset); offset += 8;
-  const tokenFeesOwed1 = buf.readBigUInt64LE(offset); offset += 8;
-
-  return {
-    poolId: base58FromHex(poolId),
-    nftMint: base58FromHex(nftMint),
-    tickLower,
-    tickUpper,
-    liquidity,
-    feeGrowthInside0Last,
-    feeGrowthInside1Last,
-    tokenFeesOwed0,
-    tokenFeesOwed1,
-  };
-}
-
-// Parse Raydium CLMM PoolState — we only need the fields relevant to price + fees
-// Layout offset reference (all LE):
-//   8   discriminator
-//   1   amm_config bump
-//   32  amm_config
-//   32  creator
-//   32  token_mint_0
-//   32  token_mint_1
-//   32  token_vault_0
-//   32  token_vault_1
-//   32  observation_key
-//   1   mint_decimals_0
-//   1   mint_decimals_1
-//   2   tick_spacing
-//   16  liquidity
-//   16  sqrt_price_x64      ← current price
-//   4   tick_current        ← current tick (i32)
-//   2   observation_index
-//   2   observation_update_duration
-//   16  fee_growth_global_0_x64
-//   16  fee_growth_global_1_x64
-//   8   protocol_fees_token_0
-//   8   protocol_fees_token_1
-//   ... swap volumes etc
-function parsePoolAccount(data) {
-  const buf = Buffer.from(data, 'base64');
-  let offset = 8;
-
-  offset += 1 + 32 + 32; // bump + amm_config + creator
-
-  const mint0Bytes = buf.slice(offset, offset + 32); offset += 32;
-  const mint1Bytes = buf.slice(offset, offset + 32); offset += 32;
-
-  offset += 32 + 32 + 32; // vault0, vault1, observation_key
-
-  const decimals0 = buf.readUInt8(offset); offset += 1;
-  const decimals1 = buf.readUInt8(offset); offset += 1;
-
-  const tickSpacing = buf.readUInt16LE(offset); offset += 2;
-
-  // skip pool liquidity (16 bytes)
-  offset += 16;
-
-  // sqrt_price_x64 (u128 LE)
-  const sqrtPriceLo = buf.readBigUInt64LE(offset); offset += 8;
-  const sqrtPriceHi = buf.readBigUInt64LE(offset); offset += 8;
-  const sqrtPriceX64 = sqrtPriceLo | (sqrtPriceHi << 64n);
-
-  const tickCurrent = buf.readInt32LE(offset); offset += 4;
-
-  offset += 2 + 2; // observation_index, observation_update_duration
-
-  // fee_growth_global_0_x64 (u128 LE)
-  const fg0Lo = buf.readBigUInt64LE(offset); offset += 8;
-  const fg0Hi = buf.readBigUInt64LE(offset); offset += 8;
-  const feeGrowthGlobal0 = fg0Lo | (fg0Hi << 64n);
-
-  // fee_growth_global_1_x64 (u128 LE)
-  const fg1Lo = buf.readBigUInt64LE(offset); offset += 8;
-  const fg1Hi = buf.readBigUInt64LE(offset); offset += 8;
-  const feeGrowthGlobal1 = fg1Lo | (fg1Hi << 64n);
-
-  return {
-    mint0: base58EncodeBytes(mint0Bytes),
-    mint1: base58EncodeBytes(mint1Bytes),
-    decimals0,
-    decimals1,
-    tickSpacing,
-    sqrtPriceX64,
-    tickCurrent,
-    feeGrowthGlobal0,
-    feeGrowthGlobal1,
-  };
-}
-
-// Calculate uncollected fees from fee growth fields
-// Standard CLMM formula: fees_owed = (feeGrowthGlobal - feeGrowthInsideLast) × liquidity / Q64
-// Note: this is a simplified version — full precision requires tick account fee_growth_outside values
-// For daily monitoring this gives a close approximation; exact values require tick account reads
-function calcPendingFees(feeGrowthGlobal, feeGrowthInsideLast, tokenFeesOwed, liquidity) {
-  const Q64 = 2n ** 64n;
-  // Handle wraparound (u128 overflow)
-  const U128_MAX = 2n ** 128n;
-  let delta = (feeGrowthGlobal - feeGrowthInsideLast + U128_MAX) % U128_MAX;
-  const accumulated = Number(delta * liquidity / Q64);
-  const alreadyOwed = Number(tokenFeesOwed);
-  return accumulated + alreadyOwed;
-}
-
-// Minimal base58 decode/encode — enough to convert 32-byte hex pubkeys
-// Uses the standard Bitcoin/Solana base58 alphabet
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
-function base58FromHex(hex) {
-  return base58EncodeBytes(Buffer.from(hex, 'hex'));
-}
-
-// Correct base58 encoding from a Buffer/Uint8Array
-// Handles leading zero bytes as leading '1' characters
 function base58EncodeBytes(input) {
-  // Normalize to plain array — Buffer.slice() can behave unexpectedly in BigInt loops
   const bytes = Array.from(input);
   let num = 0n;
-  for (const b of bytes) {
-    num = num * 256n + BigInt(b);
-  }
+  for (const b of bytes) { num = num * 256n + BigInt(b); }
   let result = '';
-  while (num > 0n) {
-    result = BASE58_ALPHABET[Number(num % 58n)] + result;
-    num = num / 58n;
-  }
-  // Each leading zero byte → leading '1'
-  for (const b of bytes) {
-    if (b === 0) result = '1' + result;
-    else break;
-  }
+  while (num > 0n) { result = BASE58_ALPHABET[Number(num % 58n)] + result; num = num / 58n; }
+  for (const b of bytes) { if (b === 0) result = '1' + result; else break; }
   return result;
+}
+
+function sqrtPriceX64ToFloat(str) {
+  const val = BigInt(str);
+  const Q64 = 2n ** 64n;
+  return Number(val / Q64) + Number(val % Q64) / Number(Q64);
+}
+
+function calcAmounts(liquidity, tickLower, tickUpper, tickCurrent, sqrtPriceCurrent) {
+  const liq = Number(liquidity);
+  const sqrtL = Math.sqrt(1.0001 ** tickLower);
+  const sqrtU = Math.sqrt(1.0001 ** tickUpper);
+  const sqrtC = sqrtPriceCurrent ?? Math.sqrt(1.0001 ** tickCurrent);
+  const inRange = tickCurrent >= tickLower && tickCurrent < tickUpper;
+  let a0 = 0, a1 = 0;
+  if (inRange)              { a0 = liq * (sqrtU - sqrtC) / (sqrtC * sqrtU); a1 = liq * (sqrtC - sqrtL); }
+  else if (tickCurrent < tickLower) { a0 = liq * (sqrtU - sqrtL) / (sqrtL * sqrtU); }
+  else                      { a1 = liq * (sqrtU - sqrtL); }
+  return { amount0: a0, amount1: a1, inRange };
+}
+
+function parsePositionAccount(data) {
+  // Layout: disc(8) + bump(1) + nft_mint(32) + pool_id(32) + tick_lower(4) + tick_upper(4) + liquidity(16) + ...
+  const buf = Buffer.from(data, 'base64');
+  const tickLower = buf.readInt32LE(73);
+  const tickUpper = buf.readInt32LE(77);
+  const liqLo = buf.readBigUInt64LE(81);
+  const liqHi = buf.readBigUInt64LE(89);
+  return { tickLower, tickUpper, liquidity: liqLo | (liqHi << 64n) };
+}
+
+function parsePoolAccount(data) {
+  // Layout: disc(8) + bump(1) + amm_config(32) + creator(32) + mint0(32) + mint1(32) + vault0(32) + vault1(32) + obs(32) + dec0(1) + dec1(1) + tickSpacing(2) + liq(16) + sqrtPrice(16) + tickCurrent(4)
+  const buf = Buffer.from(data, 'base64');
+  const mint0Bytes = buf.slice(73, 105);
+  const mint1Bytes = buf.slice(105, 137);
+  const dec0       = buf.readUInt8(233);
+  const dec1       = buf.readUInt8(234);
+  const sqrtLo     = buf.readBigUInt64LE(238);
+  const sqrtHi     = buf.readBigUInt64LE(246);
+  const tickCurrent = buf.readInt32LE(254);
+  return {
+    mint0: base58EncodeBytes(Array.from(mint0Bytes)),
+    mint1: base58EncodeBytes(Array.from(mint1Bytes)),
+    decimals0: dec0,
+    decimals1: dec1,
+    sqrtPriceX64: sqrtLo | (sqrtHi << 64n),
+    tickCurrent,
+  };
 }
 
 async function getRaydiumPositions() {
   console.log(`\n--- Raydium xStocks CLMM ${RAYDIUM_DRY_RUN ? '[DRY RUN]' : '[LIVE]'} ---`);
   const results = [];
 
-  try {
-    // Step 1: Query Raydium CLMM program directly for position accounts owned by this wallet
-    // PersonalPositionState layout (all LE):
-    //   0-7:   discriminator
-    //   8-39:  nft_mint (unique position ID)
-    //   40-71: pool_id
-    //   72-103: owner (wallet pubkey) ← filter here
-    console.log(`Scanning Raydium CLMM for positions owned by ${WALLET_SOL.slice(0,8)}...`);
+  const xstockPositions = Object.entries(ASSET)
+    .filter(([, v]) => typeof v === 'object' && v.nftMint)
+    .map(([key, v]) => ({ key, ...v }));
 
-    // NFT mints are hardcoded from Raydium UI — bypasses wallet scanning entirely.
-    // Position PDAs are derived from: seeds=[POSITION_SEED, nft_mint], program=RAYDIUM_CLMM_PROGRAM
-    // We fetch each position account directly using getAccountInfo on the derived PDA.
+  console.log(`Processing ${xstockPositions.length} hardcoded xStock positions`);
 
-    // Build list of positions from ASSET config
-    const xstockPositions = Object.entries(ASSET)
-      .filter(([, v]) => typeof v === 'object' && v.nftMint)
-      .map(([key, v]) => ({ key, ...v }));
+  for (const posConfig of xstockPositions) {
+    const { key, nftMint, poolId } = posConfig;
+    try {
+      // Find position account by nft_mint at offset 9 (disc=8, bump=1, then nft_mint)
+      const programAccounts = await solRpc('getProgramAccounts', [
+        RAYDIUM_CLMM_PROGRAM,
+        { encoding: 'base64', filters: [{ dataSize: 281 }, { memcmp: { offset: 9, bytes: nftMint } }] },
+      ]);
 
-    console.log(`Processing ${xstockPositions.length} hardcoded xStock positions`);
-
-    for (const posConfig of xstockPositions) {
-      const { key, nftMint, recordId, cycleId } = posConfig;
-      try {
-        // Find position account by memcmp on nft_mint at offset 9 in PersonalPositionState
-        // Layout: discriminator(8) + bump(1) + nft_mint(32 starting at byte 9)
-        // dataSize=281 confirmed from source: 8+1+32+32+4+4+16+16+16+8+8+72+64
-        const programAccounts = await solRpc('getProgramAccounts', [
-          RAYDIUM_CLMM_PROGRAM,
-          {
-            encoding: 'base64',
-            filters: [
-              { dataSize: 281 },
-              { memcmp: { offset: 9, bytes: nftMint } },
-            ],
-          },
-        ]);
-
-        if (!programAccounts || programAccounts.length === 0) {
-          // Try offset 8 as fallback (no bump byte in some versions)
-          console.log(`  ${key}: not found at offset 9, trying offset 8...`);
-          const fallback = await solRpc('getProgramAccounts', [
-            RAYDIUM_CLMM_PROGRAM,
-            {
-              encoding: 'base64',
-              filters: [
-                { dataSize: 281 },
-                { memcmp: { offset: 8, bytes: nftMint } },
-              ],
-            },
-          ]);
-          if (!fallback || fallback.length === 0) {
-            console.log(`  ${key}: no position account found at offset 8 or 9`);
-            continue;
-          }
-          programAccounts.push(...fallback);
-        }
-
-        const posData = programAccounts[0].account.data[0];
-        const pos = parsePositionAccount(posData);
-        // Override poolId with hardcoded value from ASSET config — bypasses runtime base58 encoding
-        pos.poolId = posConfig.poolId;
-        console.log(`  ${key}: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}, pool: ${pos.poolId.slice(0,8)}...`);
-
-        // Delay between positions to let Helius recover after getProgramAccounts
-        await new Promise(r => setTimeout(r, 2000));
-
-        // Fetch the pool account — retry up to 3 times with backoff if null
-        let poolAccountRes = null;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          poolAccountRes = await solRpc('getAccountInfo', [pos.poolId, { encoding: 'base64' }]);
-          if (poolAccountRes?.value?.data) break;
-          console.log(`  Pool ${pos.poolId}: attempt ${attempt} failed — error above`);
-          await new Promise(r => setTimeout(r, 3000));
-        }
-
-        if (!poolAccountRes?.value?.data) {
-          console.error(`  Pool ${pos.poolId.slice(0,8)}...: could not fetch account data after retries`);
-          continue;
-        }
-
-        const pool = parsePoolAccount(poolAccountRes.value.data[0]);
-
-        console.log(`  Pool: mint0=${pool.mint0.slice(0,8)}... mint1=${pool.mint1.slice(0,8)}... tick=${pool.tickCurrent} dec0=${pool.decimals0} dec1=${pool.decimals1}`);
-
-        // Get token prices from DeFi Llama
-        const priceKeys = `solana:${pool.mint0},solana:${pool.mint1}`;
-        const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/${priceKeys}`);
-        const price0    = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
-        const price1    = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
-
-        console.log(`  Prices: mint0=$${price0?.toFixed(4) ?? 'n/a'}, mint1=$${price1?.toFixed(4) ?? 'n/a'}`);
-
-        // Calculate position value
-        const sqrtPriceFloat = sqrtPriceX64ToFloat(pool.sqrtPriceX64.toString());
-        const { amount0, amount1, inRange } = calcAmounts(
-          pos.liquidity, pos.tickLower, pos.tickUpper, pool.tickCurrent, sqrtPriceFloat
-        );
-
-        const tokens0 = amount0 / Math.pow(10, pool.decimals0);
-        const tokens1 = amount1 / Math.pow(10, pool.decimals1);
-        const value0  = price0 != null ? tokens0 * price0 : null;
-        const value1  = price1 != null ? tokens1 * price1 : null;
-        const positionValue = (value0 ?? 0) + (value1 ?? 0);
-
-        console.log(`  Amounts: ${tokens0.toFixed(6)} token0 ($${value0?.toFixed(2) ?? '?'}) + ${tokens1.toFixed(6)} token1 ($${value1?.toFixed(2) ?? '?'})`);
-        console.log(`  Position value: $${positionValue.toFixed(2)}, in range: ${inRange}`);
-
-        // Calculate pending fees using correct CLMM formula:
-        // feeGrowthInside = feeGrowthGlobal - feeGrowthBelow(tickLower) - feeGrowthAbove(tickUpper)
-        // pendingFees = (feeGrowthInside - feeGrowthInsideLast) × liquidity / Q64 + tokenFeesOwed
-        //
-        // Fetch tick accounts for lower and upper bounds
-        // Tick account PDA: seeds = [TICK_ARRAY_SEED, pool_id, tick_start_index (as LE i32)]
-        // Raydium uses tick arrays (not individual ticks) — each array covers 60 ticks × tickSpacing
-        // The tick array start index = floor(tick / (tickSpacing * 60)) * (tickSpacing * 60)
-
-        // TickState::LEN = 4+16+16+16+16+(16*3)+16+16+8+8+4 = 168 (from Raydium source)
-        // TickArrayState layout: disc(8) + pool_id(32) + start_tick_index(4) + ticks[60*168] + 1 + 115 = 10240
-        const TICK_SIZE = 168;
-        const TICK_ARRAY_SIZE = 60;
-
-        function getTickArrayStart(tick, tickSpacing) {
-          const tps = tickSpacing * TICK_ARRAY_SIZE;
-          // Use floor division that handles negative ticks correctly
-          return Math.floor(tick / tps) * tps;
-        }
-
-        let pendingYield = 0;
-        try {
-          const lowerArrayStart = getTickArrayStart(pos.tickLower, pool.tickSpacing);
-          const upperArrayStart = getTickArrayStart(pos.tickUpper, pool.tickSpacing);
-
-          // Derive tick array PDAs directly — avoids getProgramAccounts throttling
-          const lowerPDA = deriveTickArrayPDA(pos.poolId, lowerArrayStart);
-          const upperPDA = deriveTickArrayPDA(pos.poolId, upperArrayStart);
-          const sameArray = lowerArrayStart === upperArrayStart;
-          console.log(`  Tick arrays: lower[${lowerArrayStart}]=${lowerPDA.slice(0,8)}... upper[${upperArrayStart}]=${sameArray ? 'same' : upperPDA.slice(0,8)+'...'}`);
-
-          // Fetch both in a single getMultipleAccounts call
-          const pdas = sameArray ? [lowerPDA] : [lowerPDA, upperPDA];
-          const multiRes = await solRpc('getMultipleAccounts', [
-            pdas,
-            { encoding: 'base64' },
-          ]);
-
-          // Debug: log what we got back
-          const val0 = multiRes?.value?.[0];
-          const val1 = multiRes?.value?.[1];
-          console.log(`  getMultipleAccounts: val[0]=${val0 === null ? 'null' : val0 === undefined ? 'undefined' : 'has data ('+val0?.data?.[0]?.slice(0,10)+'...)'}`);
-          if (!sameArray) console.log(`  getMultipleAccounts: val[1]=${val1 === null ? 'null' : val1 === undefined ? 'undefined' : 'has data'}`);
-
-          const lowerAccData = multiRes?.value?.[0]?.data?.[0] ?? null;
-          const upperAccData = sameArray ? lowerAccData : (multiRes?.value?.[1]?.data?.[0] ?? null);
-
-          const lowerArrayAcc = lowerAccData ? { account: { data: [lowerAccData] } } : null;
-          const upperArray = upperAccData ? { account: { data: [upperAccData] } } : lowerArrayAcc;
-
-          if (!lowerArrayAcc) {
-            console.log(`  Tick array not found — using tokenFeesOwed only`);
-            const pendingTokens0 = Number(pos.tokenFeesOwed0) / Math.pow(10, pool.decimals0);
-            const pendingTokens1 = Number(pos.tokenFeesOwed1) / Math.pow(10, pool.decimals1);
-            pendingYield = (price0 ?? 0) * pendingTokens0 + (price1 ?? 0) * pendingTokens1;
-          } else {
-            // Parse fee_growth_outside from tick array account
-            // TickState field offsets within each tick struct:
-            //   tick(4) + liq_net(16) + liq_gross(16) = 36 → fee_growth_outside_0
-            //   36 + 16 = 52 → fee_growth_outside_1
-            function parseFeeGrowthOutside(accountData, tickIndex, arrayStartIndex) {
-              const buf = Buffer.from(accountData, 'base64');
-              const HEADER = 44; // disc(8) + pool_id(32) + start_tick_index(4)
-              const tickOffset = (tickIndex - arrayStartIndex) / pool.tickSpacing;
-              if (tickOffset < 0 || tickOffset >= TICK_ARRAY_SIZE) return { fg0: 0n, fg1: 0n };
-              const tickStart = HEADER + tickOffset * TICK_SIZE;
-              const FG0_OFF = 36; // tick(4) + liq_net(16) + liq_gross(16)
-              const FG1_OFF = 52; // FG0_OFF + 16
-              const fg0Lo = buf.readBigUInt64LE(tickStart + FG0_OFF);
-              const fg0Hi = buf.readBigUInt64LE(tickStart + FG0_OFF + 8);
-              const fg1Lo = buf.readBigUInt64LE(tickStart + FG1_OFF);
-              const fg1Hi = buf.readBigUInt64LE(tickStart + FG1_OFF + 8);
-              return {
-                fg0: fg0Lo | (fg0Hi << 64n),
-                fg1: fg1Lo | (fg1Hi << 64n),
-              };
-            }
-
-            const lower = parseFeeGrowthOutside(lowerArrayAcc.account.data[0], pos.tickLower, lowerArrayStart);
-            const upper = parseFeeGrowthOutside(upperArray.account.data[0], pos.tickUpper, upperArrayStart);
-
-            const U128_MAX = 2n ** 128n;
-            const Q64 = 2n ** 64n;
-
-            // feeGrowthBelow(tickLower): if currentTick >= tickLower → fg_outside, else global - fg_outside
-            const fgBelow0 = pool.tickCurrent >= pos.tickLower ? lower.fg0 : (pool.feeGrowthGlobal0 - lower.fg0 + U128_MAX) % U128_MAX;
-            const fgBelow1 = pool.tickCurrent >= pos.tickLower ? lower.fg1 : (pool.feeGrowthGlobal1 - lower.fg1 + U128_MAX) % U128_MAX;
-
-            // feeGrowthAbove(tickUpper): if currentTick < tickUpper → fg_outside, else global - fg_outside
-            const fgAbove0 = pool.tickCurrent < pos.tickUpper ? upper.fg0 : (pool.feeGrowthGlobal0 - upper.fg0 + U128_MAX) % U128_MAX;
-            const fgAbove1 = pool.tickCurrent < pos.tickUpper ? upper.fg1 : (pool.feeGrowthGlobal1 - upper.fg1 + U128_MAX) % U128_MAX;
-
-            // feeGrowthInside = feeGrowthGlobal - feeGrowthBelow - feeGrowthAbove
-            const fgInside0 = (pool.feeGrowthGlobal0 - fgBelow0 - fgAbove0 + U128_MAX * 2n) % U128_MAX;
-            const fgInside1 = (pool.feeGrowthGlobal1 - fgBelow1 - fgAbove1 + U128_MAX * 2n) % U128_MAX;
-
-            // pendingFees = (fgInside - fgInsideLast) × liquidity / Q64 + tokenFeesOwed
-            const delta0 = (fgInside0 - pos.feeGrowthInside0Last + U128_MAX) % U128_MAX;
-            const delta1 = (fgInside1 - pos.feeGrowthInside1Last + U128_MAX) % U128_MAX;
-
-            const rawPending0 = Number(delta0 * pos.liquidity / Q64) + Number(pos.tokenFeesOwed0);
-            const rawPending1 = Number(delta1 * pos.liquidity / Q64) + Number(pos.tokenFeesOwed1);
-
-            const pendingTokens0 = rawPending0 / Math.pow(10, pool.decimals0);
-            const pendingTokens1 = rawPending1 / Math.pow(10, pool.decimals1);
-            const pendingUSD0 = price0 != null ? pendingTokens0 * price0 : 0;
-            const pendingUSD1 = price1 != null ? pendingTokens1 * price1 : 0;
-            pendingYield = pendingUSD0 + pendingUSD1;
-
-            console.log(`  Pending fees: ${pendingTokens0.toFixed(6)} token0 ($${pendingUSD0.toFixed(2)}) + ${pendingTokens1.toFixed(6)} USDC ($${pendingUSD1.toFixed(2)}) = $${pendingYield.toFixed(4)}`);
-          }
-        } catch(feeErr) {
-          console.error(`  Fee calc error: ${feeErr.message} — falling back to tokenFeesOwed`);
-          const pendingTokens0 = Number(pos.tokenFeesOwed0) / Math.pow(10, pool.decimals0);
-          const pendingTokens1 = Number(pos.tokenFeesOwed1) / Math.pow(10, pool.decimals1);
-          pendingYield = (price0 ?? 0) * pendingTokens0 + (price1 ?? 0) * pendingTokens1;
-        }
-
-        // Resolve asset key
-        const assetKey = resolveXStockAsset(pool.mint0, pool.mint1);
-        console.log(`  Resolved asset key: ${assetKey ?? 'UNKNOWN (add mint to XSTOCK_MINT_MAP)'}`);
-        console.log(`  mint0 (xStock): ${pool.mint0}`);
-        console.log(`  mint1 (USDC?):  ${pool.mint1}`);
-
-        results.push({
-          assetKey,
-          poolId: pos.poolId,
-          mint0: pool.mint0,
-          mint1: pool.mint1,
-          positionValue,
-          pendingYield,
-          inRange,
-          tickCurrent: pool.tickCurrent,
-          tickLower: pos.tickLower,
-          tickUpper: pos.tickUpper,
-        });
-
-      } catch (e) {
-        console.error(`  Error processing position: ${e.message}`);
+      const posAccount = programAccounts?.[0] ?? null;
+      if (!posAccount) {
+        console.log(`  ${key}: position account not found`);
+        continue;
       }
-    }
 
-  } catch (e) {
-    console.error(`Raydium fatal: ${e.message}`);
+      const pos = parsePositionAccount(posAccount.account.data[0]);
+      console.log(`  ${key}: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}`);
+
+      await new Promise(r => setTimeout(r, 2000));
+
+      // Fetch pool account
+      let poolRes = null;
+      for (let i = 1; i <= 3; i++) {
+        poolRes = await solRpc('getAccountInfo', [poolId, { encoding: 'base64' }]);
+        if (poolRes?.value?.data) break;
+        await new Promise(r => setTimeout(r, 3000));
+      }
+
+      if (!poolRes?.value?.data) { console.error(`  ${key}: pool not found`); continue; }
+
+      const pool = parsePoolAccount(poolRes.value.data[0]);
+
+      // Get prices
+      const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/solana:${pool.mint0},solana:${pool.mint1}`);
+      const price0    = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
+      const price1    = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
+
+      const sqrtP = sqrtPriceX64ToFloat(pool.sqrtPriceX64.toString());
+      const { amount0, amount1, inRange } = calcAmounts(pos.liquidity, pos.tickLower, pos.tickUpper, pool.tickCurrent, sqrtP);
+
+      const tokens0 = amount0 / Math.pow(10, pool.decimals0);
+      const tokens1 = amount1 / Math.pow(10, pool.decimals1);
+      const positionValue = (price0 ?? 0) * tokens0 + (price1 ?? 0) * tokens1;
+
+      console.log(`  ${key}: $${positionValue.toFixed(2)}, in range: ${inRange}`);
+      results.push({ key, positionValue, inRange });
+
+    } catch (e) { console.error(`  ${key}: ${e.message}`); }
   }
 
   return results;
-}
-
-// Resolve which xStock asset a position belongs to
-// On first discovery run this will log unknown — we update the map after seeing the mints
-// Known USDC mint on Solana: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
-const USDC_MINT_SOL  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-
-// xStock mint → ASSET key mapping (confirmed from dry run output)
-const XSTOCK_MINT_MAP = {
-  'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB': 'tslax',
-  'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh': 'nvdax',
-  'XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp': 'aaplx',
-  'XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN': 'googlx',
-  'XsueG8BtpquVJX9LVLLEGuViXUungE6WmK5YZ3p3bd1': 'crclx',
-  'XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W': 'spyx',
-};
-
-function resolveXStockAsset(mint0, mint1) {
-  const xStockMint = mint0 === USDC_MINT_SOL ? mint1 : mint0;
-  return XSTOCK_MINT_MAP[xStockMint] ?? null;
-}
-
-// base58 → Uint8Array — needed for memcmp filters and PDA derivation
-function base58ToBytes(str) {
-  let num = 0n;
-  for (const char of str) {
-    const idx = BASE58_ALPHABET.indexOf(char);
-    if (idx < 0) throw new Error(`Invalid base58 char: ${char}`);
-    num = num * 58n + BigInt(idx);
-  }
-  const bytes = [];
-  while (num > 0n) {
-    bytes.unshift(Number(num & 0xffn));
-    num >>= 8n;
-  }
-  while (bytes.length < 32) bytes.unshift(0);
-  return new Uint8Array(bytes);
-}
-
-// SHA256 for PDA derivation (Node.js built-in)
-import { createHash } from 'crypto';
-function sha256(data) { return createHash('sha256').update(data).digest(); }
-
-// Ed25519 curve parameters for PDA off-curve check
-const _p = (2n ** 255n) - 19n;
-const _d = (() => {
-  // d = -121665/121666 mod p
-  function _inv(a, m) {
-    let [or, r, os, s] = [a, m, 1n, 0n];
-    while (r !== 0n) { const q = or / r; [or, r] = [r, or - q * r]; [os, s] = [s, os - q * s]; }
-    return ((os % m) + m) % m;
-  }
-  return (-121665n * _inv(121666n, _p) + _p) % _p;
-})();
-
-function _modPow(b, e, m) {
-  let r = 1n; b = b % m;
-  while (e > 0n) { if (e & 1n) r = r * b % m; e >>= 1n; b = b * b % m; }
-  return r;
-}
-
-// Returns true if the 32-byte array is a valid ed25519 curve point
-function _isOnEd25519Curve(bytes) {
-  try {
-    const arr = Array.from(bytes);
-    const signBit = (arr[31] & 0x80) !== 0;
-    arr[31] &= 0x7f;
-    let y = 0n;
-    for (let i = 31; i >= 0; i--) y = y * 256n + BigInt(arr[i]);
-    if (y >= _p) return false;
-    const y2 = y * y % _p;
-    const u = (y2 - 1n + _p) % _p;
-    const v = (_d * y2 + 1n) % _p;
-    if (v === 0n) return u === 0n;
-    function _inv2(a) {
-      let [or, r, os, s] = [a, _p, 1n, 0n];
-      while (r !== 0n) { const q = or / r; [or, r] = [r, or - q * r]; [os, s] = [s, os - q * s]; }
-      return ((os % _p) + _p) % _p;
-    }
-    const x2 = u * _inv2(v) % _p;
-    if (x2 === 0n) return !signBit;
-    let x = _modPow(x2, (_p + 3n) / 8n, _p);
-    if (x * x % _p !== x2) {
-      const sqrtM1 = _modPow(2n, (_p - 1n) / 4n, _p);
-      x = x * sqrtM1 % _p;
-      if (x * x % _p !== x2) return false;
-    }
-    if ((x & 1n) !== (signBit ? 1n : 0n)) x = _p - x;
-    return true;
-  } catch { return false; }
-}
-
-// Derive a Program Derived Address with proper ed25519 off-curve check
-// seeds: array of Buffer/Uint8Array. Returns base58-encoded PDA string.
-function findPDA(seeds, programId) {
-  const programIdBytes = base58ToBytes(programId);
-  for (let nonce = 255; nonce >= 0; nonce--) {
-    const parts = [Buffer.from('ProgramDerivedAddress')];
-    for (const seed of seeds) parts.push(Buffer.from(seed));
-    parts.push(Buffer.from(programIdBytes));
-    parts.push(Buffer.from([nonce]));
-    const hash = sha256(sha256(Buffer.concat(parts)));
-    if (!_isOnEd25519Curve(hash)) return base58EncodeBytes(hash);
-  }
-  throw new Error('Could not find valid PDA');
-}
-
-// Derive Raydium CLMM tick array PDA
-// Seeds: [b"tick_array", pool_id_bytes, start_tick_index_be_bytes]
-function deriveTickArrayPDA(poolId, startTickIndex) {
-  const startBuf = Buffer.alloc(4);
-  startBuf.writeInt32BE(startTickIndex);
-  return findPDA(
-    [Buffer.from('tick_array'), Buffer.from(base58ToBytes(poolId)), startBuf],
-    RAYDIUM_CLMM_PROGRAM
-  );
 }
 
 // ============================================================
@@ -1168,9 +593,7 @@ function deriveTickArrayPDA(poolId, startTickIndex) {
 
 async function main() {
   console.log(`\n====== Daily Portfolio Check v27 — ${NOW_UTC} ======`);
-  if (RAYDIUM_DRY_RUN) {
-    console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium data will be logged but NOT written to Airtable');
-  }
+  if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   const [wethRes, moonwellRes, suilendRes, raydiumRes] = await Promise.allSettled([
     getWethPosition(),
@@ -1193,7 +616,7 @@ async function main() {
       [F.positionValue]: weth.positionValue,
       [F.revertPosVal]:  weth.positionValue,
       ...(weth.feeValue > 0 ? { [F.feeValue]: weth.feeValue } : {}),
-      [F.notes]:         `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
+      [F.notes]: `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
     })]);
     if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}`); }
   }
@@ -1207,12 +630,12 @@ async function main() {
         const fields = { [LF.supplyUSD]: data.supplyUSD, [LF.tokenAmt]: data.tokens };
         if (data.supplyAPY != null) fields[LF.supplyAPY] = data.supplyAPY;
         batch.push(lendingRecord(LPOS[posKey], fields));
-        console.log(`  Queued ${posKey}: $${data.supplyUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, APY ${data.supplyAPY?.toFixed(2) ?? 'n/a'}%`);
+        console.log(`  Queued ${posKey}: $${data.supplyUSD.toFixed(2)}, APY ${data.supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       } else if (data.type === 'borrow') {
         const fields = { [LF.borrowUSD]: data.borrowUSD, [LF.tokenAmt]: data.tokens };
         if (data.borrowAPY != null) fields[LF.borrowAPY] = data.borrowAPY;
         batch.push(lendingRecord(LPOS[posKey], fields));
-        console.log(`  Queued ${posKey}: $${data.borrowUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, Borrow APY ${data.borrowAPY?.toFixed(2) ?? 'n/a'}%`);
+        console.log(`  Queued ${posKey}: $${data.borrowUSD.toFixed(2)}, Borrow APY ${data.borrowAPY?.toFixed(2) ?? 'n/a'}%`);
       }
     }
     if (batch.length > 0) {
@@ -1230,13 +653,13 @@ async function main() {
         const fields = { [LF.supplyUSD]: data.supplyUSD, [LF.tokenAmt]: data.tokens };
         if (data.supplyAPY != null) fields[LF.supplyAPY] = data.supplyAPY;
         batch.push(lendingRecord(LPOS[posKey], fields));
-        console.log(`  Queued ${posKey}: $${data.supplyUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, APY ${data.supplyAPY?.toFixed(2) ?? 'n/a'}%`);
+        console.log(`  Queued ${posKey}: $${data.supplyUSD.toFixed(2)}, APY ${data.supplyAPY?.toFixed(2) ?? 'n/a'}%`);
       } else if (data.type === 'borrow') {
         const fields = { [LF.borrowUSD]: data.borrowUSD, [LF.tokenAmt]: data.tokens };
         if (data.borrowAPY != null) fields[LF.borrowAPY] = data.borrowAPY;
         if (data.notes)             fields[LF.notes]     = data.notes;
         batch.push(lendingRecord(LPOS[posKey], fields));
-        console.log(`  Queued ${posKey}: $${data.borrowUSD.toFixed(2)}, ${data.tokens?.toFixed(4)} tokens, Borrow APY ${data.borrowAPY?.toFixed(2) ?? 'n/a'}%`);
+        console.log(`  Queued ${posKey}: $${data.borrowUSD.toFixed(2)}, Borrow APY ${data.borrowAPY?.toFixed(2) ?? 'n/a'}%`);
       }
     }
     if (batch.length > 0) {
@@ -1247,38 +670,24 @@ async function main() {
 
   // Raydium xStocks
   if (raydium.length > 0) {
-    console.log(`\nRaydium — ${raydium.length} position(s) found`);
-
+    console.log(`\nRaydium — ${raydium.length} position(s)`);
     if (RAYDIUM_DRY_RUN) {
-      console.log('DRY RUN — printing results, skipping Airtable write:');
-      for (const pos of raydium) {
-        console.log(`  ${pos.assetKey ?? 'UNKNOWN'} | mint0: ${pos.mint0} | value: $${pos.positionValue.toFixed(2)} | yield: $${pos.pendingYield.toFixed(4)} | inRange: ${pos.inRange}`);
-      }
-      console.log('\n⚠️  ACTION REQUIRED after this run:');
-      console.log('  1. Check the mint0 addresses above and map them in XSTOCK_MINT_MAP');
-      console.log('  2. Confirm position values match Raydium UI');
-      console.log('  3. Confirm pending yield matches Raydium UI');
-      console.log('  4. Set RAYDIUM_DRY_RUN=false in GitHub repo variables to go live');
+      for (const pos of raydium) console.log(`  ${pos.key}: $${pos.positionValue.toFixed(2)}, inRange: ${pos.inRange}`);
+      console.log('DRY RUN — set RAYDIUM_DRY_RUN=false in GitHub Variables to go live');
     } else {
-      // Live write — only write positions that have a resolved asset key
       const batch = [];
       for (const pos of raydium) {
-        if (!pos.assetKey || !ASSET[pos.assetKey]) {
-          console.warn(`  Skipping unresolved position (mint0: ${pos.mint0})`);
-          continue;
-        }
-        const { recordId, cycleId } = ASSET[pos.assetKey];
-        batch.push(dailyRecord(recordId, pos.inRange, {
+        const meta = ASSET[pos.key];
+        if (!meta) continue;
+        batch.push(dailyRecord(meta.recordId, pos.inRange, {
           [F.positionValue]: pos.positionValue,
           [F.revertPosVal]:  pos.positionValue,
-          [F.feeValue]:      pos.pendingYield,
-          [F.cycleId]:       cycleId,
-          [F.notes]:         `Tick: ${pos.tickCurrent} | Range: [${pos.tickLower}, ${pos.tickUpper}]`,
+          [F.cycleId]:       meta.cycleId,
+          [F.notes]:         `Raydium CLMM | ${pos.key.toUpperCase()} | Position value only — pending yield Phase 2`,
         }));
-        console.log(`  Queued ${pos.assetKey}: $${pos.positionValue.toFixed(2)}, yield: $${pos.pendingYield.toFixed(4)}, inRange: ${pos.inRange}`);
+        console.log(`  Queued ${pos.key}: $${pos.positionValue.toFixed(2)}, inRange: ${pos.inRange}`);
       }
       if (batch.length > 0) {
-        // Batch in chunks of 10 (Airtable limit)
         for (let i = 0; i < batch.length; i += 10) {
           const ok = await airtableCreate(DAILY_TABLE, batch.slice(i, i + 10));
           if (ok) written += Math.min(10, batch.length - i);
@@ -1286,8 +695,6 @@ async function main() {
         console.log(`✓ Raydium: ${batch.length} records written`);
       }
     }
-  } else {
-    console.log('Raydium: no positions returned');
   }
 
   console.log(`\n====== Complete — ${written} records written ======`);
