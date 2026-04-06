@@ -897,16 +897,135 @@ async function getRaydiumPositions() {
         console.log(`  Amounts: ${tokens0.toFixed(6)} token0 ($${value0?.toFixed(2) ?? '?'}) + ${tokens1.toFixed(6)} token1 ($${value1?.toFixed(2) ?? '?'})`);
         console.log(`  Position value: $${positionValue.toFixed(2)}, in range: ${inRange}`);
 
-        // Calculate pending fees
-        const pendingRaw0 = calcPendingFees(pool.feeGrowthGlobal0, pos.feeGrowthInside0Last, pos.tokenFeesOwed0, pos.liquidity);
-        const pendingRaw1 = calcPendingFees(pool.feeGrowthGlobal1, pos.feeGrowthInside1Last, pos.tokenFeesOwed1, pos.liquidity);
-        const pendingTokens0 = pendingRaw0 / Math.pow(10, pool.decimals0);
-        const pendingTokens1 = pendingRaw1 / Math.pow(10, pool.decimals1);
-        const pendingUSD0    = price0 != null ? pendingTokens0 * price0 : 0;
-        const pendingUSD1    = price1 != null ? pendingTokens1 * price1 : 0;
-        const pendingYield   = pendingUSD0 + pendingUSD1;
+        // Calculate pending fees using correct CLMM formula:
+        // feeGrowthInside = feeGrowthGlobal - feeGrowthBelow(tickLower) - feeGrowthAbove(tickUpper)
+        // pendingFees = (feeGrowthInside - feeGrowthInsideLast) × liquidity / Q64 + tokenFeesOwed
+        //
+        // Fetch tick accounts for lower and upper bounds
+        // Tick account PDA: seeds = [TICK_ARRAY_SEED, pool_id, tick_start_index (as LE i32)]
+        // Raydium uses tick arrays (not individual ticks) — each array covers 60 ticks × tickSpacing
+        // The tick array start index = floor(tick / (tickSpacing * 60)) * (tickSpacing * 60)
 
-        console.log(`  Pending fees: ${pendingTokens0.toFixed(6)} token0 + ${pendingTokens1.toFixed(6)} USDC = $${pendingYield.toFixed(4)}`);
+        const TICK_ARRAY_SIZE = 60;
+        const ticksPerArray = pool.tickSpacing * TICK_ARRAY_SIZE;
+
+        function getTickArrayStart(tick, tickSpacing) {
+          const tps = tickSpacing * TICK_ARRAY_SIZE;
+          return Math.floor(tick / tps) * tps;
+        }
+
+        function encodeTickArrayStartIndex(startIndex) {
+          // i32 little-endian as 4 bytes
+          const buf = Buffer.alloc(4);
+          buf.writeInt32LE(startIndex);
+          return buf;
+        }
+
+        // Derive tick array PDA: seeds = ["tick_array", pool_id_bytes, start_index_bytes]
+        // We need to fetch tick arrays and then find the specific tick offset within them
+        const lowerArrayStart = getTickArrayStart(pos.tickLower, pool.tickSpacing);
+        const upperArrayStart = getTickArrayStart(pos.tickUpper, pool.tickSpacing);
+
+        // Fetch both tick arrays in parallel using getProgramAccounts with memcmp
+        // TickArray layout: discriminator(8) + pool_id(32) + start_tick_index(i32) + ticks[60]
+        // Each tick: fee_growth_outside_0(u128=16) + fee_growth_outside_1(u128=16) + ... = 88 bytes total per tick
+        const TICK_SIZE = 88; // full tick struct size in Raydium CLMM
+        const TICK_ARRAY_ACCOUNT_SIZE = 8 + 32 + 4 + (TICK_SIZE * TICK_ARRAY_SIZE) + 115; // ~7627 bytes
+
+        async function fetchTickArray(startIndex) {
+          // Use getProgramAccounts with memcmp: pool_id at offset 8, start_index at offset 40
+          const startIndexBuf = encodeTickArrayStartIndex(startIndex);
+          const startIndexBase58 = base58EncodeBytes(startIndexBuf);
+          // Actually Raydium stores the pool_id at offset 8 and start_tick_index as i32 at offset 40
+          // We filter by pool_id (32 bytes at offset 8) and start_tick_index (4 bytes at offset 40)
+          const poolIdBuf = base58ToBytes(pos.poolId);
+
+          const accounts = await solRpc('getProgramAccounts', [
+            RAYDIUM_CLMM_PROGRAM,
+            {
+              encoding: 'base64',
+              filters: [
+                { memcmp: { offset: 8,  bytes: pos.poolId } },
+                { memcmp: { offset: 40, bytes: base58EncodeBytes(startIndexBuf) } },
+              ],
+            },
+          ]);
+          return accounts?.[0] ?? null;
+        }
+
+        let pendingYield = 0;
+        try {
+          const [lowerArrayAcc, upperArrayAcc] = await Promise.all([
+            fetchTickArray(lowerArrayStart),
+            lowerArrayStart === upperArrayStart ? Promise.resolve(null) : fetchTickArray(upperArrayStart),
+          ]);
+
+          const upperArray = upperArrayAcc ?? lowerArrayAcc; // same array if ticks are close
+
+          if (!lowerArrayAcc) {
+            console.log(`  Tick array not found — using tokenFeesOwed only`);
+            const pendingTokens0 = Number(pos.tokenFeesOwed0) / Math.pow(10, pool.decimals0);
+            const pendingTokens1 = Number(pos.tokenFeesOwed1) / Math.pow(10, pool.decimals1);
+            pendingYield = (price0 ?? 0) * pendingTokens0 + (price1 ?? 0) * pendingTokens1;
+          } else {
+            // Parse fee_growth_outside from tick accounts
+            function parseFeeGrowthOutside(accountData, tickIndex, arrayStartIndex) {
+              const buf = Buffer.from(accountData, 'base64');
+              // TickArray layout: disc(8) + pool_id(32) + start_tick_index(4) = 44 bytes header
+              const HEADER = 44;
+              const tickOffset = (tickIndex - arrayStartIndex) / pool.tickSpacing;
+              if (tickOffset < 0 || tickOffset >= TICK_ARRAY_SIZE) return { fg0: 0n, fg1: 0n };
+              const tickStart = HEADER + tickOffset * TICK_SIZE;
+              // Tick struct: fee_growth_outside_0_x64(u128) + fee_growth_outside_1_x64(u128) + ...
+              const fg0Lo = buf.readBigUInt64LE(tickStart);
+              const fg0Hi = buf.readBigUInt64LE(tickStart + 8);
+              const fg1Lo = buf.readBigUInt64LE(tickStart + 16);
+              const fg1Hi = buf.readBigUInt64LE(tickStart + 24);
+              return {
+                fg0: fg0Lo | (fg0Hi << 64n),
+                fg1: fg1Lo | (fg1Hi << 64n),
+              };
+            }
+
+            const lower = parseFeeGrowthOutside(lowerArrayAcc.account.data[0], pos.tickLower, lowerArrayStart);
+            const upper = parseFeeGrowthOutside(upperArray.account.data[0], pos.tickUpper, upperArrayStart);
+
+            const U128_MAX = 2n ** 128n;
+            const Q64 = 2n ** 64n;
+
+            // feeGrowthBelow(tickLower): if currentTick >= tickLower → fg_outside, else global - fg_outside
+            const fgBelow0 = pool.tickCurrent >= pos.tickLower ? lower.fg0 : (pool.feeGrowthGlobal0 - lower.fg0 + U128_MAX) % U128_MAX;
+            const fgBelow1 = pool.tickCurrent >= pos.tickLower ? lower.fg1 : (pool.feeGrowthGlobal1 - lower.fg1 + U128_MAX) % U128_MAX;
+
+            // feeGrowthAbove(tickUpper): if currentTick < tickUpper → fg_outside, else global - fg_outside
+            const fgAbove0 = pool.tickCurrent < pos.tickUpper ? upper.fg0 : (pool.feeGrowthGlobal0 - upper.fg0 + U128_MAX) % U128_MAX;
+            const fgAbove1 = pool.tickCurrent < pos.tickUpper ? upper.fg1 : (pool.feeGrowthGlobal1 - upper.fg1 + U128_MAX) % U128_MAX;
+
+            // feeGrowthInside = feeGrowthGlobal - feeGrowthBelow - feeGrowthAbove
+            const fgInside0 = (pool.feeGrowthGlobal0 - fgBelow0 - fgAbove0 + U128_MAX * 2n) % U128_MAX;
+            const fgInside1 = (pool.feeGrowthGlobal1 - fgBelow1 - fgAbove1 + U128_MAX * 2n) % U128_MAX;
+
+            // pendingFees = (fgInside - fgInsideLast) × liquidity / Q64 + tokenFeesOwed
+            const delta0 = (fgInside0 - pos.feeGrowthInside0Last + U128_MAX) % U128_MAX;
+            const delta1 = (fgInside1 - pos.feeGrowthInside1Last + U128_MAX) % U128_MAX;
+
+            const rawPending0 = Number(delta0 * pos.liquidity / Q64) + Number(pos.tokenFeesOwed0);
+            const rawPending1 = Number(delta1 * pos.liquidity / Q64) + Number(pos.tokenFeesOwed1);
+
+            const pendingTokens0 = rawPending0 / Math.pow(10, pool.decimals0);
+            const pendingTokens1 = rawPending1 / Math.pow(10, pool.decimals1);
+            const pendingUSD0 = price0 != null ? pendingTokens0 * price0 : 0;
+            const pendingUSD1 = price1 != null ? pendingTokens1 * price1 : 0;
+            pendingYield = pendingUSD0 + pendingUSD1;
+
+            console.log(`  Pending fees: ${pendingTokens0.toFixed(6)} token0 ($${pendingUSD0.toFixed(2)}) + ${pendingTokens1.toFixed(6)} USDC ($${pendingUSD1.toFixed(2)}) = $${pendingYield.toFixed(4)}`);
+          }
+        } catch(feeErr) {
+          console.error(`  Fee calc error: ${feeErr.message} — falling back to tokenFeesOwed`);
+          const pendingTokens0 = Number(pos.tokenFeesOwed0) / Math.pow(10, pool.decimals0);
+          const pendingTokens1 = Number(pos.tokenFeesOwed1) / Math.pow(10, pool.decimals1);
+          pendingYield = (price0 ?? 0) * pendingTokens0 + (price1 ?? 0) * pendingTokens1;
+        }
 
         // Resolve asset key
         const assetKey = resolveXStockAsset(pool.mint0, pool.mint1);
@@ -944,16 +1063,17 @@ async function getRaydiumPositions() {
 // Known USDC mint on Solana: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
 const USDC_MINT_SOL  = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
-// ⚠️ POPULATE after first discovery run — map xStock mint → ASSET key
-// These will be logged in the Actions output on first run
+// xStock mint → ASSET key mapping (confirmed from dry run output)
 const XSTOCK_MINT_MAP = {
-  // 'MINT_ADDRESS': 'tslax',
-  // 'MINT_ADDRESS': 'nvdax',
-  // etc.
+  'XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB': 'tslax',
+  'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh': 'nvdax',
+  'XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp': 'aaplx',
+  'XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN': 'googlx',
+  'XsueG8BtpquVJX9LVLLEGuViXUungE6WmK5YZ3p3bd1': 'crclx',
+  'XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W': 'spyx',
 };
 
 function resolveXStockAsset(mint0, mint1) {
-  // mint1 should be USDC, mint0 should be the xStock
   const xStockMint = mint0 === USDC_MINT_SOL ? mint1 : mint0;
   return XSTOCK_MINT_MAP[xStockMint] ?? null;
 }
