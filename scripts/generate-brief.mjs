@@ -333,6 +333,8 @@ BRIEF FORMAT (follow exactly, in order)
 3. Strategy P&L
    "[Strategy] is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount] — net price delta is [positive/negative] [amount]. Total fees this cycle are [amount], averaging about [amount] a day. Net strategy return including all fees is [amount] on [total deployed] deployed — about [percent] in [X] days, annualizing around [percent]."
 
+   Always refer to the strategy as "The current delta neutral strategy cycle" — never "PSF", "P S F", "WETH-USDC strategy", or any other name.
+
 4. One Thing to Watch
    The single most notable item requiring attention today. Two sentences max.
    Examples: unclaimed fees building up on an xStock LP, a lending rate that spiked, the position approaching Near Drift.
@@ -357,7 +359,21 @@ Tickers must be phonetic:
 Never use raw ticker symbols. Never explain the band structure or hedge mechanics.
 Target length: 60–75 seconds at 1.2× speed (~130–160 words).
 
-Return ONLY the brief text. No preamble, no explanation, no JSON.`;
+Return ONLY the brief text. No preamble, no explanation, no JSON.
+
+═══════════════════════════════════════
+EXAMPLE OUTPUT — MATCH THIS STYLE EXACTLY
+═══════════════════════════════════════
+
+Good morning. It's Friday, April 4th.
+
+Eth is at two thousand and fifty-eight dollars, sitting in Normal Zone. You have about one hundred and twenty dollars of breathing room before Near Drift. No action needed.
+
+The current delta neutral strategy cycle is thirteen days in. The LP is down one hundred and forty-six dollars on price since open, the hedge is up one hundred and seventy-eight dollars — net price delta is positive thirty-two dollars. Total fees this cycle are six hundred and fifteen dollars, averaging about fifty-one dollars a day. Net strategy return including all fees is six hundred and forty-seven dollars on thirty thousand six hundred and eighty-seven dollars deployed — about two percent in thirteen days, annualizing around sixty-four percent.
+
+One thing to watch: the C-R-C-L-x position has three hundred and twenty-two dollars in unclaimed fees on a fifteen hundred dollar position. Worth deciding today whether to claim or let it ride into the weekend.
+
+Market sentiment is Extreme Fear at nine. Bitcoin is at sixty-six thousand eight hundred dollars, holding well above the two hundred week moving average. Macro is risk-off but the structure is intact. Have a good one.`;
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
