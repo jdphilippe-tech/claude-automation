@@ -511,15 +511,23 @@ function parsePoolAccount(data) {
   const mint1Bytes = buf.slice(105, 137);
   const dec0       = buf.readUInt8(233);
   const dec1       = buf.readUInt8(234);
-  const sqrtLo     = buf.readBigUInt64LE(253);
-  const sqrtHi     = buf.readBigUInt64LE(261);
-  const tickCurrent = buf.readInt32LE(254);
+  const sqrtLo      = buf.readBigUInt64LE(253);
+  const sqrtHi      = buf.readBigUInt64LE(261);
+  const sqrtPriceX64 = sqrtLo | (sqrtHi << 64n);
+
+  // Derive tickCurrent from sqrtPriceX64 mathematically — avoids byte offset issues
+  // tick = log(sqrtPrice^2) / log(1.0001) where sqrtPrice = sqrtPriceX64 / 2^64
+  const Q64f = Number(2n ** 64n);
+  const sqrtPriceFloat = Number(sqrtPriceX64 / 2n**64n) + Number(sqrtPriceX64 % 2n**64n) / Q64f;
+  const rawPrice = sqrtPriceFloat * sqrtPriceFloat;
+  const tickCurrent = Math.round(Math.log(rawPrice) / Math.log(1.0001));
+
   return {
     mint0: base58EncodeBytes(Array.from(mint0Bytes)),
     mint1: base58EncodeBytes(Array.from(mint1Bytes)),
     decimals0: dec0,
     decimals1: dec1,
-    sqrtPriceX64: sqrtLo | (sqrtHi << 64n),
+    sqrtPriceX64,
     tickCurrent,
   };
 }
