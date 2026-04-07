@@ -17,42 +17,59 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: npm install
-      - name: Test Lighter API (read-only token)
+      - name: Test Lighter API (shares + staking)
         env:
           LIGHTER_READ_TOKEN: ${{ secrets.LIGHTER_READ_TOKEN }}
         run: |
           node -e "
           const fetch = (...a) => import('node-fetch').then(({default:f}) => f(...a));
-          const BASE       = 'https://mainnet.zklighter.elliot.ai';
-          const TOKEN      = process.env.LIGHTER_READ_TOKEN;
-          const ACCOUNT    = 449217;
-          const LLP_ID     = 281474976710654;
-          const EDGE_ID    = 281474976688087;
+          const BASE    = 'https://mainnet.zklighter.elliot.ai';
+          const TOKEN   = process.env.LIGHTER_READ_TOKEN;
+          const ACCT    = 449217;
+          const LLP_ID  = 281474976710654;
+          const EDGE_ID = 281474976688087;
+          const headers = { 'Authorization': TOKEN };
 
           (async () => {
-            const headers = { 'Authorization': TOKEN };
+            // 1. LLP with account_index — should return your shares
+            console.log('--- LLP with account_index ---');
+            const r1 = await (await fetch(
+              BASE+'/api/v1/publicPoolsMetadata?index='+(LLP_ID+1)+'&limit=1&account_index='+ACCT,
+              { headers }
+            )).json();
+            console.log(JSON.stringify(r1, null, 2));
 
-            // 1. Full account data with shares
-            console.log('--- Account ---');
-            const r1 = await (await fetch(BASE+'/api/v1/account?account_index='+ACCOUNT, { headers })).json();
-            console.log(JSON.stringify(r1, null, 2).slice(0, 3000));
-
-            // 2. LLP with auth — should return your share count
-            console.log('\n--- LLP (authenticated) ---');
-            const r2 = await (await fetch(BASE+'/api/v1/publicPoolsMetadata?index='+(LLP_ID+1)+'&limit=1', { headers })).json();
+            // 2. Edge & Hedge with account_index
+            console.log('\n--- Edge & Hedge with account_index ---');
+            const r2 = await (await fetch(
+              BASE+'/api/v1/publicPoolsMetadata?index='+(EDGE_ID+1)+'&limit=1&account_index='+ACCT,
+              { headers }
+            )).json();
             console.log(JSON.stringify(r2, null, 2));
 
-            // 3. Edge & Hedge with auth
-            console.log('\n--- Edge & Hedge (authenticated) ---');
-            const r3 = await (await fetch(BASE+'/api/v1/publicPoolsMetadata?index='+(EDGE_ID+1)+'&limit=1', { headers })).json();
+            // 3. Staking pools with filter=stake
+            console.log('\n--- Staking pools (filter=stake) ---');
+            const r3 = await (await fetch(
+              BASE+'/api/v1/publicPoolsMetadata?index=0&limit=20&filter=stake',
+              { headers }
+            )).json();
             console.log(JSON.stringify(r3, null, 2));
 
-            // 4. LIT staking — search for it by scanning pool IDs
-            // LIT staking is native token staking, not a public pool
-            // Try the staking endpoint directly
-            console.log('\n--- Staking info ---');
-            const r4 = await (await fetch(BASE+'/api/v1/accountMetadata?account_index='+ACCOUNT, { headers })).json();
-            console.log(JSON.stringify(r4, null, 2).slice(0, 2000));
+            // 4. User pools with filter=user and account_index
+            console.log('\n--- User pools (filter=user, account_index) ---');
+            const r4 = await (await fetch(
+              BASE+'/api/v1/publicPoolsMetadata?index=0&limit=20&filter=user&account_index='+ACCT,
+              { headers }
+            )).json();
+            console.log(JSON.stringify(r4, null, 2));
+
+            // 5. Filter=account_index — shows all pools this account has shares in
+            console.log('\n--- filter=account_index ---');
+            const r5 = await (await fetch(
+              BASE+'/api/v1/publicPoolsMetadata?index=0&limit=20&filter=account_index&account_index='+ACCT,
+              { headers }
+            )).json();
+            console.log(JSON.stringify(r5, null, 2));
           })().catch(e => console.error('Error:', e.message));
           "
       - name: Run daily portfolio check
