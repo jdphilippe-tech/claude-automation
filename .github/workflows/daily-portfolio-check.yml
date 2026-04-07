@@ -1,10 +1,10 @@
 name: Daily Portfolio Check
 on:
-  schedule:
-    - cron: '0 14 * * *'   # 14:00 UTC = 7:00 AM PDT  (summer)
-                            # Change to '0 15 * * *' in November (PST)
-                            # Change back to '0 14 * * *' in March (PDT)
-  workflow_dispatch:        # Allows manual trigger from GitHub Actions UI
+  # Cron is handled externally by cron-job.org which calls the workflow_dispatch
+  # endpoint at 14:00 UTC (7:00 AM PDT) daily — far more reliable than GitHub's
+  # built-in cron which can be delayed 1-3 hours during peak periods.
+  # To trigger manually: Actions tab → Daily Portfolio Check → Run workflow
+  workflow_dispatch:
 jobs:
   daily-check:
     runs-on: ubuntu-latest
@@ -28,7 +28,10 @@ jobs:
   morning-brief:
     runs-on: ubuntu-latest
     needs: daily-check
-    if: github.event_name == 'schedule'
+    # Runs when MORNING_BRIEF_ENABLED variable is 'true' — set in GitHub repo Variables.
+    # Allows manual workflow_dispatch triggers without firing the brief.
+    # cron-job.org triggers workflow_dispatch daily at 7 AM PDT with brief enabled.
+    if: vars.MORNING_BRIEF_ENABLED == 'true'
     permissions:
       contents: write
     steps:
