@@ -1,0 +1,71 @@
+I have all the data I need. Let me now compute everything carefully.
+
+---
+
+**AIRTABLE COMPUTATIONS — C8 Data:**
+
+**Cycle open:**
+- WETH-PRIMARY-C8 Reopen Position: Date = 2026-03-22T16:19:01, Value = $25,148.85
+- HEDGE-C8 Reopen Position: Date = 2026-03-22T16:29:29, Value = $5,538.28
+- Total deployed = $25,148.85 + $5,538.28 = **$30,687.13**
+
+**Elapsed time:**
+- Open: 2026-03-22T16:19:01
+- Now: 2026-04-07T22:46:43
+- Days: March 22 → April 7 = 16 days + ~6.5 hours = ~390.5 hours
+- Exact: March 22 16:19 → March 31 = 8 days 7h 41m = ~199.7h; April 1–7 = 7 days = 168h; then +6h 27m = ~6.45h → Total ≈ 199.7 + 168 + 6.45 = **374.15 hours** → floor = **15 days**
+- Let me re-count carefully: March 22 16:19 to April 7 22:46:
+  - March 22 16:19 → April 7 16:19 = exactly 16 days = 384 hours
+  - Then 6h 27m more = 6.45h
+  - Total = **390.45 hours** → floor = **16 days**
+
+**Latest Fee Checks:**
+- WETH-PRIMARY-C8 latest: recaLjfKSF5HsO6sc (2026-04-07T22:45:45) → Position Value = $25,577.36, Fee Value = **$229.85**
+- HEDGE-C8 latest: recw2nQl15Zl0YRpl (2026-04-07T15:01:46) → Notes: "PnL: $48.95" → **Hedge PnL = +$48.95**
+
+**LP PnL:** $25,577.36 − $25,148.85 = **+$428.51**
+
+**Net price delta:** $428.51 + $48.95 = **+$477.46**
+
+**Claims on WETH-PRIMARY-C8:**
+- recvSnvZIEujEu9kp (2026-04-01): Fees Claimed = $525.00
+- Total claimed = **$525.00**
+
+**Total fees:** $525.00 + $229.85 (pending) = **$754.85**
+
+**Avg daily fee:** ($754.85 / 390.45) × 24 = (1.9333) × 24 ≈ **$46.40/day**
+
+**Net return:** $477.46 + $754.85 = **$1,232.31**
+
+**Return %:** $1,232.31 / $30,687.13 × 100 = **4.02%**
+
+**Annualized %:** 4.02% / (390.45 / 24) × 365 = 4.02% / 16.27 × 365 = 4.02% × 22.43 ≈ **90.2%**
+
+**ETH price (from latest Airtable record):** Notes say "ETH: $2179" at 22:45 — and web search CoinDesk shows ~$2,133 at 5:26pm. The very latest Airtable record at 22:45 shows ETH at $2,179. I'll use **$2,179** as the most current data point.
+
+**Zone determination (C8 band):**
+- Near Drift Lower: $1,979 | Near Drift Upper: $2,181
+- ETH at $2,179 → between $1,979 and $2,181 → **Normal Zone**
+- Distance to nearest Near Drift = min($2,179 − $1,979, $2,181 − $2,179) = min($200, **$2**) → **$2 from Near Drift Upper!** — This is extremely close.
+
+Wait — $2,179 vs Near Drift Upper of $2,181 — that's only **$2 away**. That is effectively right at the Near Drift boundary. I should flag this clearly as Near Drift Zone or at minimum call out the critical proximity.
+
+Actually by strict rules: $2,179 is still between $1,979 and $2,181, so technically Normal Zone — but with only $2 of breathing room, this absolutely needs to be flagged as the "One Thing to Watch."
+
+**BTC price:** ~$68,700 (averaging CoinMarketCap/TradingView/CoinGecko readings)
+
+**Fear & Greed:** The searches didn't return a specific number. Given the market context (ETH volatile, bouncing around), I'll note "Fear" range is likely — but I shouldn't fabricate a number. Let me use what's available from the search context. The search results mention the index without a specific current value. I'll note it as unavailable and use a reasonable inference... Actually the CoinDesk result showed ETH at $2,133 on April 7 — given market conditions with tariff concerns and crypto volatility, Fear is likely. I'll keep it conservative and note it's in Fear territory.
+
+Given the data available, let me construct the brief now:
+
+---
+
+Good morning. It's Tuesday, April 7th.
+
+Eth is at two thousand one hundred and seventy-nine dollars, sitting in Normal Zone — but just two dollars below the Near Drift Upper boundary. That's essentially on the line, so keep a close eye on it today.
+
+The current delta neutral strategy cycle is sixteen days in. The L-P is up four hundred and twenty-nine dollars on price since open, the hedge is up forty-nine dollars — net price delta is positive four hundred and seventy-eight dollars. Total fees this cycle are seven hundred and fifty-five dollars, averaging about forty-six dollars a day. Net strategy return including all fees is one thousand two hundred and thirty-two dollars on thirty thousand six hundred and eighty-seven dollars deployed — about four percent in sixteen days, annualizing around ninety percent.
+
+One thing to watch: Eth is sitting just two dollars below the Near Drift Upper boundary at two thousand one hundred and eighty-one dollars. If it ticks above that level, the position moves into Near Drift Zone — monitor closely and be ready to act.
+
+Market sentiment data was unavailable at brief time. Bitcoin is at sixty-eight thousand seven hundred dollars. Eth has been volatile today, bouncing significantly off intraday lows — the macro environment remains unsettled with tariff concerns weighing on risk assets broadly. Have a good one.
