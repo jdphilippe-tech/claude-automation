@@ -605,23 +605,142 @@ async function getRaydiumPositions() {
       const tokens1 = amount1 / Math.pow(10, pool.decimals1);
       const positionValue = (price0 ?? 0) * tokens0 + (price1 ?? 0) * tokens1;
 
-      // Pending fee calculation:
-      // For in-range positions: use (feeGrowthGlobal - feeGrowthInsideLast) * liquidity / Q64
-      // This is the simplified formula — accurate for in-range positions.
-      // Out-of-range positions aren't earning fees so yield is $0.
+      // Pending fee calculation using tick array fee_growth_outside values
+      // Steps: 1) find tick arrays via recent tx, 2) read fee_growth_outside from each bound,
+      //        3) derive feeGrowthInside, 4) apply (fgInside - fgInsideLast) * liq / Q64
       const Q64 = 2n ** 64n;
       const U128 = 2n ** 128n;
       let pendingYield = 0;
-      if (inRange) {
-        try {
-          const delta0 = (pool.feeGrowthGlobal0 - pos.fgInside0Last + U128) % U128;
-          const delta1 = (pool.feeGrowthGlobal1 - pos.fgInside1Last + U128) % U128;
+
+      try {
+        // Step 1: Find tick array addresses from a recent position transaction
+        const sigRes = await solRpc('getSignaturesForAddress', [nftMint, { limit: 5 }]);
+        let lowerTickArrayAddr = null, upperTickArrayAddr = null;
+
+        for (const sigEntry of (sigRes || [])) {
+          const txRes = await solRpc('getTransaction', [
+            sigEntry.signature,
+            { encoding: 'json', maxSupportedTransactionVersion: 0 }
+          ]);
+          const keys = txRes?.transaction?.message?.accountKeys ?? [];
+          if (!keys.includes(RAYDIUM_CLMM_PROGRAM)) continue;
+
+          // In Raydium CLMM instructions, tick array accounts appear at specific positions:
+          // openPosition/increaseLiquidity: [nftOwner, nftAccount, poolState, protocolPosition,
+          //   personalPosition, tickArrayLower, tickArrayUpper, tokenAccount0, tokenAccount1, ...]
+          // We identify tick arrays by their data size (10240 bytes)
+          const accountInfos = await solRpc('getMultipleAccounts', [
+            keys,
+            { encoding: 'base64', dataSlice: { offset: 0, length: 0 } }
+          ]);
+
+          const tickArrayAddrs = [];
+          for (let i = 0; i < keys.length; i++) {
+            const info = accountInfos?.value?.[i];
+            if (info?.data?.length === 0 && info?.rentEpoch !== undefined) {
+              // Check actual size via getAccountInfo
+            }
+          }
+
+          // Better approach: filter keys by checking which ones are tick arrays for this pool
+          // Tick arrays have dataSize=10240 and owner=RAYDIUM_CLMM_PROGRAM
+          // And contain the pool_id at offset 8
+          const candidateKeys = keys.filter((k, i) =>
+            k !== RAYDIUM_CLMM_PROGRAM &&
+            k !== nftMint &&
+            k !== poolId
+          );
+
+          // Fetch sizes in batch
+          const infosRes = await solRpc('getMultipleAccounts', [
+            candidateKeys.slice(0, 12),
+            { encoding: 'base64' }
+          ]);
+
+          for (let i = 0; i < candidateKeys.length && i < 12; i++) {
+            const d = infosRes?.value?.[i]?.data?.[0];
+            if (!d) continue;
+            const buf = Buffer.from(d, 'base64');
+            if (buf.length === 10240) {
+              // Verify pool_id at offset 8
+              const storedPoolId = base58EncodeBytes(Array.from(buf.slice(8, 40)));
+              if (storedPoolId === poolId) {
+                const startTick = buf.readInt32LE(40);
+                console.log(`  Found tick array: ${candidateKeys[i].slice(0,8)}... startTick=${startTick}`);
+                if (startTick <= pos.tickLower && !lowerTickArrayAddr) {
+                  lowerTickArrayAddr = { addr: candidateKeys[i], startTick, data: d };
+                }
+                if (startTick <= pos.tickUpper && startTick > (lowerTickArrayAddr?.startTick ?? -Infinity) && !upperTickArrayAddr) {
+                  upperTickArrayAddr = { addr: candidateKeys[i], startTick, data: d };
+                }
+              }
+            }
+          }
+          if (lowerTickArrayAddr) break;
+        }
+
+        // Step 2 & 3: If tick arrays found, compute feeGrowthInside
+        if (lowerTickArrayAddr && inRange) {
+          const TICK_SIZE = 168;
+          const TA_HEADER = 44; // disc(8)+pool_id(32)+start_tick(4)
+
+          function getTickFeeGrowth(taData, tickIndex, taStartTick, tickSpacing) {
+            const buf = Buffer.from(taData, 'base64');
+            const tickArraySpacing = tickSpacing ?? 10;
+            const offset = (tickIndex - taStartTick) / tickArraySpacing;
+            if (offset < 0 || offset >= 60 || !Number.isInteger(offset)) return { fg0: 0n, fg1: 0n };
+            const tickStart = TA_HEADER + offset * TICK_SIZE;
+            const FG0 = 36; const FG1 = 52; // offsets within tick struct
+            const fg0Lo = buf.readBigUInt64LE(tickStart + FG0);
+            const fg0Hi = buf.readBigUInt64LE(tickStart + FG0 + 8);
+            const fg1Lo = buf.readBigUInt64LE(tickStart + FG1);
+            const fg1Hi = buf.readBigUInt64LE(tickStart + FG1 + 8);
+            return { fg0: fg0Lo | (fg0Hi << 64n), fg1: fg1Lo | (fg1Hi << 64n) };
+          }
+
+          // Get tick spacing from pool (at offset 235 = dec0(1)+dec1(1)+offset 233)
+          const poolBuf = Buffer.from(poolRes.value.data[0], 'base64');
+          const tickSpacing = poolBuf.readUInt16LE(235);
+
+          const lowerTA = lowerTickArrayAddr ?? upperTickArrayAddr;
+          const upperTA = upperTickArrayAddr ?? lowerTickArrayAddr;
+
+          const lower = getTickFeeGrowth(lowerTA.data, pos.tickLower, lowerTA.startTick, tickSpacing);
+          const upper = getTickFeeGrowth(upperTA.data, pos.tickUpper, upperTA.startTick, tickSpacing);
+
+          // feeGrowthBelow(tickLower): currentTick >= tickLower → fg_outside, else global - fg_outside
+          const fgBelow0 = pool.tickCurrent >= pos.tickLower ? lower.fg0 : (pool.feeGrowthGlobal0 - lower.fg0 + U128) % U128;
+          const fgBelow1 = pool.tickCurrent >= pos.tickLower ? lower.fg1 : (pool.feeGrowthGlobal1 - lower.fg1 + U128) % U128;
+
+          // feeGrowthAbove(tickUpper): currentTick < tickUpper → fg_outside, else global - fg_outside
+          const fgAbove0 = pool.tickCurrent < pos.tickUpper ? upper.fg0 : (pool.feeGrowthGlobal0 - upper.fg0 + U128) % U128;
+          const fgAbove1 = pool.tickCurrent < pos.tickUpper ? upper.fg1 : (pool.feeGrowthGlobal1 - upper.fg1 + U128) % U128;
+
+          // feeGrowthInside = global - below - above
+          const fgInside0 = (pool.feeGrowthGlobal0 - fgBelow0 - fgAbove0 + U128 * 2n) % U128;
+          const fgInside1 = (pool.feeGrowthGlobal1 - fgBelow1 - fgAbove1 + U128 * 2n) % U128;
+
+          const delta0 = (fgInside0 - pos.fgInside0Last + U128) % U128;
+          const delta1 = (fgInside1 - pos.fgInside1Last + U128) % U128;
+
           const rawFee0 = Number(delta0 * pos.liquidity / Q64) + Number(pos.feesOwed0);
           const rawFee1 = Number(delta1 * pos.liquidity / Q64) + Number(pos.feesOwed1);
           const fee0USD = (price0 ?? 0) * rawFee0 / Math.pow(10, pool.decimals0);
           const fee1USD = (price1 ?? 0) * rawFee1 / Math.pow(10, pool.decimals1);
           pendingYield = fee0USD + fee1USD;
-        } catch(e) { /* fee calc failed, leave as 0 */ }
+          console.log(`  Fees (tick array): $${fee0USD.toFixed(2)} token0 + $${fee1USD.toFixed(2)} USDC = $${pendingYield.toFixed(2)}`);
+        } else if (inRange) {
+          // Fallback: simplified formula (overcounts but better than $0)
+          const delta0 = (pool.feeGrowthGlobal0 - pos.fgInside0Last + U128) % U128;
+          const delta1 = (pool.feeGrowthGlobal1 - pos.fgInside1Last + U128) % U128;
+          const rawFee0 = Number(delta0 * pos.liquidity / Q64) + Number(pos.feesOwed0);
+          const rawFee1 = Number(delta1 * pos.liquidity / Q64) + Number(pos.feesOwed1);
+          pendingYield = (price0 ?? 0) * rawFee0 / Math.pow(10, pool.decimals0) +
+                         (price1 ?? 0) * rawFee1 / Math.pow(10, pool.decimals1);
+          console.log(`  Fees (simplified fallback): $${pendingYield.toFixed(2)}`);
+        }
+      } catch(feeErr) {
+        console.error(`  Fee calc error: ${feeErr.message.slice(0, 80)}`);
       }
 
       console.log(`  ${key}: $${positionValue.toFixed(2)}, in range: ${inRange}, fees: $${pendingYield.toFixed(2)}`);
