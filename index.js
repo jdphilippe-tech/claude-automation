@@ -836,9 +836,9 @@ async function getLighterPositions() {
       console.log(`LIT staking pool not found in protocol filter — using hardcoded ${LIT_STAKE_AMOUNT} LIT`);
     }
 
-    // LIT price from DeFi Llama
-    const litPriceData = await fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:lighter-network');
-    const litPrice = litPriceData?.coins?.['coingecko:lighter-network']?.price ?? null;
+    // LIT price from DeFi Llama — CoinGecko ID is 'lighter'
+    const litPriceData = await fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:lighter');
+    const litPrice = litPriceData?.coins?.['coingecko:lighter']?.price ?? null;
     if (litPrice) {
       const litEquity = litStakeAmount * litPrice;
       console.log(`LIT Staking: ${litStakeAmount} LIT × $${litPrice.toFixed(4)} = $${litEquity.toFixed(2)}, APR=${litAPR?.toFixed(2)}%`);
@@ -973,7 +973,6 @@ async function main() {
     if (lighter.llp) {
       batch.push(dailyRecord(ASSET.lighterLLP, true, {
         [F.positionValue]: lighter.llp.equity,
-        [F.revertPosVal]:  lighter.llp.equity,
         ...(lighter.llp.apr != null ? { [F.protocolAPR]: lighter.llp.apr } : {}),
         [F.notes]:         `Lighter LLP | APY: ${lighter.llp.apr?.toFixed(2)}%`,
       }));
@@ -982,7 +981,6 @@ async function main() {
     if (lighter.edge) {
       batch.push(dailyRecord(ASSET.lighterEdge, true, {
         [F.positionValue]: lighter.edge.equity,
-        [F.revertPosVal]:  lighter.edge.equity,
         ...(lighter.edge.apr != null ? { [F.protocolAPR]: lighter.edge.apr } : {}),
         [F.notes]:         `Lighter Edge & Hedge | APY: ${lighter.edge.apr?.toFixed(2)}%`,
       }));
@@ -991,7 +989,6 @@ async function main() {
     if (lighter.lit) {
       batch.push(dailyRecord(ASSET.lighterLIT, true, {
         [F.positionValue]: lighter.lit.equity,
-        [F.revertPosVal]:  lighter.lit.equity,
         ...(lighter.lit.apr != null ? { [F.protocolAPR]: lighter.lit.apr } : {}),
         [F.notes]:         `LIT Staking | ${lighter.lit.litStakeAmount} LIT × $${lighter.lit.litPrice?.toFixed(4)} | APR: ${lighter.lit.apr?.toFixed(2)}%`,
       }));
