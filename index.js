@@ -712,7 +712,6 @@ async function getRaydiumPositions() {
 
           const lower = getTickFeeGrowth(lowerTA.data, pos.tickLower, lowerTA.startTick, tickSpacing);
           const upper = getTickFeeGrowth(upperTA.data, pos.tickUpper, upperTA.startTick, tickSpacing);
-          console.log(`  [feeDiag] tickSpacing=${tickSpacing} tickCurrent=${pool.tickCurrent} lower.fg0=${lower.fg0} upper.fg0=${upper.fg0} fgGlobal0=${pool.feeGrowthGlobal0} fgInsideLast0=${pos.fgInside0Last}`);
 
           // feeGrowthBelow(tickLower): currentTick >= tickLower → fg_outside, else global - fg_outside
           const fgBelow0 = pool.tickCurrent >= pos.tickLower ? lower.fg0 : (pool.feeGrowthGlobal0 - lower.fg0 + U128) % U128;
