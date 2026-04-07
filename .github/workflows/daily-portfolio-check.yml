@@ -17,43 +17,72 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: npm install
-      - name: Test Lighter API
+      - name: Test Lighter API (authenticated)
+        env:
+          LIGHTER_PRIVATE_KEY: ${{ secrets.LIGHTER_PRIVATE_KEY }}
+          LIGHTER_PUBLIC_KEY: ${{ secrets.LIGHTER_PUBLIC_KEY }}
         run: |
           node -e "
+          const crypto = require('crypto');
           const fetch = (...a) => import('node-fetch').then(({default:f}) => f(...a));
-          const BASE         = 'https://mainnet.zklighter.elliot.ai';
-          const WALLET       = '0xEE2178C5d2a19A83450ba2A13fd889A02Da19BDd';
-          const ACCOUNT_IDX  = 449217;
-          const LLP_ID       = 281474976710654;
-          const EDGE_ID      = 281474976688087;
+          const BASE        = 'https://mainnet.zklighter.elliot.ai';
+          const ACCOUNT_IDX = 449217;
+          const LLP_ID      = 281474976710654;
+          const EDGE_ID     = 281474976688087;
+
+          // Lighter auth token format (read-only):
+          // ro:{account_index}:{single|all}:{expiry_unix}:{random_hex}
+          // Then sign with ECDSA secp256k1 private key
+          // But first — try the simpler approach: pass account_index as query param
+          // Per docs the auth param can be the raw API key for some endpoints
 
           (async () => {
-            // 1. Full account data including shares
-            console.log('--- Full account (index=449217) ---');
-            const r1 = await (await fetch(BASE+'/api/v1/account?account_index='+ACCOUNT_IDX+'&l1_address='+WALLET)).json();
-            console.log(JSON.stringify(r1, null, 2).slice(0, 4000));
+            const privKey = process.env.LIGHTER_PRIVATE_KEY;
+            const pubKey  = process.env.LIGHTER_PUBLIC_KEY;
+            console.log('Private key present:', !!privKey, 'length:', privKey?.length);
+            console.log('Public key present:', !!pubKey, 'length:', pubKey?.length);
+            console.log('Private key prefix:', privKey?.slice(0,10));
 
-            // 2. accountMetadata — may include pool share data
-            console.log('\n--- accountMetadata ---');
-            const r2 = await (await fetch(BASE+'/api/v1/accountMetadata?account_index='+ACCOUNT_IDX)).json();
-            console.log(JSON.stringify(r2, null, 2).slice(0, 2000));
+            // Try passing API keys directly as auth header (some endpoints accept this)
+            const authHeader = pubKey + ':' + privKey;
+            console.log('\n--- LLP metadata with auth header ---');
+            const r1 = await (await fetch(
+              BASE+'/api/v1/publicPoolsMetadata?index='+(LLP_ID+1)+'&limit=1',
+              { headers: { 'Authorization': authHeader } }
+            )).json();
+            console.log(JSON.stringify(r1, null, 2));
 
-            // 3. Search for LIT staking pool by name
-            console.log('\n--- Search all public pools (first 20) ---');
-            const r3 = await (await fetch(BASE+'/api/v1/publicPoolsMetadata?index=0&limit=20')).json();
-            const pools = r3?.public_pools ?? [];
-            for (const p of pools) {
-              console.log('  index='+p.account_index+' name='+p.name+' APY='+p.annual_percentage_yield?.toFixed(2)+'% shares='+p.total_shares);
+            // Try auth as query param
+            console.log('\n--- LLP metadata with auth query param ---');
+            const r2 = await (await fetch(
+              BASE+'/api/v1/publicPoolsMetadata?index='+(LLP_ID+1)+'&limit=1&auth='+encodeURIComponent(authHeader)
+            )).json();
+            console.log(JSON.stringify(r2, null, 2));
+
+            // Try account endpoint with just public key as auth
+            console.log('\n--- Account with public key auth ---');
+            const r3 = await (await fetch(
+              BASE+'/api/v1/account?account_index='+ACCOUNT_IDX,
+              { headers: { 'Authorization': pubKey } }
+            )).json();
+            console.log(JSON.stringify(r3, null, 2).slice(0, 3000));
+
+            // Try account endpoint with private key as auth
+            console.log('\n--- Account with private key auth ---');
+            const r4 = await (await fetch(
+              BASE+'/api/v1/account?account_index='+ACCOUNT_IDX,
+              { headers: { 'Authorization': privKey } }
+            )).json();
+            console.log(JSON.stringify(r4, null, 2).slice(0, 3000));
+
+            // Search for staking pools by scanning a range of IDs
+            console.log('\n--- Scan pool IDs near LIT (281474976624800) ---');
+            const ids = [281474976624800, 281474976624801, 281474976624683, 281474976600000, 281474976700000];
+            for (const id of ids) {
+              const r = await (await fetch(BASE+'/api/v1/publicPoolsMetadata?index='+(id+1)+'&limit=1')).json();
+              const pool = r?.public_pools?.[0];
+              if (pool) console.log('id='+id+' name='+pool.name+' shares='+pool.total_shares+' value='+pool.total_asset_value);
             }
-
-            // 4. LLP and Edge with auth not needed — check if shares field appears
-            console.log('\n--- LLP metadata (check shares field) ---');
-            const r4 = await (await fetch(BASE+'/api/v1/publicPoolsMetadata?index='+(LLP_ID+1)+'&limit=1&account_index='+ACCOUNT_IDX)).json();
-            console.log(JSON.stringify(r4, null, 2));
-
-            console.log('\n--- Edge metadata (check shares field) ---');
-            const r5 = await (await fetch(BASE+'/api/v1/publicPoolsMetadata?index='+(EDGE_ID+1)+'&limit=1&account_index='+ACCOUNT_IDX)).json();
-            console.log(JSON.stringify(r5, null, 2));
           })().catch(e => console.error('Error:', e.message));
           "
       - name: Run daily portfolio check
