@@ -146,18 +146,31 @@ async function runAirtableQuery(input) {
 
 async function runWebSearch(input) {
   const { query } = input;
-  const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+  const BRAVE_API_KEY = process.env.BRAVE_SEARCH_API_KEY;
+
+  if (!BRAVE_API_KEY) {
+    return { error: 'BRAVE_SEARCH_API_KEY not set — web search unavailable' };
+  }
+
   try {
-    const res  = await fetch(url);
+    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3&text_decorations=false&search_lang=en`;
+    const res  = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip',
+        'X-Subscription-Token': BRAVE_API_KEY
+      }
+    });
+    if (!res.ok) {
+      return { error: `Brave Search ${res.status}: ${await res.text()}` };
+    }
     const data = await res.json();
-    return {
-      answer:   data.Answer   || '',
-      abstract: data.Abstract || '',
-      results:  (data.RelatedTopics || [])
-                  .slice(0, 5)
-                  .map(t => t.Text || '')
-                  .filter(Boolean)
-    };
+    const results = (data.web?.results || []).slice(0, 3).map(r => ({
+      title:       r.title       || '',
+      description: r.description || '',
+      url:         r.url         || ''
+    }));
+    return { results };
   } catch (e) {
     return { error: e.message };
   }
