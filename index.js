@@ -685,7 +685,7 @@ async function getRaydiumPositions() {
         const feesOwed1USD = (price1 ?? 0) * Number(pos.feesOwed1) / Math.pow(10, pool.decimals1);
         pendingYield = feesOwed0USD + feesOwed1USD;
 
-        if (lowerTickArrayAddr && inRange) {
+        if (lowerTickArrayAddr) {  // Apply tick array formula regardless of in-range status
           const TICK_SIZE = 168;
           const TA_HEADER = 44; // disc(8)+pool_id(32)+start_tick(4)
 
@@ -712,6 +712,7 @@ async function getRaydiumPositions() {
 
           const lower = getTickFeeGrowth(lowerTA.data, pos.tickLower, lowerTA.startTick, tickSpacing);
           const upper = getTickFeeGrowth(upperTA.data, pos.tickUpper, upperTA.startTick, tickSpacing);
+          console.log(`  [feeDiag] tickSpacing=${tickSpacing} tickCurrent=${pool.tickCurrent} lower.fg0=${lower.fg0} upper.fg0=${upper.fg0} fgGlobal0=${pool.feeGrowthGlobal0} fgInsideLast0=${pos.fgInside0Last}`);
 
           // feeGrowthBelow(tickLower): currentTick >= tickLower → fg_outside, else global - fg_outside
           const fgBelow0 = pool.tickCurrent >= pos.tickLower ? lower.fg0 : (pool.feeGrowthGlobal0 - lower.fg0 + U128) % U128;
@@ -734,15 +735,9 @@ async function getRaydiumPositions() {
           const fee1USD = (price1 ?? 0) * rawFee1 / Math.pow(10, pool.decimals1);
           pendingYield = fee0USD + fee1USD;
           console.log(`  Fees (tick array): $${fee0USD.toFixed(2)} token0 + $${fee1USD.toFixed(2)} USDC = $${pendingYield.toFixed(2)}`);
-        } else if (inRange) {
-          // Fallback: simplified formula (overcounts but better than $0)
-          const delta0 = (pool.feeGrowthGlobal0 - pos.fgInside0Last + U128) % U128;
-          const delta1 = (pool.feeGrowthGlobal1 - pos.fgInside1Last + U128) % U128;
-          const rawFee0 = Number(delta0 * pos.liquidity / Q64) + Number(pos.feesOwed0);
-          const rawFee1 = Number(delta1 * pos.liquidity / Q64) + Number(pos.feesOwed1);
-          pendingYield = (price0 ?? 0) * rawFee0 / Math.pow(10, pool.decimals0) +
-                         (price1 ?? 0) * rawFee1 / Math.pow(10, pool.decimals1);
-          console.log(`  Fees (simplified fallback): $${pendingYield.toFixed(2)}`);
+        } else {
+          // Fallback: feesOwed floor only (tick arrays not found, already set above)
+          console.log(`  Fees (feesOwed floor only): $${pendingYield.toFixed(2)}`);
         }
       } catch(feeErr) {
         console.error(`  Fee calc error: ${feeErr.message.slice(0, 80)}`);
