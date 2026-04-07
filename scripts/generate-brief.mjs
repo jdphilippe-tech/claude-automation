@@ -287,6 +287,11 @@ From the complete record set, determine:
                           The Notes field contains text like "PnL: $48.95 | Entry: $2078.1 | Size: -5.5 ETH".
                           Extract the dollar amount after "PnL: $". This can be negative (e.g. "PnL: $-431.75").
                           NEVER compute hedge PnL from position value delta — always use the Notes field value.
+  • Delta balance       = |Net price delta| = |LP PnL + Hedge PnL|
+                          Example: LP PnL = +$428, Hedge PnL = -$798 → Net price delta = -$370 → Delta balance = $370
+  • Delta tolerance     = Normal Zone: 0.5% of LP current value | Near Drift Zone: 0.25% of LP current value
+  • Delta status        = if delta balance ≤ tolerance → "within tolerance, no action needed"
+                          if delta balance > tolerance → "outside tolerance, hedge adjustment may be needed"
   • Net price delta     = LP PnL + Hedge PnL
   • Cycle open date     = Date on earliest Reopen Position for WETH-PRIMARY-C[n]
   • Elapsed hours       = hours from cycle open date to now
@@ -302,6 +307,7 @@ Search for:
   • ETH current price in USD
   • BTC current price in USD
   • Crypto Fear & Greed index — search "alternative.me fear greed index" and look for a number between 0-100 in the description. It will say something like "Now: 28" or "Current value is 28 (Fear)". Extract just the number and label. If you cannot find a specific number, say "Market sentiment data was unavailable at brief time" — do NOT estimate or guess a number.
+  • ETH 30-day volatility or ATR — search "ETH 30 day volatility" or "Ethereum ATR" to get a sense of whether current volatility is elevated, normal, or compressed relative to recent history. This is used to assess whether the current 360-point band width remains appropriate.
 
 STEP 3 — Zone Determination
 You must know the current band parameters. Check the Airtable records — the
@@ -331,16 +337,16 @@ BRIEF FORMAT (follow exactly, in order)
    Drift example: "Eth is at [price] and has crossed into Drift Zone. Action may be required — review the position."
 
 3. Strategy P&L
-   "[Strategy] is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount] — net price delta is [positive/negative] [amount]. Total fees this cycle are [amount], averaging about [amount] a day. Net strategy return including all fees is [amount] on [total deployed] deployed — about [percent] in [X] days, annualizing around [percent]."
+   "The current delta neutral strategy cycle is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount] — net price delta is [positive/negative] [amount]. Delta balance is [amount], which is [within/outside] tolerance for [Normal/Near Drift] Zone. [If outside tolerance: hedge adjustment may be needed.] Total fees this cycle are [amount], averaging about [amount] a day. Net strategy return including all fees is [amount] on [total deployed] deployed — about [percent] in [X] days, annualizing around [percent]."
 
    Always refer to the strategy as "The current delta neutral strategy cycle" — never "PSF", "P S F", "WETH-USDC strategy", or any other name.
 
 4. One Thing to Watch
    The single most notable item requiring attention today. Two sentences max.
-   Examples: unclaimed fees building up on an xStock LP, a lending rate that spiked, the position approaching Near Drift.
+   Examples: unclaimed fees building up on an xStock LP, a lending rate that spiked, the position approaching Near Drift, delta outside tolerance.
 
 5. Market Close
-   "Market sentiment is [label] at [number]. Bitcoin is at [price]. [One macro sentence if relevant.] Have a good one."
+   "Market sentiment is [label] at [number]. Bitcoin is at [price]. [Band width verdict — one sentence assessing whether the current 360-point band remains appropriate given current ETH volatility: e.g. 'Volatility looks normal — the three-sixty band remains appropriate.' or 'Volatility is elevated — worth reviewing whether the three-sixty band needs widening.' or 'Volatility is compressed — the three-sixty band has comfortable room.'] Have a good one."
 
 ═══════════════════════════════════════
 SPEAKING RULES — CRITICAL
@@ -370,11 +376,11 @@ Good morning. It's Friday, April 4th.
 
 Eth is at two thousand and fifty-eight dollars, sitting in Normal Zone. You have about one hundred and twenty dollars of breathing room before Near Drift. No action needed.
 
-The current delta neutral strategy cycle is thirteen days in. The LP is down one hundred and forty-six dollars on price since open, the hedge is up one hundred and seventy-eight dollars — net price delta is positive thirty-two dollars. Total fees this cycle are six hundred and fifteen dollars, averaging about fifty-one dollars a day. Net strategy return including all fees is six hundred and forty-seven dollars on thirty thousand six hundred and eighty-seven dollars deployed — about two percent in thirteen days, annualizing around sixty-four percent.
+The current delta neutral strategy cycle is thirteen days in. The LP is down one hundred and forty-six dollars on price since open, the hedge is up one hundred and seventy-eight dollars — net price delta is positive thirty-two dollars. Delta balance is thirty-two dollars, within tolerance for Normal Zone. Total fees this cycle are six hundred and fifteen dollars, averaging about fifty-one dollars a day. Net strategy return including all fees is six hundred and forty-seven dollars on thirty thousand six hundred and eighty-seven dollars deployed — about two percent in thirteen days, annualizing around sixty-four percent.
 
 One thing to watch: the C-R-C-L-x position has three hundred and twenty-two dollars in unclaimed fees on a fifteen hundred dollar position. Worth deciding today whether to claim or let it ride into the weekend.
 
-Market sentiment is Extreme Fear at nine. Bitcoin is at sixty-six thousand eight hundred dollars, holding well above the two hundred week moving average. Macro is risk-off but the structure is intact. Have a good one.`;
+Market sentiment is Extreme Fear at nine. Bitcoin is at sixty-six thousand eight hundred dollars. Volatility looks normal — the three-sixty band remains appropriate. Have a good one.`;
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
