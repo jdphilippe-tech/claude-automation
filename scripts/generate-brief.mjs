@@ -42,6 +42,7 @@ Field IDs:
   fld6QnTv9CKHvglcX = Fee Value    (pending fees, only on Fee Check records)
   fldE5uO0nwZmgLQtF = Fees Claimed (only on Claim records)
   fldFFts5ByR1EeYBk = Cycle ID     (e.g. WETH-PRIMARY-C8, HEDGE-C8)
+  fldxWdSuQ09uhadFo = Notes        (HEDGE Fee Check records contain "PnL: $XX.XX | Entry: $XXXX | Size: -X.X ETH")
 
 LENDING ACTIONS TABLE: ${AIRTABLE_LENDING_TABLE}
 
@@ -77,7 +78,7 @@ Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
         fields: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of field IDs to return. Always include fldFFts5ByR1EeYBk (Cycle ID) and fldUkwrxtS4AEr52W (Action Type).'
+          description: 'Array of field IDs to return. Always include fldFFts5ByR1EeYBk (Cycle ID), fldUkwrxtS4AEr52W (Action Type), and fldxWdSuQ09uhadFo (Notes — required for hedge PnL).'
         },
         page_size: {
           type: 'number',
@@ -135,10 +136,9 @@ async function runAirtableQuery(input) {
   }
 
   const data = await res.json();
-  // Summarise what we got so Claude can decide whether to paginate
   return {
     records: data.records,
-    offset: data.offset || null,           // null means no more pages
+    offset: data.offset || null,
     total_returned: data.records?.length ?? 0,
     has_more: !!data.offset
   };
@@ -146,7 +146,6 @@ async function runAirtableQuery(input) {
 
 async function runWebSearch(input) {
   const { query } = input;
-  // DuckDuckGo instant answers — no API key required
   const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
   try {
     const res  = await fetch(url);
@@ -210,7 +209,6 @@ async function runClaude(systemPrompt, userPrompt) {
     const response = await res.json();
     console.log(`  stop_reason: ${response.stop_reason}`);
 
-    // Append Claude's reply to history
     messages.push({ role: 'assistant', content: response.content });
 
     if (response.stop_reason === 'end_turn') {
@@ -221,7 +219,6 @@ async function runClaude(systemPrompt, userPrompt) {
 
     if (response.stop_reason === 'tool_use') {
       const toolCalls = response.content.filter(b => b.type === 'tool_use');
-      // Execute tool calls (sequentially to avoid Airtable rate limits)
       const toolResults = [];
       for (const call of toolCalls) {
         const result = await executeTool(call.name, call.input);
@@ -255,7 +252,7 @@ STEP 1 — PSF Cycle Data (Airtable Daily Actions)
 Query table ${AIRTABLE_DAILY_TABLE} with:
   filterByFormula: OR(FIND('WETH-PRIMARY-C',{Cycle ID}),FIND('HEDGE-C',{Cycle ID}))
   sort: fldHG3MCcyhkXknyH ascending (oldest first)
-  fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk
+  fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk, fldxWdSuQ09uhadFo
 
 ⚠️  PAGINATION IS MANDATORY. Keep calling airtable_query with the offset from
 each response until has_more = false. The Reopen Position records you need to
@@ -273,11 +270,15 @@ From the complete record set, determine:
   • Total claimed       = sum of all Fees Claimed on all Claim records for WETH-PRIMARY-C[n]
   • Total fees          = total claimed + pending fees
   • LP PnL              = LP current − LP open
-  • Hedge PnL           = Hedge current − Hedge open
+  • Hedge PnL           = READ from the Notes field on the latest HEDGE-C[n] Fee Check record.
+                          The Notes field contains text like "PnL: $48.95 | Entry: $2078.1 | Size: -5.5 ETH".
+                          Extract the dollar amount after "PnL: $". This can be negative (e.g. "PnL: $-431.75").
+                          NEVER compute hedge PnL from position value delta — always use the Notes field value.
   • Net price delta     = LP PnL + Hedge PnL
   • Cycle open date     = Date on earliest Reopen Position for WETH-PRIMARY-C[n]
   • Elapsed hours       = hours from cycle open date to now
-  • Days in cycle       = elapsed hours / 24  (use one decimal, e.g. 15.3)
+  • Days in cycle       = floor(elapsed hours / 24) — always a WHOLE NUMBER, never a decimal.
+                          Example: 16.1 days → say "sixteen days". 13.8 days → say "thirteen days".
   • Avg daily fee       = (total fees / elapsed hours) × 24
   • Net return          = net price delta + total fees
   • Return %            = net return / total deployed × 100
@@ -335,6 +336,7 @@ ElevenLabs will read this text aloud. Numbers must be written as words:
   ✓ "one hundred and forty-six dollars"       ✗ "$146"
   ✓ "sixty-four percent"                      ✗ "64%"
   ✓ "thirty thousand dollars"                 ✗ "$30,000"
+  ✓ "sixteen days"                            ✗ "sixteen point one days"
 
 Tickers must be phonetic:
   ETH → "Eth"   BTC → "Bitcoin"   USDC → "U-S-D-C"   SOL → "Sol"
@@ -366,7 +368,6 @@ async function main() {
   console.log(briefText);
   console.log('=================\n');
 
-  // Write output for the next workflow step to consume
   const outputDir = path.dirname(OUTPUT_PATH);
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, briefText, 'utf8');
