@@ -44,6 +44,7 @@ jobs:
         env:
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
         run: node scripts/generate-brief.mjs
       - name: Convert brief to audio via ElevenLabs
         env:
