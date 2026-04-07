@@ -1,7 +1,7 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v27
-// Raydium xStocks CLMM: position value + in-range status (pending yield = Phase 2)
-// Retained: WETH/USDC Primary (Arbitrum), Moonwell (Base), Suilend (Sui)
+// Daily Portfolio Check — GitHub Actions v28
+// Lighter: LLP + Edge & Hedge (authenticated shares) + LIT Staking (price × amount)
+// Retained: WETH/USDC Primary (Arbitrum), Moonwell (Base), Suilend (Sui), Raydium (Solana)
 // Schedule: 14:00 UTC = 7:00 AM PDT
 // ============================================================
 
@@ -24,6 +24,14 @@ const SOL_RPC      = process.env.SOL_RPC_URL ?? 'https://api.mainnet-beta.solana
 // Set RAYDIUM_DRY_RUN=false in GitHub repo Variables to go live
 const RAYDIUM_DRY_RUN = (process.env.RAYDIUM_DRY_RUN ?? 'true') !== 'false';
 
+// Lighter
+const LIGHTER_BASE      = 'https://mainnet.zklighter.elliot.ai/api/v1';
+const LIGHTER_TOKEN     = process.env.LIGHTER_READ_TOKEN;
+const LIGHTER_ACCT      = 449217;
+const LIGHTER_LLP_ID    = 281474976710654;
+const LIGHTER_EDGE_ID   = 281474976688087;
+const LIT_STAKE_AMOUNT  = 185.97; // hardcoded — staking API not available; update if stake changes
+
 const OBLIGATION_CAP_KEYWORD = 'ObligationOwnerCap';
 const RAYDIUM_CLMM_PROGRAM   = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
 
@@ -40,6 +48,7 @@ const F = {
   feeValue:      'fld6QnTv9CKHvglcX',
   cycleId:       'fldFFts5ByR1EeYBk',
   notes:         'fldxWdSuQ09uhadFo',
+  protocolAPR:   'fldL3Pa57i3fyaAf0',
 };
 
 // ---- Lending Actions field IDs ----
@@ -58,6 +67,9 @@ const LF = {
 // ---- Asset record IDs ----
 const ASSET = {
   wethPrimary: 'recbVsmOWh9YOWPBZ',
+  lighterLLP:   'recEFiaxgavObYWzL',
+  lighterEdge:  'rectz3Zo3aDbe4GgL',
+  lighterLIT:   'receiu02rkzc3quDW',
   // Raydium xStocks — all data confirmed from Raydium UI and dry runs
   // ⚠️ UPDATE cycleId once Cycle IDs are seeded in Airtable
   tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2',  nftMint: '7R5JFSuXL23epYJmX6LhzbM2Nce39at4maWD7NeFK4tU', poolId: '8aDaBQkTrS6HVMjyc6EZebgdiaXhLYGriDWKWWp1NpFF' },
@@ -752,24 +764,117 @@ async function getRaydiumPositions() {
 }
 
 // ============================================================
+// MODULE 5 — Lighter (LLP, Edge & Hedge, LIT Staking)
+// equity = shares_amount × (total_asset_value / total_shares)
+// LIT equity = LIT_STAKE_AMOUNT × LIT price from DeFi Llama
+// ============================================================
+
+async function getLighterPositions() {
+  console.log('\n--- Lighter ---');
+  const results = {};
+
+  try {
+    const headers = { 'Authorization': LIGHTER_TOKEN };
+
+    // LLP
+    const llpRes = await fetchWithTimeout(
+      `${LIGHTER_BASE}/publicPoolsMetadata?index=${LIGHTER_LLP_ID + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
+      { headers }
+    );
+    const llp = llpRes?.public_pools?.[0];
+    if (llp && llp.account_share) {
+      const pricePerShare = Number(llp.total_asset_value) / Number(llp.total_shares);
+      const equity = llp.account_share.shares_amount * pricePerShare;
+      const apr = llp.annual_percentage_yield ?? null;
+      console.log(`LLP: shares=${llp.account_share.shares_amount}, equity=$${equity.toFixed(2)}, APY=${apr?.toFixed(2)}%`);
+      results.llp = { equity, apr };
+    } else {
+      console.error('LLP: no account_share in response');
+    }
+
+    // Edge & Hedge
+    const edgeRes = await fetchWithTimeout(
+      `${LIGHTER_BASE}/publicPoolsMetadata?index=${LIGHTER_EDGE_ID + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
+      { headers }
+    );
+    const edge = edgeRes?.public_pools?.[0];
+    if (edge && edge.account_share) {
+      const pricePerShare = Number(edge.total_asset_value) / Number(edge.total_shares);
+      const equity = edge.account_share.shares_amount * pricePerShare;
+      const apr = edge.annual_percentage_yield ?? null;
+      console.log(`Edge & Hedge: shares=${edge.account_share.shares_amount}, equity=$${equity.toFixed(2)}, APY=${apr?.toFixed(2)}%`);
+      results.edge = { equity, apr };
+    } else {
+      console.error('Edge & Hedge: no account_share in response');
+    }
+
+    // LIT Staking — try to find staking pool with account_index to get live stake amount
+    // Staking pool is a protocol pool; scan IDs near known range with filter=protocol
+    let litStakeAmount = LIT_STAKE_AMOUNT; // fallback to hardcoded
+    let litAPR = 6.84; // fallback APR from UI
+    const stakingSearchRes = await fetchWithTimeout(
+      `${LIGHTER_BASE}/publicPoolsMetadata?index=0&limit=100&filter=protocol`,
+      { headers }
+    );
+    const stakingPools = stakingSearchRes?.public_pools ?? [];
+    const litPool = stakingPools.find(p => p.name?.toLowerCase().includes('lit') || p.name?.toLowerCase().includes('staking'));
+    if (litPool) {
+      console.log(`LIT pool found: index=${litPool.account_index} name=${litPool.name}`);
+      // Fetch with account_index to get our shares
+      const litPoolRes = await fetchWithTimeout(
+        `${LIGHTER_BASE}/publicPoolsMetadata?index=${litPool.account_index + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
+        { headers }
+      );
+      const litPoolData = litPoolRes?.public_pools?.[0];
+      if (litPoolData?.account_share) {
+        // For staking pools, principal_amount = tokens staked
+        litStakeAmount = Number(litPoolData.account_share.principal_amount ?? litPoolData.account_share.shares_amount);
+        litAPR = litPoolData.annual_percentage_yield ?? litAPR;
+        console.log(`LIT stake from API: ${litStakeAmount} LIT, APR=${litAPR?.toFixed(2)}%`);
+      }
+    } else {
+      console.log(`LIT staking pool not found in protocol filter — using hardcoded ${LIT_STAKE_AMOUNT} LIT`);
+    }
+
+    // LIT price from DeFi Llama
+    const litPriceData = await fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:lighter-network');
+    const litPrice = litPriceData?.coins?.['coingecko:lighter-network']?.price ?? null;
+    if (litPrice) {
+      const litEquity = litStakeAmount * litPrice;
+      console.log(`LIT Staking: ${litStakeAmount} LIT × $${litPrice.toFixed(4)} = $${litEquity.toFixed(2)}, APR=${litAPR?.toFixed(2)}%`);
+      results.lit = { equity: litEquity, litPrice, litStakeAmount, apr: litAPR };
+    } else {
+      console.error('LIT: price not found on DeFi Llama');
+    }
+
+  } catch (e) {
+    console.error(`Lighter fatal: ${e.message}`);
+  }
+
+  return results;
+}
+
+// ============================================================
 // MAIN
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v27 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v28 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
-  const [wethRes, moonwellRes, suilendRes, raydiumRes] = await Promise.allSettled([
+  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes] = await Promise.allSettled([
     getWethPosition(),
     getMoonwellData(),
     getSuilendData(),
     getRaydiumPositions(),
+    getLighterPositions(),
   ]);
 
   const weth     = wethRes.status     === 'fulfilled' ? wethRes.value     : null;
   const moonwell = moonwellRes.status === 'fulfilled' ? moonwellRes.value : null;
   const suilend  = suilendRes.status  === 'fulfilled' ? suilendRes.value  : null;
   const raydium  = raydiumRes.status  === 'fulfilled' ? raydiumRes.value  : [];
+  const lighter  = lighterRes.status  === 'fulfilled' ? lighterRes.value  : {};
 
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
@@ -859,6 +964,42 @@ async function main() {
         }
         console.log(`✓ Raydium: ${batch.length} records written`);
       }
+    }
+  }
+
+  // Lighter (LLP, Edge & Hedge, LIT Staking)
+  if (lighter && Object.keys(lighter).length > 0) {
+    const batch = [];
+    if (lighter.llp) {
+      batch.push(dailyRecord(ASSET.lighterLLP, true, {
+        [F.positionValue]: lighter.llp.equity,
+        [F.revertPosVal]:  lighter.llp.equity,
+        ...(lighter.llp.apr != null ? { [F.protocolAPR]: lighter.llp.apr } : {}),
+        [F.notes]:         `Lighter LLP | APY: ${lighter.llp.apr?.toFixed(2)}%`,
+      }));
+      console.log(`  Queued LLP: $${lighter.llp.equity.toFixed(2)}, APY ${lighter.llp.apr?.toFixed(2)}%`);
+    }
+    if (lighter.edge) {
+      batch.push(dailyRecord(ASSET.lighterEdge, true, {
+        [F.positionValue]: lighter.edge.equity,
+        [F.revertPosVal]:  lighter.edge.equity,
+        ...(lighter.edge.apr != null ? { [F.protocolAPR]: lighter.edge.apr } : {}),
+        [F.notes]:         `Lighter Edge & Hedge | APY: ${lighter.edge.apr?.toFixed(2)}%`,
+      }));
+      console.log(`  Queued Edge & Hedge: $${lighter.edge.equity.toFixed(2)}, APY ${lighter.edge.apr?.toFixed(2)}%`);
+    }
+    if (lighter.lit) {
+      batch.push(dailyRecord(ASSET.lighterLIT, true, {
+        [F.positionValue]: lighter.lit.equity,
+        [F.revertPosVal]:  lighter.lit.equity,
+        ...(lighter.lit.apr != null ? { [F.protocolAPR]: lighter.lit.apr } : {}),
+        [F.notes]:         `LIT Staking | ${lighter.lit.litStakeAmount} LIT × $${lighter.lit.litPrice?.toFixed(4)} | APR: ${lighter.lit.apr?.toFixed(2)}%`,
+      }));
+      console.log(`  Queued LIT Staking: $${lighter.lit.equity.toFixed(2)}, APR ${lighter.lit.apr?.toFixed(2)}%`);
+    }
+    if (batch.length > 0) {
+      const ok = await airtableCreate(DAILY_TABLE, batch);
+      if (ok) { written += batch.length; console.log(`✓ Lighter: ${batch.length} records written`); }
     }
   }
 
