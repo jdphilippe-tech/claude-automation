@@ -17,6 +17,34 @@ jobs:
           node-version: '20'
       - name: Install dependencies
         run: npm install
+      - name: Test Lighter API
+        run: |
+          node -e "
+          const fetch = (...a) => import('node-fetch').then(({default:f}) => f(...a));
+          const WALLET = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
+          const BASE = 'https://mainnet.zklighter.elliot.ai';
+          const EXPLORER = 'https://explorer.elliot.ai';
+          (async () => {
+            console.log('--- accountsByL1Address ---');
+            const r1 = await (await fetch(BASE+'/api/v1/accountsByL1Address?l1_address='+WALLET)).json();
+            console.log(JSON.stringify(r1, null, 2));
+
+            console.log('--- Explorer positions ---');
+            const r2 = await (await fetch(EXPLORER+'/api/accounts/'+WALLET+'/positions')).json();
+            console.log(JSON.stringify(r2, null, 2).slice(0, 3000));
+
+            console.log('--- Explorer assets ---');
+            const r3 = await (await fetch(EXPLORER+'/api/accounts/'+WALLET+'/assets')).json();
+            console.log(JSON.stringify(r3, null, 2).slice(0, 3000));
+
+            const subAccounts = r1?.sub_accounts ?? [];
+            for (const sa of subAccounts) {
+              console.log('--- Sub-account index=' + sa.index + ' ---');
+              const r4 = await (await fetch(BASE+'/api/v1/account?account_index='+sa.index)).json();
+              console.log(JSON.stringify(r4, null, 2).slice(0, 2000));
+            }
+          })().catch(e => console.error('Error:', e.message));
+          "
       - name: Run daily portfolio check
         env:
           AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
