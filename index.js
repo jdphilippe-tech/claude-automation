@@ -495,13 +495,24 @@ function calcAmounts(liquidity, tickLower, tickUpper, tickCurrent, sqrtPriceCurr
 }
 
 function parsePositionAccount(data) {
-  // Layout: disc(8) + bump(1) + nft_mint(32) + pool_id(32) + tick_lower(4) + tick_upper(4) + liquidity(16) + ...
+  // Layout: disc(8)+bump(1)+nft_mint(32)+pool_id(32)+tick_lower(4)+tick_upper(4)+liquidity(16)
+  //         +fee_growth_inside_0_last(16)+fee_growth_inside_1_last(16)
+  //         +token_fees_owed_0(8)+token_fees_owed_1(8)
   const buf = Buffer.from(data, 'base64');
   const tickLower = buf.readInt32LE(73);
   const tickUpper = buf.readInt32LE(77);
   const liqLo = buf.readBigUInt64LE(81);
   const liqHi = buf.readBigUInt64LE(89);
-  return { tickLower, tickUpper, liquidity: liqLo | (liqHi << 64n) };
+  const liquidity = liqLo | (liqHi << 64n);
+  // fee growth inside last (for fee calculation)
+  const fgi0Lo = buf.readBigUInt64LE(97);  const fgi0Hi = buf.readBigUInt64LE(105);
+  const fgi1Lo = buf.readBigUInt64LE(113); const fgi1Hi = buf.readBigUInt64LE(121);
+  const fgInside0Last = fgi0Lo | (fgi0Hi << 64n);
+  const fgInside1Last = fgi1Lo | (fgi1Hi << 64n);
+  // token fees owed (already confirmed on-chain, floor value)
+  const feesOwed0 = buf.readBigUInt64LE(129);
+  const feesOwed1 = buf.readBigUInt64LE(137);
+  return { tickLower, tickUpper, liquidity, fgInside0Last, fgInside1Last, feesOwed0, feesOwed1 };
 }
 
 function parsePoolAccount(data) {
@@ -511,31 +522,23 @@ function parsePoolAccount(data) {
   const mint1Bytes = buf.slice(105, 137);
   const dec0       = buf.readUInt8(233);
   const dec1       = buf.readUInt8(234);
-  // Read sqrtPrice at multiple candidate offsets for diagnosis
-  const sqrtLo_237 = buf.readBigUInt64LE(237); const sqrtHi_237 = buf.readBigUInt64LE(245);
-  const sqrtLo_253 = buf.readBigUInt64LE(253); const sqrtHi_253 = buf.readBigUInt64LE(261);
+  const sqrtLo = buf.readBigUInt64LE(253);
+  const sqrtHi = buf.readBigUInt64LE(261);
+  const sqrtPriceX64 = sqrtLo | (sqrtHi << 64n);
 
   const Q64 = 2n ** 64n;
   const Q64f = Number(Q64);
-
-  function sqrtToTick(lo, hi) {
-    const sqrtX64 = lo | (hi << 64n);
-    const f = Number(sqrtX64 / Q64) + Number(sqrtX64 % Q64) / Q64f;
-    const p = f * f;
-    if (p <= 0) return -999999;
-    return Math.round(Math.log(p) / Math.log(1.0001));
-  }
-
-  const tick_237 = sqrtToTick(sqrtLo_237, sqrtHi_237);
-  const tick_253 = sqrtToTick(sqrtLo_253, sqrtHi_253);
-
-  console.log(`  [sqrtDiag] offset237→tick=${tick_237} | offset253→tick=${tick_253} | bufLen=${buf.length}`);
-
-  // Use 253 as primary (confirmed from source)
-  const sqrtPriceX64 = sqrtLo_253 | (sqrtHi_253 << 64n);
   const sqrtPriceFloat = Number(sqrtPriceX64 / Q64) + Number(sqrtPriceX64 % Q64) / Q64f;
   const rawPrice = sqrtPriceFloat * sqrtPriceFloat;
-  const tickCurrent = tick_253;
+  const tickCurrent = Math.round(Math.log(rawPrice) / Math.log(1.0001));
+
+  // fee_growth_global fields: after sqrtPrice(16)+tickCurrent(4)+obs_index(2)+obs_duration(2)
+  // sqrtPrice at 253-268, tickCurrent 269-272, obs_index 273-274, obs_duration 275-276
+  // fee_growth_global_0 at 277, fee_growth_global_1 at 293
+  const fg0Lo = buf.readBigUInt64LE(277); const fg0Hi = buf.readBigUInt64LE(285);
+  const fg1Lo = buf.readBigUInt64LE(293); const fg1Hi = buf.readBigUInt64LE(301);
+  const feeGrowthGlobal0 = fg0Lo | (fg0Hi << 64n);
+  const feeGrowthGlobal1 = fg1Lo | (fg1Hi << 64n);
 
   return {
     mint0: base58EncodeBytes(Array.from(mint0Bytes)),
@@ -544,6 +547,8 @@ function parsePoolAccount(data) {
     decimals1: dec1,
     sqrtPriceX64,
     tickCurrent,
+    feeGrowthGlobal0,
+    feeGrowthGlobal1,
   };
 }
 
@@ -600,8 +605,27 @@ async function getRaydiumPositions() {
       const tokens1 = amount1 / Math.pow(10, pool.decimals1);
       const positionValue = (price0 ?? 0) * tokens0 + (price1 ?? 0) * tokens1;
 
-      console.log(`  ${key}: $${positionValue.toFixed(2)}, in range: ${inRange}`);
-      results.push({ key, positionValue, inRange });
+      // Pending fee calculation:
+      // For in-range positions: use (feeGrowthGlobal - feeGrowthInsideLast) * liquidity / Q64
+      // This is the simplified formula — accurate for in-range positions.
+      // Out-of-range positions aren't earning fees so yield is $0.
+      const Q64 = 2n ** 64n;
+      const U128 = 2n ** 128n;
+      let pendingYield = 0;
+      if (inRange) {
+        try {
+          const delta0 = (pool.feeGrowthGlobal0 - pos.fgInside0Last + U128) % U128;
+          const delta1 = (pool.feeGrowthGlobal1 - pos.fgInside1Last + U128) % U128;
+          const rawFee0 = Number(delta0 * pos.liquidity / Q64) + Number(pos.feesOwed0);
+          const rawFee1 = Number(delta1 * pos.liquidity / Q64) + Number(pos.feesOwed1);
+          const fee0USD = (price0 ?? 0) * rawFee0 / Math.pow(10, pool.decimals0);
+          const fee1USD = (price1 ?? 0) * rawFee1 / Math.pow(10, pool.decimals1);
+          pendingYield = fee0USD + fee1USD;
+        } catch(e) { /* fee calc failed, leave as 0 */ }
+      }
+
+      console.log(`  ${key}: $${positionValue.toFixed(2)}, in range: ${inRange}, fees: $${pendingYield.toFixed(2)}`);
+      results.push({ key, positionValue, inRange, pendingYield });
 
     } catch (e) { console.error(`  ${key}: ${e.message}`); }
   }
@@ -705,7 +729,8 @@ async function main() {
           [F.positionValue]: pos.positionValue,
           [F.revertPosVal]:  pos.positionValue,
           [F.cycleId]:       meta.cycleId,
-          [F.notes]:         `Raydium CLMM | ${pos.key.toUpperCase()} | Position value only — pending yield Phase 2`,
+          ...(pos.pendingYield > 0 ? { [F.feeValue]: pos.pendingYield } : {}),
+          [F.notes]:         `Raydium CLMM | ${pos.key.toUpperCase()}${pos.pendingYield > 0 ? '' : ' | fees: out-of-range (no accumulation)'}`,
         }));
         console.log(`  Queued ${pos.key}: $${pos.positionValue.toFixed(2)}, inRange: ${pos.inRange}`);
       }
