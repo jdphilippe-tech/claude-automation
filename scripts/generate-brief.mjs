@@ -301,7 +301,7 @@ STEP 2 — Market Data (web search)
 Search for:
   • ETH current price in USD
   • BTC current price in USD
-  • Crypto Fear & Greed index (number and label)
+  • Crypto Fear & Greed index — search "alternative.me fear greed index" and look for a number between 0-100 in the description. It will say something like "Now: 28" or "Current value is 28 (Fear)". Extract just the number and label. If you cannot find a specific number, say "Market sentiment data was unavailable at brief time" — do NOT estimate or guess a number.
 
 STEP 3 — Zone Determination
 You must know the current band parameters. Check the Airtable records — the
@@ -351,6 +351,7 @@ ElevenLabs will read this text aloud. Numbers must be written as words:
   ✓ "one hundred and forty-six dollars"       ✗ "$146"
   ✓ "sixty-four percent"                      ✗ "64%"
   ✓ "thirty thousand dollars"                 ✗ "$30,000"
+  ✓ "LP" is spoken as "el-pee" by ElevenLabs — write it as "LP" not "L-P"
   ✓ "sixteen days"                            ✗ "sixteen point one days"
 
 Tickers must be phonetic:
