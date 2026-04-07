@@ -680,6 +680,11 @@ async function getRaydiumPositions() {
         }
 
         // Step 2 & 3: If tick arrays found, compute feeGrowthInside
+        // Always include tokenFeesOwed as floor (accrued regardless of range status)
+        const feesOwed0USD = (price0 ?? 0) * Number(pos.feesOwed0) / Math.pow(10, pool.decimals0);
+        const feesOwed1USD = (price1 ?? 0) * Number(pos.feesOwed1) / Math.pow(10, pool.decimals1);
+        pendingYield = feesOwed0USD + feesOwed1USD;
+
         if (lowerTickArrayAddr && inRange) {
           const TICK_SIZE = 168;
           const TA_HEADER = 44; // disc(8)+pool_id(32)+start_tick(4)
