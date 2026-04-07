@@ -513,13 +513,8 @@ function parsePoolAccount(data) {
   const dec1       = buf.readUInt8(234);
   const sqrtLo     = buf.readBigUInt64LE(253);
   const sqrtHi     = buf.readBigUInt64LE(261);
-  // Try reading tickCurrent at both candidate offsets for debugging
-  const tickAt254 = buf.readInt32LE(254);
-  const tickAt269 = buf.readInt32LE(269);
-  const tickAt273 = buf.readInt32LE(273);
-  const tickCurrent = tickAt269;
+  const tickCurrent = buf.readInt32LE(254);
   return {
-    tickAt254, tickAt269, tickAt273,
     mint0: base58EncodeBytes(Array.from(mint0Bytes)),
     mint1: base58EncodeBytes(Array.from(mint1Bytes)),
     decimals0: dec0,
@@ -570,8 +565,6 @@ async function getRaydiumPositions() {
       if (!poolRes?.value?.data) { console.error(`  ${key}: pool not found`); continue; }
 
       const pool = parsePoolAccount(poolRes.value.data[0]);
-      console.log(`  Pool tick debug: tickAt254=${pool.tickAt254} tickAt269=${pool.tickAt269} tickAt273=${pool.tickAt273} | pos range [${pos.tickLower}, ${pos.tickUpper}]`);
-
       // Get prices
       const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/solana:${pool.mint0},solana:${pool.mint1}`);
       const price0    = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
