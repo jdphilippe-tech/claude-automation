@@ -2,10 +2,9 @@ import fs from 'fs';
 
 const AUDIO_FILE = process.env.AUDIO_FILE;
 const BRIEF_DATE = process.env.BRIEF_DATE;
-const REPO_URL = process.env.REPO_URL;
-
-const BRIEF_FILE = process.env.BRIEF_TEXT_FILE || '/tmp/brief.txt';
-const DESC_FILE = process.env.DESCRIPTION_FILE || '/tmp/description.txt';
+const REPO_URL   = process.env.REPO_URL;
+const BRIEF_FILE = process.env.BRIEF_TEXT_FILE || 'audio/brief-text.txt';
+const DESC_FILE  = process.env.DESCRIPTION_FILE || '/tmp/description.txt';
 
 if (!AUDIO_FILE || !BRIEF_DATE || !REPO_URL) {
   console.error('Missing required env vars: AUDIO_FILE, BRIEF_DATE, REPO_URL');
@@ -21,10 +20,10 @@ const description = fs.existsSync(DESC_FILE)
   ? fs.readFileSync(DESC_FILE, 'utf8').trim()
   : 'Daily portfolio and market intelligence brief.';
 
-const RSS_FILE = 'feed.xml';
-const audioUrl = `${REPO_URL}/${AUDIO_FILE}`;
-const fileSize = fs.statSync(AUDIO_FILE).size;
-const pubDate = new Date().toUTCString();
+const RSS_FILE   = 'feed.xml';
+const audioUrl   = `${REPO_URL}/${AUDIO_FILE}`;
+const fileSize   = fs.statSync(AUDIO_FILE).size;
+const pubDate    = new Date().toUTCString();
 const ARTWORK_URL = `${REPO_URL}/artwork.jpg`;
 
 let existingItems = '';
@@ -42,7 +41,6 @@ const displayDate = d.toLocaleDateString('en-US', {
   timeZone: 'UTC'
 });
 
-// Plain hyphen — no encoding issues
 const episodeTitle = `Morning Brief - ${displayDate}`;
 
 const newItem = `<item>
