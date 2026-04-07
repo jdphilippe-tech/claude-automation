@@ -511,16 +511,31 @@ function parsePoolAccount(data) {
   const mint1Bytes = buf.slice(105, 137);
   const dec0       = buf.readUInt8(233);
   const dec1       = buf.readUInt8(234);
-  const sqrtLo      = buf.readBigUInt64LE(253);
-  const sqrtHi      = buf.readBigUInt64LE(261);
-  const sqrtPriceX64 = sqrtLo | (sqrtHi << 64n);
+  // Read sqrtPrice at multiple candidate offsets for diagnosis
+  const sqrtLo_237 = buf.readBigUInt64LE(237); const sqrtHi_237 = buf.readBigUInt64LE(245);
+  const sqrtLo_253 = buf.readBigUInt64LE(253); const sqrtHi_253 = buf.readBigUInt64LE(261);
 
-  // Derive tickCurrent from sqrtPriceX64 mathematically — avoids byte offset issues
-  // tick = log(sqrtPrice^2) / log(1.0001) where sqrtPrice = sqrtPriceX64 / 2^64
-  const Q64f = Number(2n ** 64n);
-  const sqrtPriceFloat = Number(sqrtPriceX64 / 2n**64n) + Number(sqrtPriceX64 % 2n**64n) / Q64f;
+  const Q64 = 2n ** 64n;
+  const Q64f = Number(Q64);
+
+  function sqrtToTick(lo, hi) {
+    const sqrtX64 = lo | (hi << 64n);
+    const f = Number(sqrtX64 / Q64) + Number(sqrtX64 % Q64) / Q64f;
+    const p = f * f;
+    if (p <= 0) return -999999;
+    return Math.round(Math.log(p) / Math.log(1.0001));
+  }
+
+  const tick_237 = sqrtToTick(sqrtLo_237, sqrtHi_237);
+  const tick_253 = sqrtToTick(sqrtLo_253, sqrtHi_253);
+
+  console.log(`  [sqrtDiag] offset237→tick=${tick_237} | offset253→tick=${tick_253} | bufLen=${buf.length}`);
+
+  // Use 253 as primary (confirmed from source)
+  const sqrtPriceX64 = sqrtLo_253 | (sqrtHi_253 << 64n);
+  const sqrtPriceFloat = Number(sqrtPriceX64 / Q64) + Number(sqrtPriceX64 % Q64) / Q64f;
   const rawPrice = sqrtPriceFloat * sqrtPriceFloat;
-  const tickCurrent = Math.round(Math.log(rawPrice) / Math.log(1.0001));
+  const tickCurrent = tick_253;
 
   return {
     mint0: base58EncodeBytes(Array.from(mint0Bytes)),
