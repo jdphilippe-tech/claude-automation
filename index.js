@@ -1048,13 +1048,14 @@ async function main() {
   }
 
   // Lighter (LLP, Edge & Hedge, LIT Staking)
-  // Note: annual_percentage_yield from Lighter API is already in % (e.g. 11.57 = 11.57%)
+  // Note: annual_percentage_yield from Lighter API is in whole % (e.g. 11.57 = 11.57%)
+  // Protocol APR (Raw) field expects decimal (e.g. 0.1157) — divide by 100
   if (lighter && Object.keys(lighter).length > 0) {
     const batch = [];
     if (lighter.llp) {
       batch.push(dailyRecord(ASSET.lighterLLP, true, {
         [F.positionValue]: lighter.llp.equity,
-        ...(lighter.llp.apr != null ? { [F.protocolAPR]: lighter.llp.apr } : {}),
+        ...(lighter.llp.apr != null ? { [F.protocolAPR]: lighter.llp.apr / 100 } : {}),
         [F.notes]:         `Lighter LLP | Equity: $${lighter.llp.equity.toFixed(2)} | APY: ${lighter.llp.apr?.toFixed(2)}% | Shares: ${lighter.llp.shares}`,
       }));
       console.log(`  Queued LLP: $${lighter.llp.equity.toFixed(2)}, APY ${lighter.llp.apr?.toFixed(2)}%`);
@@ -1062,7 +1063,7 @@ async function main() {
     if (lighter.edge) {
       batch.push(dailyRecord(ASSET.lighterEdge, true, {
         [F.positionValue]: lighter.edge.equity,
-        ...(lighter.edge.apr != null ? { [F.protocolAPR]: lighter.edge.apr } : {}),
+        ...(lighter.edge.apr != null ? { [F.protocolAPR]: lighter.edge.apr / 100 } : {}),
         [F.notes]:         `Lighter Edge & Hedge | Equity: $${lighter.edge.equity.toFixed(2)} | APY: ${lighter.edge.apr?.toFixed(2)}% | Shares: ${lighter.edge.shares}`,
       }));
       console.log(`  Queued Edge & Hedge: $${lighter.edge.equity.toFixed(2)}, APY ${lighter.edge.apr?.toFixed(2)}%`);
@@ -1070,7 +1071,7 @@ async function main() {
     if (lighter.lit) {
       batch.push(dailyRecord(ASSET.lighterLIT, true, {
         [F.positionValue]: lighter.lit.equity,
-        ...(lighter.lit.apr != null ? { [F.protocolAPR]: lighter.lit.apr } : {}),
+        ...(lighter.lit.apr != null ? { [F.protocolAPR]: lighter.lit.apr / 100 } : {}),
         [F.notes]:         `LIT Staking | ${lighter.lit.litStakeAmount} LIT × $${lighter.lit.litPrice?.toFixed(4)} = $${lighter.lit.equity.toFixed(2)} | APR: ${lighter.lit.apr?.toFixed(2)}%`,
       }));
       console.log(`  Queued LIT Staking: $${lighter.lit.equity.toFixed(2)}, APR ${lighter.lit.apr?.toFixed(2)}%`);
