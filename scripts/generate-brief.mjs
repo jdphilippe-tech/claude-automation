@@ -207,7 +207,7 @@ async function runClaude(systemPrompt, userPrompt) {
       },
       body: JSON.stringify({
         model:      CLAUDE_MODEL,
-        max_tokens: 1024,  // brief is ~150 words, 1024 tokens is plenty
+        max_tokens: 4096,  // raised from 1024 — Claude needs room to reason through data before writing the brief
         system:     systemPrompt,
         tools:      TOOLS,
         messages
@@ -251,6 +251,13 @@ async function runClaude(systemPrompt, userPrompt) {
         });
       }
       messages.push({ role: 'user', content: toolResults });
+      continue;
+    }
+
+    // max_tokens during reasoning — continue the loop so Claude can finish
+    if (response.stop_reason === 'max_tokens') {
+      console.warn('  Warning: hit max_tokens mid-response — continuing loop');
+      messages.push({ role: 'user', content: [{ type: 'text', text: 'Continue.' }] });
       continue;
     }
 
