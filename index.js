@@ -1,8 +1,11 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v28
-// Lighter: LLP + Edge & Hedge (authenticated shares) + LIT Staking (price × amount)
-// Retained: WETH/USDC Primary (Arbitrum), Moonwell (Base), Suilend (Sui), Raydium (Solana)
-// Schedule: 14:00 UTC = 7:00 AM PDT
+// Daily Portfolio Check — GitHub Actions v29
+// Added: ETH Short Hedge (Hyperliquid)
+// Fixed: removed revertPosVal from WETH/USDC + xStocks
+//        Lighter APR format (already %, no conversion needed)
+//        ETH Hedge protocol APR removed (not applicable)
+//        LIT/LLP/Edge APR written correctly as decimal percentage
+// Schedule: 14:00 UTC = 7:00 AM PDT (triggered via cron-job.org)
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -12,8 +15,9 @@ const AIRTABLE_BASE    = 'appWojaxYR99bXC1f';
 const DAILY_TABLE      = 'tblKsk0QnkOoKNLuk';
 const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
 
-const WALLET_EVM  = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
-const WALLET_SUI  = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
+const WALLET_EVM        = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
+const WALLET_SUI        = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
+const WALLET_HYPERLIQUID = '0x464b059B1AF55A408CB3c822D610c2D962d2cf4b';
 const WETH_POS_ID = 5384162n;
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
@@ -66,7 +70,8 @@ const LF = {
 
 // ---- Asset record IDs ----
 const ASSET = {
-  wethPrimary: 'recbVsmOWh9YOWPBZ',
+  wethPrimary:  'recbVsmOWh9YOWPBZ',
+  ethHedge:     'recgASxadhJMkNNry',
   lighterLLP:   'recEFiaxgavObYWzL',
   lighterEdge:  'rectz3Zo3aDbe4GgL',
   lighterLIT:   'receiu02rkzc3quDW',
@@ -787,7 +792,7 @@ async function getLighterPositions() {
       const equity = llp.account_share.shares_amount * pricePerShare;
       const apr = llp.annual_percentage_yield ?? null;
       console.log(`LLP: shares=${llp.account_share.shares_amount}, equity=$${equity.toFixed(2)}, APY=${apr?.toFixed(2)}%`);
-      results.llp = { equity, apr };
+      results.llp = { equity, apr, shares: llp.account_share.shares_amount };
     } else {
       console.error('LLP: no account_share in response');
     }
@@ -803,7 +808,7 @@ async function getLighterPositions() {
       const equity = edge.account_share.shares_amount * pricePerShare;
       const apr = edge.annual_percentage_yield ?? null;
       console.log(`Edge & Hedge: shares=${edge.account_share.shares_amount}, equity=$${equity.toFixed(2)}, APY=${apr?.toFixed(2)}%`);
-      results.edge = { equity, apr };
+      results.edge = { equity, apr, shares: edge.account_share.shares_amount };
     } else {
       console.error('Edge & Hedge: no account_share in response');
     }
@@ -855,19 +860,86 @@ async function getLighterPositions() {
 }
 
 // ============================================================
+// MODULE 6 — ETH Short Hedge (Hyperliquid)
+// Position Value = USDC spot balance
+// PnL, Entry, Size written to Notes field
+// Protocol APR not written — funding rate not meaningful as APR
+// ============================================================
+
+async function getEthHedge() {
+  console.log('\n--- ETH Short Hedge ---');
+  try {
+    const [hlState, hlSpot, hlFunding] = await Promise.all([
+      fetchWithTimeout('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'clearinghouseState', user: WALLET_HYPERLIQUID }),
+      }),
+      fetchWithTimeout('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'spotClearinghouseState', user: WALLET_HYPERLIQUID }),
+      }),
+      fetchWithTimeout('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'fundingHistory', coin: 'ETH', startTime: Date.now() - 3600000 }),
+      }),
+    ]);
+
+    // USDC spot balance = position value
+    let positionValue = null;
+    const balances = hlSpot?.balances ?? [];
+    const usdc = balances.find(b => b.coin === 'USDC' || b.coin === 'USDC.e');
+    if (usdc) {
+      positionValue = parseFloat(usdc.total ?? usdc.hold ?? 0);
+      console.log(`Portfolio Value (USDC): $${positionValue.toFixed(2)}`);
+    }
+
+    // ETH perp position — PnL, entry, size
+    let hedgeData = null;
+    const ethPos = (hlState?.assetPositions ?? []).find(p => p.position?.coin === 'ETH');
+    if (ethPos) {
+      const pos = ethPos.position;
+      hedgeData = {
+        unrealizedPnl: parseFloat(pos.unrealizedPnl ?? 0),
+        entryPx:       parseFloat(pos.entryPx ?? 0),
+        size:          parseFloat(pos.szi ?? 0),
+      };
+      console.log(`ETH PnL: $${hedgeData.unrealizedPnl.toFixed(2)}, entry: $${hedgeData.entryPx}, size: ${hedgeData.size} ETH`);
+    } else {
+      console.log('No active ETH position found');
+    }
+
+    // Build notes
+    const noteParts = [];
+    if (hedgeData?.unrealizedPnl != null) noteParts.push(`PnL: $${hedgeData.unrealizedPnl.toFixed(2)}`);
+    if (hedgeData?.entryPx)               noteParts.push(`Entry: $${hedgeData.entryPx}`);
+    if (hedgeData?.size)                  noteParts.push(`Size: ${hedgeData.size} ETH`);
+    const notes = noteParts.length > 0 ? noteParts.join(' | ') : 'No active ETH position';
+
+    return { positionValue, notes };
+  } catch (e) {
+    console.error(`ETH Hedge fatal: ${e.message}`);
+    return null;
+  }
+}
+
+// ============================================================
 // MAIN
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v28 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v29 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
-  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes] = await Promise.allSettled([
+  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes] = await Promise.allSettled([
     getWethPosition(),
     getMoonwellData(),
     getSuilendData(),
     getRaydiumPositions(),
     getLighterPositions(),
+    getEthHedge(),
   ]);
 
   const weth     = wethRes.status     === 'fulfilled' ? wethRes.value     : null;
@@ -875,6 +947,7 @@ async function main() {
   const suilend  = suilendRes.status  === 'fulfilled' ? suilendRes.value  : null;
   const raydium  = raydiumRes.status  === 'fulfilled' ? raydiumRes.value  : [];
   const lighter  = lighterRes.status  === 'fulfilled' ? lighterRes.value  : {};
+  const hedge    = hedgeRes.status    === 'fulfilled' ? hedgeRes.value    : null;
 
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
@@ -883,11 +956,19 @@ async function main() {
   if (weth) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
       [F.positionValue]: weth.positionValue,
-      [F.revertPosVal]:  weth.positionValue,
       ...(weth.feeValue > 0 ? { [F.feeValue]: weth.feeValue } : {}),
       [F.notes]: `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
     })]);
     if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}`); }
+  }
+
+  // ETH Short Hedge (Hyperliquid)
+  if (hedge?.positionValue != null) {
+    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.ethHedge, true, {
+      [F.positionValue]: hedge.positionValue,
+      [F.notes]:         hedge.notes,
+    })]);
+    if (ok) { written++; console.log(`✓ ETH Hedge: $${hedge.positionValue.toFixed(2)} | ${hedge.notes}`); }
   }
 
   // Moonwell
@@ -950,7 +1031,6 @@ async function main() {
         if (!meta) continue;
         batch.push(dailyRecord(meta.recordId, pos.inRange, {
           [F.positionValue]: pos.positionValue,
-          [F.revertPosVal]:  pos.positionValue,
           [F.cycleId]:       meta.cycleId,
           ...(pos.pendingYield > 0 ? { [F.feeValue]: pos.pendingYield } : {}),
           [F.notes]:         `Raydium CLMM | ${pos.key.toUpperCase()}${pos.pendingYield > 0 ? '' : ' | fees: out-of-range (no accumulation)'}`,
@@ -968,13 +1048,14 @@ async function main() {
   }
 
   // Lighter (LLP, Edge & Hedge, LIT Staking)
+  // Note: annual_percentage_yield from Lighter API is already in % (e.g. 11.57 = 11.57%)
   if (lighter && Object.keys(lighter).length > 0) {
     const batch = [];
     if (lighter.llp) {
       batch.push(dailyRecord(ASSET.lighterLLP, true, {
         [F.positionValue]: lighter.llp.equity,
         ...(lighter.llp.apr != null ? { [F.protocolAPR]: lighter.llp.apr } : {}),
-        [F.notes]:         `Lighter LLP | APY: ${lighter.llp.apr?.toFixed(2)}%`,
+        [F.notes]:         `Lighter LLP | Equity: $${lighter.llp.equity.toFixed(2)} | APY: ${lighter.llp.apr?.toFixed(2)}% | Shares: ${lighter.llp.shares}`,
       }));
       console.log(`  Queued LLP: $${lighter.llp.equity.toFixed(2)}, APY ${lighter.llp.apr?.toFixed(2)}%`);
     }
@@ -982,7 +1063,7 @@ async function main() {
       batch.push(dailyRecord(ASSET.lighterEdge, true, {
         [F.positionValue]: lighter.edge.equity,
         ...(lighter.edge.apr != null ? { [F.protocolAPR]: lighter.edge.apr } : {}),
-        [F.notes]:         `Lighter Edge & Hedge | APY: ${lighter.edge.apr?.toFixed(2)}%`,
+        [F.notes]:         `Lighter Edge & Hedge | Equity: $${lighter.edge.equity.toFixed(2)} | APY: ${lighter.edge.apr?.toFixed(2)}% | Shares: ${lighter.edge.shares}`,
       }));
       console.log(`  Queued Edge & Hedge: $${lighter.edge.equity.toFixed(2)}, APY ${lighter.edge.apr?.toFixed(2)}%`);
     }
@@ -990,7 +1071,7 @@ async function main() {
       batch.push(dailyRecord(ASSET.lighterLIT, true, {
         [F.positionValue]: lighter.lit.equity,
         ...(lighter.lit.apr != null ? { [F.protocolAPR]: lighter.lit.apr } : {}),
-        [F.notes]:         `LIT Staking | ${lighter.lit.litStakeAmount} LIT × $${lighter.lit.litPrice?.toFixed(4)} | APR: ${lighter.lit.apr?.toFixed(2)}%`,
+        [F.notes]:         `LIT Staking | ${lighter.lit.litStakeAmount} LIT × $${lighter.lit.litPrice?.toFixed(4)} = $${lighter.lit.equity.toFixed(2)} | APR: ${lighter.lit.apr?.toFixed(2)}%`,
       }));
       console.log(`  Queued LIT Staking: $${lighter.lit.equity.toFixed(2)}, APR ${lighter.lit.apr?.toFixed(2)}%`);
     }
