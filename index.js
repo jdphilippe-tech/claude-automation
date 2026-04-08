@@ -790,8 +790,8 @@ async function getLighterPositions() {
     if (llp && llp.account_share) {
       const pricePerShare = Number(llp.total_asset_value) / Number(llp.total_shares);
       const equity = llp.account_share.shares_amount * pricePerShare;
-      const apr = llp.annual_percentage_yield ?? null;
-      console.log(`LLP: shares=${llp.account_share.shares_amount}, equity=$${equity.toFixed(2)}, APY=${apr?.toFixed(2)}%`);
+      const apr = llp.annual_percentage_yield != null ? llp.annual_percentage_yield / 100 : null;
+      console.log(`LLP: shares=${llp.account_share.shares_amount}, equity=$${equity.toFixed(2)}, APY=${llp.annual_percentage_yield?.toFixed(2)}%`);
       results.llp = { equity, apr, shares: llp.account_share.shares_amount };
     } else {
       console.error('LLP: no account_share in response');
@@ -806,8 +806,8 @@ async function getLighterPositions() {
     if (edge && edge.account_share) {
       const pricePerShare = Number(edge.total_asset_value) / Number(edge.total_shares);
       const equity = edge.account_share.shares_amount * pricePerShare;
-      const apr = edge.annual_percentage_yield ?? null;
-      console.log(`Edge & Hedge: shares=${edge.account_share.shares_amount}, equity=$${equity.toFixed(2)}, APY=${apr?.toFixed(2)}%`);
+      const apr = edge.annual_percentage_yield != null ? edge.annual_percentage_yield / 100 : null;
+      console.log(`Edge & Hedge: shares=${edge.account_share.shares_amount}, equity=$${edge.equity?.toFixed(2)}, APY=${edge.annual_percentage_yield?.toFixed(2)}%`);
       results.edge = { equity, apr, shares: edge.account_share.shares_amount };
     } else {
       console.error('Edge & Hedge: no account_share in response');
@@ -816,7 +816,7 @@ async function getLighterPositions() {
     // LIT Staking — try to find staking pool with account_index to get live stake amount
     // Staking pool is a protocol pool; scan IDs near known range with filter=protocol
     let litStakeAmount = LIT_STAKE_AMOUNT; // fallback to hardcoded
-    let litAPR = 6.84; // fallback APR from UI
+    let litAPR = 0.0684; // fallback APR from UI (6.84% as decimal)
     const stakingSearchRes = await fetchWithTimeout(
       `${LIGHTER_BASE}/publicPoolsMetadata?index=0&limit=100&filter=protocol`,
       { headers }
@@ -834,7 +834,7 @@ async function getLighterPositions() {
       if (litPoolData?.account_share) {
         // For staking pools, principal_amount = tokens staked
         litStakeAmount = Number(litPoolData.account_share.principal_amount ?? litPoolData.account_share.shares_amount);
-        litAPR = litPoolData.annual_percentage_yield ?? litAPR;
+        litAPR = litPoolData.annual_percentage_yield != null ? litPoolData.annual_percentage_yield / 100 : litAPR;
         console.log(`LIT stake from API: ${litStakeAmount} LIT, APR=${litAPR?.toFixed(2)}%`);
       }
     } else {
@@ -1048,33 +1048,33 @@ async function main() {
   }
 
   // Lighter (LLP, Edge & Hedge, LIT Staking)
-  // Note: annual_percentage_yield from Lighter API is in whole % (e.g. 11.57 = 11.57%)
-  // Protocol APR (Raw) field expects decimal (e.g. 0.1157) — divide by 100
+  // Note: APR values are normalized to decimal in the module (e.g. 0.1157 for 11.57%)
+  // Write directly — no conversion needed here
   if (lighter && Object.keys(lighter).length > 0) {
     const batch = [];
     if (lighter.llp) {
       batch.push(dailyRecord(ASSET.lighterLLP, true, {
         [F.positionValue]: lighter.llp.equity,
-        ...(lighter.llp.apr != null ? { [F.protocolAPR]: lighter.llp.apr / 100 } : {}),
-        [F.notes]:         `Lighter LLP | Equity: $${lighter.llp.equity.toFixed(2)} | APY: ${lighter.llp.apr?.toFixed(2)}% | Shares: ${lighter.llp.shares}`,
+        ...(lighter.llp.apr != null ? { [F.protocolAPR]: lighter.llp.apr } : {}),
+        [F.notes]:         `Lighter LLP | Equity: $${lighter.llp.equity.toFixed(2)} | APY: ${(lighter.llp.apr * 100)?.toFixed(2)}% | Shares: ${lighter.llp.shares}`,
       }));
-      console.log(`  Queued LLP: $${lighter.llp.equity.toFixed(2)}, APY ${lighter.llp.apr?.toFixed(2)}%`);
+      console.log(`  Queued LLP: $${lighter.llp.equity.toFixed(2)}, APY ${(lighter.llp.apr * 100)?.toFixed(2)}%`);
     }
     if (lighter.edge) {
       batch.push(dailyRecord(ASSET.lighterEdge, true, {
         [F.positionValue]: lighter.edge.equity,
-        ...(lighter.edge.apr != null ? { [F.protocolAPR]: lighter.edge.apr / 100 } : {}),
-        [F.notes]:         `Lighter Edge & Hedge | Equity: $${lighter.edge.equity.toFixed(2)} | APY: ${lighter.edge.apr?.toFixed(2)}% | Shares: ${lighter.edge.shares}`,
+        ...(lighter.edge.apr != null ? { [F.protocolAPR]: lighter.edge.apr } : {}),
+        [F.notes]:         `Lighter Edge & Hedge | Equity: $${lighter.edge.equity.toFixed(2)} | APY: ${(lighter.edge.apr * 100)?.toFixed(2)}% | Shares: ${lighter.edge.shares}`,
       }));
-      console.log(`  Queued Edge & Hedge: $${lighter.edge.equity.toFixed(2)}, APY ${lighter.edge.apr?.toFixed(2)}%`);
+      console.log(`  Queued Edge & Hedge: $${lighter.edge.equity.toFixed(2)}, APY ${(lighter.edge.apr * 100)?.toFixed(2)}%`);
     }
     if (lighter.lit) {
       batch.push(dailyRecord(ASSET.lighterLIT, true, {
         [F.positionValue]: lighter.lit.equity,
-        ...(lighter.lit.apr != null ? { [F.protocolAPR]: lighter.lit.apr / 100 } : {}),
-        [F.notes]:         `LIT Staking | ${lighter.lit.litStakeAmount} LIT × $${lighter.lit.litPrice?.toFixed(4)} = $${lighter.lit.equity.toFixed(2)} | APR: ${lighter.lit.apr?.toFixed(2)}%`,
+        ...(lighter.lit.apr != null ? { [F.protocolAPR]: lighter.lit.apr } : {}),
+        [F.notes]:         `LIT Staking | ${lighter.lit.litStakeAmount} LIT × $${lighter.lit.litPrice?.toFixed(4)} = $${lighter.lit.equity.toFixed(2)} | APR: ${(lighter.lit.apr * 100)?.toFixed(2)}%`,
       }));
-      console.log(`  Queued LIT Staking: $${lighter.lit.equity.toFixed(2)}, APR ${lighter.lit.apr?.toFixed(2)}%`);
+      console.log(`  Queued LIT Staking: $${lighter.lit.equity.toFixed(2)}, APR ${(lighter.lit.apr * 100)?.toFixed(2)}%`);
     }
     if (batch.length > 0) {
       const ok = await airtableCreate(DAILY_TABLE, batch);
