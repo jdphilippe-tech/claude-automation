@@ -207,7 +207,7 @@ async function runClaude(systemPrompt, userPrompt) {
       },
       body: JSON.stringify({
         model:      CLAUDE_MODEL,
-        max_tokens: 4096,
+        max_tokens: 1024,  // brief is ~150 words, 1024 tokens is plenty
         system:     systemPrompt,
         tools:      TOOLS,
         messages
@@ -227,7 +227,16 @@ async function runClaude(systemPrompt, userPrompt) {
     if (response.stop_reason === 'end_turn') {
       const textBlock = response.content.find(b => b.type === 'text');
       if (!textBlock) throw new Error('end_turn but no text block');
-      return textBlock.text.trim();
+      
+      // Extract only the brief — starts with "Good morning" and contains no code/JSON
+      // Claude may include preamble or reasoning before the brief text
+      const raw = textBlock.text.trim();
+      const briefStart = raw.indexOf('Good morning');
+      if (briefStart === -1) {
+        console.warn('Warning: could not find "Good morning" in response — using full text');
+        return raw;
+      }
+      return raw.slice(briefStart).trim();
     }
 
     if (response.stop_reason === 'tool_use') {
@@ -255,7 +264,7 @@ async function runClaude(systemPrompt, userPrompt) {
 
 const SYSTEM_PROMPT = `You are the morning brief generator for JD's Portfolio OS — a personal DeFi portfolio management system.
 
-Your job: fetch all required data using your tools, compute everything yourself, and return the spoken audio brief text. Nothing else — no JSON wrapper, no markdown, just the words to be spoken aloud.
+Your job: fetch all required data using your tools, compute everything yourself, and return the spoken audio brief text. Nothing else — no JSON wrapper, no markdown, no preamble, no explanation. Your ENTIRE response must start with "Good morning." and end with "Have a good one." Any text before "Good morning" or after "Have a good one." will be stripped and discarded.
 
 ═══════════════════════════════════════
 DATA FETCHING INSTRUCTIONS
