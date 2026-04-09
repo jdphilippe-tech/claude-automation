@@ -1,0 +1,28 @@
+name: Fee Check
+
+on:
+  # Manually triggered only — run this before claiming fees on any LP position.
+  # After triggering, post the claim tx hash in chat to log Claim records in Airtable.
+  workflow_dispatch:
+
+jobs:
+  fee-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run fee check
+        env:
+          AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
+          SOL_RPC_URL: ${{ secrets.SOL_RPC_URL }}
+          RAYDIUM_DRY_RUN: ${{ vars.RAYDIUM_DRY_RUN }}
+        run: node scripts/fee-check.mjs
