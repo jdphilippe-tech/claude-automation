@@ -7,10 +7,9 @@
 //
 // Triggered manually via GitHub Actions → Fee Check workflow.
 // Use this before claiming fees to get a current fee balance.
-// After claiming, post the tx hash in chat to log a Claim record.
+// After claiming, post the tx hash in chat to log Claim records.
 //
-// Logic is identical to the daily automation (index.js) for
-// these two modules — no Moonwell, Suilend, Lighter, or hedge.
+// Logic lifted verbatim from index.js for these two modules.
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -25,7 +24,7 @@ const WETH_POS_ID = 5384162n;
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 const SOL_RPC      = process.env.SOL_RPC_URL ?? 'https://api.mainnet-beta.solana.com';
 
-const RAYDIUM_DRY_RUN    = (process.env.RAYDIUM_DRY_RUN ?? 'true') !== 'false';
+const RAYDIUM_DRY_RUN      = (process.env.RAYDIUM_DRY_RUN ?? 'true') !== 'false';
 const RAYDIUM_CLMM_PROGRAM = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
 
 const NOW_UTC = new Date().toISOString();
@@ -75,7 +74,7 @@ function dailyRecord(assetRecordId, inRange, extra = {}) {
   };
 }
 
-// ── MODULE 1 — WETH/USDC PRIMARY (Arbitrum) ─────────────────────────────────
+// ── MODULE 1 — WETH/USDC PRIMARY (Arbitrum) — verbatim from index.js ────────
 
 async function getWethPosition() {
   console.log('\n--- WETH/USDC Primary ---');
@@ -143,8 +142,7 @@ async function getWethPosition() {
   }
 }
 
-// ── MODULE 2 — RAYDIUM xSTOCKS CLMMs (Solana) ───────────────────────────────
-// (Identical logic to index.js getRaydiumPositions)
+// ── MODULE 2 — RAYDIUM xSTOCKS CLMMs — verbatim from index.js ───────────────
 
 async function fetchWithTimeout(url, opts = {}, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -165,50 +163,59 @@ async function solRpc(method, params) {
   return res?.result ?? null;
 }
 
-const BASE58_CHARS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-function base58EncodeBytes(bytes) {
-  let n = 0n;
-  for (const b of bytes) n = n * 256n + BigInt(b);
-  let s = '';
-  while (n > 0n) { s = BASE58_CHARS[Number(n % 58n)] + s; n /= 58n; }
-  for (const b of bytes) { if (b !== 0) break; s = '1' + s; }
-  return s;
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function base58EncodeBytes(input) {
+  const bytes = Array.from(input);
+  let num = 0n;
+  for (const b of bytes) { num = num * 256n + BigInt(b); }
+  let result = '';
+  while (num > 0n) { result = BASE58_ALPHABET[Number(num % 58n)] + result; num = num / 58n; }
+  for (const b of bytes) { if (b === 0) result = '1' + result; else break; }
+  return result;
 }
 
-function sqrtPriceX64ToFloat(sqrtPriceX64Str) {
-  const val = BigInt(sqrtPriceX64Str);
+function sqrtPriceX64ToFloat(str) {
+  const val = BigInt(str);
   const Q64 = 2n ** 64n;
-  const intPart = val / Q64;
-  const fracPart = val % Q64;
-  return Number(intPart) + Number(fracPart) / Number(Q64);
+  return Number(val / Q64) + Number(val % Q64) / Number(Q64);
 }
 
-function calcAmounts(liquidityStr, tickLower, tickUpper, tickCurrent, sqrtP) {
-  const liq = Number(BigInt(liquidityStr));
-  const sqrtLower   = Math.sqrt(1.0001 ** tickLower);
-  const sqrtUpper   = Math.sqrt(1.0001 ** tickUpper);
-  const sqrtCurrent = sqrtP;
+function calcAmounts(liquidity, tickLower, tickUpper, tickCurrent, sqrtPriceCurrent) {
+  const liq = Number(liquidity);
+  const sqrtL = Math.sqrt(1.0001 ** tickLower);
+  const sqrtU = Math.sqrt(1.0001 ** tickUpper);
+  const sqrtC = sqrtPriceCurrent ?? Math.sqrt(1.0001 ** tickCurrent);
   const inRange = tickCurrent >= tickLower && tickCurrent < tickUpper;
-
-  let amount0 = 0, amount1 = 0;
-  if (inRange) {
-    amount0 = liq * (sqrtUpper - sqrtCurrent) / (sqrtCurrent * sqrtUpper);
-    amount1 = liq * (sqrtCurrent - sqrtLower);
-  } else if (tickCurrent < tickLower) {
-    amount0 = liq * (sqrtUpper - sqrtLower) / (sqrtLower * sqrtUpper);
-  } else {
-    amount1 = liq * (sqrtUpper - sqrtLower);
-  }
-  return { amount0, amount1, inRange };
+  let a0 = 0, a1 = 0;
+  if (inRange)                      { a0 = liq * (sqrtU - sqrtC) / (sqrtC * sqrtU); a1 = liq * (sqrtC - sqrtL); }
+  else if (tickCurrent < tickLower) { a0 = liq * (sqrtU - sqrtL) / (sqrtL * sqrtU); }
+  else                              { a1 = liq * (sqrtU - sqrtL); }
+  return { amount0: a0, amount1: a1, inRange };
 }
 
-function parsePoolAccount(base64Data) {
-  // Layout: disc(8)+bump(1)+amm_config(32)+creator(32)+mint0(32)+mint1(32)+...
-  const buf = Buffer.from(base64Data, 'base64');
+function parsePositionAccount(data) {
+  const buf = Buffer.from(data, 'base64');
+  const tickLower = buf.readInt32LE(73);
+  const tickUpper = buf.readInt32LE(77);
+  const liqLo = buf.readBigUInt64LE(81);
+  const liqHi = buf.readBigUInt64LE(89);
+  const liquidity = liqLo | (liqHi << 64n);
+  const fgi0Lo = buf.readBigUInt64LE(97);  const fgi0Hi = buf.readBigUInt64LE(105);
+  const fgi1Lo = buf.readBigUInt64LE(113); const fgi1Hi = buf.readBigUInt64LE(121);
+  const fgInside0Last = fgi0Lo | (fgi0Hi << 64n);
+  const fgInside1Last = fgi1Lo | (fgi1Hi << 64n);
+  const feesOwed0 = buf.readBigUInt64LE(129);
+  const feesOwed1 = buf.readBigUInt64LE(137);
+  return { tickLower, tickUpper, liquidity, fgInside0Last, fgInside1Last, feesOwed0, feesOwed1 };
+}
+
+function parsePoolAccount(data) {
+  const buf = Buffer.from(data, 'base64');
   const mint0Bytes = buf.slice(73, 105);
   const mint1Bytes = buf.slice(105, 137);
-  const dec0 = buf.readUInt8(233);
-  const dec1 = buf.readUInt8(234);
+  const dec0       = buf.readUInt8(233);
+  const dec1       = buf.readUInt8(234);
   const sqrtLo = buf.readBigUInt64LE(253);
   const sqrtHi = buf.readBigUInt64LE(261);
   const sqrtPriceX64 = sqrtLo | (sqrtHi << 64n);
@@ -233,54 +240,32 @@ function parsePoolAccount(base64Data) {
   };
 }
 
-function parsePersonalPosition(base64Data) {
-  // Layout: disc(8)+bump(1)+nft_mint(32)+pool_id(32)+tick_lower(4)+tick_upper(4)+liquidity(16)
-  //         +fee_growth_inside_0_last(16)+fee_growth_inside_1_last(16)
-  //         +token_fees_owed_0(8)+token_fees_owed_1(8)
-  const buf = Buffer.from(base64Data, 'base64');
-  const tickLower = buf.readInt32LE(73);
-  const tickUpper = buf.readInt32LE(77);
-  const liqLo = buf.readBigUInt64LE(81);
-  const liqHi = buf.readBigUInt64LE(89);
-  const liquidity = liqLo | (liqHi << 64n);
-  const fgi0Lo = buf.readBigUInt64LE(97);  const fgi0Hi = buf.readBigUInt64LE(105);
-  const fgi1Lo = buf.readBigUInt64LE(113); const fgi1Hi = buf.readBigUInt64LE(121);
-  const fgInside0Last = fgi0Lo | (fgi0Hi << 64n);
-  const fgInside1Last = fgi1Lo | (fgi1Hi << 64n);
-  const feesOwed0 = buf.readBigUInt64LE(129);
-  const feesOwed1 = buf.readBigUInt64LE(137);
-  return { tickLower, tickUpper, liquidity, fgInside0Last, fgInside1Last, feesOwed0, feesOwed1 };
-}
-
 async function getRaydiumPositions() {
-  console.log('\n--- Raydium xStocks CLMMs ---');
+  console.log(`\n--- Raydium xStocks CLMM ${RAYDIUM_DRY_RUN ? '[DRY RUN]' : '[LIVE]'} ---`);
   const results = [];
-  const entries = Object.entries(ASSET).filter(([k]) => k !== 'wethPrimary');
 
-  for (const [key, meta] of entries) {
+  const xstockPositions = Object.entries(ASSET)
+    .filter(([, v]) => typeof v === 'object' && v.nftMint)
+    .map(([key, v]) => ({ key, ...v }));
+
+  console.log(`Processing ${xstockPositions.length} hardcoded xStock positions`);
+
+  for (const posConfig of xstockPositions) {
+    const { key, nftMint, poolId } = posConfig;
     try {
-      const { nftMint, poolId } = meta;
-      console.log(`\n  Processing ${key.toUpperCase()}...`);
-
-      // Find personal position account: disc(8)+bump(1)+nft_mint at offset 9
-      const posRes = await solRpc('getProgramAccounts', [
+      const programAccounts = await solRpc('getProgramAccounts', [
         RAYDIUM_CLMM_PROGRAM,
-        {
-          encoding: 'base64',
-          filters: [
-            { dataSize: 281 },
-            { memcmp: { offset: 9, bytes: nftMint } }
-          ]
-        }
+        { encoding: 'base64', filters: [{ dataSize: 281 }, { memcmp: { offset: 9, bytes: nftMint } }] },
       ]);
 
-      if (!posRes?.length) {
-        console.error(`  ${key}: personal position not found`);
+      const posAccount = programAccounts?.[0] ?? null;
+      if (!posAccount) {
+        console.log(`  ${key}: position account not found`);
         continue;
       }
 
-      const pos = parsePersonalPosition(posRes[0].account.data[0]);
-      console.log(`  tickLower=${pos.tickLower}, tickUpper=${pos.tickUpper}, liq=${pos.liquidity}`);
+      const pos = parsePositionAccount(posAccount.account.data[0]);
+      console.log(`  ${key}: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}`);
 
       await new Promise(r => setTimeout(r, 2000));
 
@@ -295,16 +280,17 @@ async function getRaydiumPositions() {
 
       const pool = parsePoolAccount(poolRes.value.data[0]);
       const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/solana:${pool.mint0},solana:${pool.mint1}`);
-      const price0 = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
-      const price1 = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
+      const price0    = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
+      const price1    = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
 
-      const sqrtP = Number(pool.sqrtPriceX64 / Q64) + Number(pool.sqrtPriceX64 % Q64) / Number(Q64);
+      const sqrtP = sqrtPriceX64ToFloat(pool.sqrtPriceX64.toString());
       const { amount0, amount1, inRange } = calcAmounts(pos.liquidity, pos.tickLower, pos.tickUpper, pool.tickCurrent, sqrtP);
+
       const tokens0 = amount0 / Math.pow(10, pool.decimals0);
       const tokens1 = amount1 / Math.pow(10, pool.decimals1);
       const positionValue = (price0 ?? 0) * tokens0 + (price1 ?? 0) * tokens1;
 
-      const Q64  = 2n ** 64n;
+      const Q64 = 2n ** 64n;
       const U128 = 2n ** 128n;
       let pendingYield = 0;
 
@@ -360,7 +346,8 @@ async function getRaydiumPositions() {
 
           function getTickFeeGrowth(taData, tickIndex, taStartTick, tickSpacing) {
             const buf = Buffer.from(taData, 'base64');
-            const offset = (tickIndex - taStartTick) / tickSpacing;
+            const tickArraySpacing = tickSpacing ?? 10;
+            const offset = (tickIndex - taStartTick) / tickArraySpacing;
             if (offset < 0 || offset >= 60 || !Number.isInteger(offset)) return { fg0: 0n, fg1: 0n };
             const tickStart = TA_HEADER + offset * TICK_SIZE;
             const FG0 = 36; const FG1 = 52;
@@ -400,7 +387,7 @@ async function getRaydiumPositions() {
         } else {
           console.log(`  Fees (feesOwed floor only): $${pendingYield.toFixed(2)}`);
         }
-      } catch (feeErr) {
+      } catch(feeErr) {
         console.error(`  Fee calc error: ${feeErr.message.slice(0, 80)}`);
       }
 
@@ -421,35 +408,35 @@ async function main() {
   console.log(`\n=== Fee Check — ${new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })} PDT ===`);
   console.log('Checking: WETH/USDC Primary + 6 Raydium xStocks CLMMs\n');
 
-  const [weth, raydium] = await Promise.allSettled([
+  const [wethRes, raydiumRes] = await Promise.allSettled([
     getWethPosition(),
     getRaydiumPositions(),
   ]);
 
-  const wethData    = weth.status    === 'fulfilled' ? weth.value    : null;
-  const raydiumData = raydium.status === 'fulfilled' ? raydium.value : [];
+  const weth    = wethRes.status    === 'fulfilled' ? wethRes.value    : null;
+  const raydium = raydiumRes.status === 'fulfilled' ? raydiumRes.value : [];
 
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
 
   // WETH/USDC Primary
-  if (wethData) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, wethData.inRange, {
-      [F.positionValue]: wethData.positionValue,
-      ...(wethData.feeValue > 0 ? { [F.feeValue]: wethData.feeValue } : {}),
-      [F.notes]: `ETH: $${wethData.ethPrice?.toFixed(0)} | Tick: ${wethData.currentTick} | Range: [${wethData.tickLower}, ${wethData.tickUpper}] | Fee Check triggered manually`,
+  if (weth) {
+    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
+      [F.positionValue]: weth.positionValue,
+      ...(weth.feeValue > 0 ? { [F.feeValue]: weth.feeValue } : {}),
+      [F.notes]: `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}] | Fee Check triggered manually`,
     })]);
-    if (ok) { written++; console.log(`✓ WETH/USDC: $${wethData.positionValue?.toFixed(2)}, fees: $${wethData.feeValue?.toFixed(2)}`); }
+    if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}`); }
   }
 
   // Raydium xStocks
-  if (raydiumData.length > 0) {
+  if (raydium.length > 0) {
     if (RAYDIUM_DRY_RUN) {
       console.log('\nRaydium DRY RUN — set RAYDIUM_DRY_RUN=false in GitHub Variables to go live');
-      for (const pos of raydiumData) console.log(`  ${pos.key}: $${pos.positionValue.toFixed(2)}, fees: $${pos.pendingYield.toFixed(2)}, inRange: ${pos.inRange}`);
+      for (const pos of raydium) console.log(`  ${pos.key}: $${pos.positionValue.toFixed(2)}, fees: $${pos.pendingYield.toFixed(2)}, inRange: ${pos.inRange}`);
     } else {
       const batch = [];
-      for (const pos of raydiumData) {
+      for (const pos of raydium) {
         const meta = ASSET[pos.key];
         if (!meta) continue;
         batch.push(dailyRecord(meta.recordId, pos.inRange, {
