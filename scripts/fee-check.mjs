@@ -203,39 +203,52 @@ function calcAmounts(liquidityStr, tickLower, tickUpper, tickCurrent, sqrtP) {
 }
 
 function parsePoolAccount(base64Data) {
+  // Layout: disc(8)+bump(1)+amm_config(32)+creator(32)+mint0(32)+mint1(32)+...
   const buf = Buffer.from(base64Data, 'base64');
-  const readU128LE = (offset) => buf.readBigUInt64LE(offset) | (buf.readBigUInt64LE(offset + 8) << 64n);
-  const sqrtPriceX64  = readU128LE(253);
-  const tickCurrent   = buf.readInt32LE(269);
-  const feeGrowthGlobal0 = readU128LE(280);
-  const feeGrowthGlobal1 = readU128LE(296);
-  const mint0Start = 72; const mint1Start = 104;
-  const mint0Bytes = Array.from(buf.slice(mint0Start, mint0Start + 32));
-  const mint1Bytes = Array.from(buf.slice(mint1Start, mint1Start + 32));
-  const decimals0 = buf.readUInt8(313);
-  const decimals1 = buf.readUInt8(314);
+  const mint0Bytes = buf.slice(73, 105);
+  const mint1Bytes = buf.slice(105, 137);
+  const dec0 = buf.readUInt8(233);
+  const dec1 = buf.readUInt8(234);
+  const sqrtLo = buf.readBigUInt64LE(253);
+  const sqrtHi = buf.readBigUInt64LE(261);
+  const sqrtPriceX64 = sqrtLo | (sqrtHi << 64n);
+  const Q64 = 2n ** 64n;
+  const Q64f = Number(Q64);
+  const sqrtPriceFloat = Number(sqrtPriceX64 / Q64) + Number(sqrtPriceX64 % Q64) / Q64f;
+  const rawPrice = sqrtPriceFloat * sqrtPriceFloat;
+  const tickCurrent = Math.round(Math.log(rawPrice) / Math.log(1.0001));
+  const fg0Lo = buf.readBigUInt64LE(277); const fg0Hi = buf.readBigUInt64LE(285);
+  const fg1Lo = buf.readBigUInt64LE(293); const fg1Hi = buf.readBigUInt64LE(301);
+  const feeGrowthGlobal0 = fg0Lo | (fg0Hi << 64n);
+  const feeGrowthGlobal1 = fg1Lo | (fg1Hi << 64n);
   return {
-    sqrtPriceX64: sqrtPriceX64.toString(),
+    mint0: base58EncodeBytes(Array.from(mint0Bytes)),
+    mint1: base58EncodeBytes(Array.from(mint1Bytes)),
+    decimals0: dec0,
+    decimals1: dec1,
+    sqrtPriceX64,
     tickCurrent,
     feeGrowthGlobal0,
     feeGrowthGlobal1,
-    mint0: base58EncodeBytes(mint0Bytes),
-    mint1: base58EncodeBytes(mint1Bytes),
-    decimals0,
-    decimals1,
   };
 }
 
 function parsePersonalPosition(base64Data) {
+  // Layout: disc(8)+bump(1)+nft_mint(32)+pool_id(32)+tick_lower(4)+tick_upper(4)+liquidity(16)
+  //         +fee_growth_inside_0_last(16)+fee_growth_inside_1_last(16)
+  //         +token_fees_owed_0(8)+token_fees_owed_1(8)
   const buf = Buffer.from(base64Data, 'base64');
-  const readU128LE = (offset) => buf.readBigUInt64LE(offset) | (buf.readBigUInt64LE(offset + 8) << 64n);
-  const tickLower     = buf.readInt32LE(72);
-  const tickUpper     = buf.readInt32LE(76);
-  const liquidity     = readU128LE(80).toString();
-  const fgInside0Last = readU128LE(96);
-  const fgInside1Last = readU128LE(112);
-  const feesOwed0     = readU128LE(128);
-  const feesOwed1     = readU128LE(144);
+  const tickLower = buf.readInt32LE(73);
+  const tickUpper = buf.readInt32LE(77);
+  const liqLo = buf.readBigUInt64LE(81);
+  const liqHi = buf.readBigUInt64LE(89);
+  const liquidity = liqLo | (liqHi << 64n);
+  const fgi0Lo = buf.readBigUInt64LE(97);  const fgi0Hi = buf.readBigUInt64LE(105);
+  const fgi1Lo = buf.readBigUInt64LE(113); const fgi1Hi = buf.readBigUInt64LE(121);
+  const fgInside0Last = fgi0Lo | (fgi0Hi << 64n);
+  const fgInside1Last = fgi1Lo | (fgi1Hi << 64n);
+  const feesOwed0 = buf.readBigUInt64LE(129);
+  const feesOwed1 = buf.readBigUInt64LE(137);
   return { tickLower, tickUpper, liquidity, fgInside0Last, fgInside1Last, feesOwed0, feesOwed1 };
 }
 
@@ -249,21 +262,14 @@ async function getRaydiumPositions() {
       const { nftMint, poolId } = meta;
       console.log(`\n  Processing ${key.toUpperCase()}...`);
 
-      // Get personal position account
-      const tokenAcctsRes = await solRpc('getTokenAccountsByOwner', [
-        WALLET_EVM.startsWith('0x') ? WALLET_EVM : WALLET_EVM,
-        { mint: nftMint },
-        { encoding: 'jsonParsed' }
-      ]);
-
-      // Use getProgramAccounts to find personal position for this NFT mint
+      // Find personal position account: disc(8)+bump(1)+nft_mint at offset 9
       const posRes = await solRpc('getProgramAccounts', [
         RAYDIUM_CLMM_PROGRAM,
         {
           encoding: 'base64',
           filters: [
-            { dataSize: 300 },
-            { memcmp: { offset: 8, bytes: nftMint } }
+            { dataSize: 281 },
+            { memcmp: { offset: 9, bytes: nftMint } }
           ]
         }
       ]);
@@ -292,7 +298,7 @@ async function getRaydiumPositions() {
       const price0 = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
       const price1 = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
 
-      const sqrtP = sqrtPriceX64ToFloat(pool.sqrtPriceX64.toString());
+      const sqrtP = Number(pool.sqrtPriceX64 / Q64) + Number(pool.sqrtPriceX64 % Q64) / Number(Q64);
       const { amount0, amount1, inRange } = calcAmounts(pos.liquidity, pos.tickLower, pos.tickUpper, pool.tickCurrent, sqrtP);
       const tokens0 = amount0 / Math.pow(10, pool.decimals0);
       const tokens1 = amount1 / Math.pow(10, pool.decimals1);
@@ -385,8 +391,8 @@ async function getRaydiumPositions() {
           const delta0 = (fgInside0 - pos.fgInside0Last + U128) % U128;
           const delta1 = (fgInside1 - pos.fgInside1Last + U128) % U128;
 
-          const rawFee0 = Number(delta0 * BigInt(pos.liquidity) / Q64) + Number(pos.feesOwed0);
-          const rawFee1 = Number(delta1 * BigInt(pos.liquidity) / Q64) + Number(pos.feesOwed1);
+          const rawFee0 = Number(delta0 * pos.liquidity / Q64) + Number(pos.feesOwed0);
+          const rawFee1 = Number(delta1 * pos.liquidity / Q64) + Number(pos.feesOwed1);
           const fee0USD = (price0 ?? 0) * rawFee0 / Math.pow(10, pool.decimals0);
           const fee1USD = (price1 ?? 0) * rawFee1 / Math.pow(10, pool.decimals1);
           pendingYield = fee0USD + fee1USD;
