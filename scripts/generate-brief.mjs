@@ -416,13 +416,21 @@ async function main() {
 
   const briefText = await runClaude(SYSTEM_PROMPT, userPrompt);
 
+  // Deduplicate — if Claude returns the brief twice in one response, strip the repeat
+  const half = Math.floor(briefText.length / 2);
+  const firstHalf  = briefText.slice(0, half).trim();
+  const secondHalf = briefText.slice(half).trim();
+  const cleanBrief = (secondHalf.length > 50 && firstHalf === secondHalf)
+    ? firstHalf
+    : briefText;
+
   console.log('\n=== BRIEF TEXT ===');
-  console.log(briefText);
+  console.log(cleanBrief);
   console.log('=================\n');
 
   const outputDir = path.dirname(OUTPUT_PATH);
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(OUTPUT_PATH, briefText, 'utf8');
+  fs.writeFileSync(OUTPUT_PATH, cleanBrief, 'utf8');
 
   console.log(`✓ Brief written to ${OUTPUT_PATH}`);
 }
