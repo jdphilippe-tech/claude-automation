@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, April 10, 2026</title>
+      <description><![CDATA[Daily portfolio and market intelligence brief.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-10.mp3" length="3174026" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-04-10</guid>
+      <pubDate>Fri, 10 Apr 2026 14:17:35 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, April 9, 2026</title>
       <description><![CDATA[Daily portfolio and market intelligence brief.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-09.mp3" length="1349634" type="audio/mpeg"/>
