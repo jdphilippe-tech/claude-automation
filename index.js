@@ -1,11 +1,11 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v29
-// Added: ETH Short Hedge (Hyperliquid)
-// Fixed: removed revertPosVal from WETH/USDC + xStocks
-//        Lighter APR format (already %, no conversion needed)
-//        ETH Hedge protocol APR removed (not applicable)
-//        LIT/LLP/Edge APR written correctly as decimal percentage
-// Schedule: 14:00 UTC = 7:00 AM PDT (triggered via cron-job.org)
+// Daily Portfolio Check — GitHub Actions v30
+// Added: Dynamic WETH/USDC position discovery
+//        Removes hardcoded NFT position ID (WETH_POS_ID)
+//        Script now auto-discovers active WETH/USDC 0.05% position
+//        by scanning wallet's Uniswap V3 NFTs — no code change
+//        needed when opening a new cycle
+// Schedule: 14:15 UTC = 7:15 AM PDT (triggered via cron-job.org)
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -18,7 +18,7 @@ const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
 const WALLET_EVM        = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
 const WALLET_SUI        = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
 const WALLET_HYPERLIQUID = '0x464b059B1AF55A408CB3c822D610c2D962d2cf4b';
-const WETH_POS_ID = 5384162n;
+// WETH_POS_ID removed — now dynamically discovered each run
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
@@ -75,8 +75,6 @@ const ASSET = {
   lighterLLP:   'recEFiaxgavObYWzL',
   lighterEdge:  'rectz3Zo3aDbe4GgL',
   lighterLIT:   'receiu02rkzc3quDW',
-  // Raydium xStocks — all data confirmed from Raydium UI and dry runs
-  // ⚠️ UPDATE cycleId once Cycle IDs are seeded in Airtable
   tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2',  nftMint: '7R5JFSuXL23epYJmX6LhzbM2Nce39at4maWD7NeFK4tU', poolId: '8aDaBQkTrS6HVMjyc6EZebgdiaXhLYGriDWKWWp1NpFF' },
   nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1',  nftMint: 'J7qm9jifiKg7CyWDbmdDUNokhgs7JvwZmy2jnJ7qmN5Z', poolId: '4KqQN6u1pFKroFE2jVEhoepAMRKPcuAzWVDCgm9zRBYN' },
   aaplx:  { recordId: 'recGF59dwIOnE8fm2', cycleId: 'AAPLx-C1',  nftMint: '2NsZvobR13JuYbkYTt5EK1XyyEJh3xB8621FhUW3LYKp', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
@@ -190,25 +188,82 @@ function lendingRecord(positionId, extra = {}) {
 
 // ============================================================
 // MODULE 1 — WETH/USDC PRIMARY (Arbitrum)
+// Dynamic position discovery — no hardcoded NFT ID
+// Scans wallet's Uniswap V3 NFTs, finds active WETH/USDC 0.05%
+// position automatically. Works across all cycles with zero
+// code changes needed when opening a new cycle.
 // ============================================================
 
 async function getWethPosition() {
   console.log('\n--- WETH/USDC Primary ---');
   try {
-    const provider   = new ethers.JsonRpcProvider(ARBITRUM_RPC);
-    const posABI     = ['function positions(uint256 tokenId) external view returns (uint96,address,address,address,uint24,int24,int24,uint128,uint256,uint256,uint128,uint128)'];
+    const provider = new ethers.JsonRpcProvider(ARBITRUM_RPC);
+
+    const NFT_MANAGER = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88';
+    const WETH        = '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1';
+    const USDC        = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831';
+    const TARGET_FEE  = 500; // 0.05%
+
+    const nftManagerABI = [
+      'function balanceOf(address owner) external view returns (uint256)',
+      'function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256)',
+      'function positions(uint256 tokenId) external view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)',
+    ];
     const factoryABI = ['function getPool(address,address,uint24) external view returns (address)'];
     const poolABI    = ['function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16, uint16, uint16, uint8, bool)'];
     const collectABI = ['function collect((uint256 tokenId, address recipient, uint128 amount0Max, uint128 amount1Max)) external returns (uint256 amount0, uint256 amount1)'];
 
-    const nft        = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', posABI, provider);
-    const raw        = await nft.positions(WETH_POS_ID);
-    const tickLowerN = Number(raw[5]);
-    const tickUpperN = Number(raw[6]);
-    const liquidity  = raw[7];
+    const nft = new ethers.Contract(NFT_MANAGER, nftManagerABI, provider);
+
+    // Step 1: get count of Uniswap V3 NFTs owned by wallet
+    const balance = await nft.balanceOf(WALLET_EVM);
+    const count = Number(balance);
+    console.log(`Wallet owns ${count} Uniswap V3 NFT(s) — scanning for active WETH/USDC 0.05% position...`);
+
+    if (count === 0) {
+      console.error('No Uniswap V3 positions found in wallet');
+      return null;
+    }
+
+    // Step 2: scan each NFT, find active WETH/USDC 0.05% with liquidity > 0
+    let WETH_POS_ID = null;
+    let raw = null;
+
+    for (let i = 0; i < count; i++) {
+      const tokenId = await nft.tokenOfOwnerByIndex(WALLET_EVM, i);
+      const pos = await nft.positions(tokenId);
+      const token0 = pos.token0.toLowerCase();
+      const token1 = pos.token1.toLowerCase();
+      const fee    = Number(pos.fee);
+      const liq    = pos.liquidity;
+
+      const isWethUsdc = (
+        (token0 === WETH.toLowerCase() && token1 === USDC.toLowerCase()) ||
+        (token0 === USDC.toLowerCase() && token1 === WETH.toLowerCase())
+      );
+
+      console.log(`  NFT #${tokenId}: fee=${fee}, liquidity=${liq}, WETH/USDC=${isWethUsdc}`);
+
+      if (isWethUsdc && fee === TARGET_FEE && liq > 0n) {
+        WETH_POS_ID = tokenId;
+        raw = pos;
+        console.log(`  ✓ Active WETH/USDC 0.05% position found: NFT #${tokenId}`);
+        break;
+      }
+    }
+
+    if (!WETH_POS_ID || !raw) {
+      console.error('No active WETH/USDC 0.05% position with liquidity found in wallet');
+      return null;
+    }
+
+    // Step 3: position math — same as v29
+    const tickLowerN = Number(raw.tickLower);
+    const tickUpperN = Number(raw.tickUpper);
+    const liquidity  = raw.liquidity;
 
     const factory  = new ethers.Contract('0x1F98431c8aD98523631AE4a59f267346ea31F984', factoryABI, provider);
-    const poolAddr = await factory.getPool(raw[2], raw[3], raw[4]);
+    const poolAddr = await factory.getPool(raw.token0, raw.token1, raw.fee);
     const slot0    = await (new ethers.Contract(poolAddr, poolABI, provider)).slot0();
 
     const currentTick  = Number(slot0.tick);
@@ -233,7 +288,7 @@ async function getWethPosition() {
     const positionValue = (amount0 * ethPrice) + amount1;
 
     const MAX128     = BigInt('0xffffffffffffffffffffffffffffffff');
-    const nftCollect = new ethers.Contract('0xC36442b4a4522E871399CD717aBDD847Ab11FE88', collectABI, provider);
+    const nftCollect = new ethers.Contract(NFT_MANAGER, collectABI, provider);
     let feeValue = 0;
     try {
       const fees = await nftCollect.collect.staticCall({
@@ -245,10 +300,10 @@ async function getWethPosition() {
       const feeETH  = Number(fees[0]) / 1e18;
       const feeUSDC = Number(fees[1]) / 1e6;
       feeValue = (feeETH * ethPrice) + feeUSDC;
-      console.log(`ETH: $${ethPrice.toFixed(2)}, position: $${positionValue.toFixed(2)}, fees: $${feeValue.toFixed(2)}, in range: ${inRange}`);
+      console.log(`ETH: $${ethPrice.toFixed(2)}, position: $${positionValue.toFixed(2)}, fees: $${feeValue.toFixed(2)}, in range: ${inRange}, NFT: #${WETH_POS_ID}`);
     } catch (e) {
       console.error(`Fee collect failed: ${e.message.slice(0, 60)}`);
-      console.log(`ETH: $${ethPrice.toFixed(2)}, position: $${positionValue.toFixed(2)}, in range: ${inRange}`);
+      console.log(`ETH: $${ethPrice.toFixed(2)}, position: $${positionValue.toFixed(2)}, in range: ${inRange}, NFT: #${WETH_POS_ID}`);
     }
 
     return { positionValue, feeValue, inRange, currentTick, tickLower: tickLowerN, tickUpper: tickUpperN, ethPrice };
@@ -476,8 +531,6 @@ async function getSuilendData() {
 
 // ============================================================
 // MODULE 4 — Raydium xStocks CLMM (Solana)
-// Logs: position value + in-range status
-// Pending yield deferred to Phase 2 (tick array PDA derivation)
 // ============================================================
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -512,28 +565,22 @@ function calcAmounts(liquidity, tickLower, tickUpper, tickCurrent, sqrtPriceCurr
 }
 
 function parsePositionAccount(data) {
-  // Layout: disc(8)+bump(1)+nft_mint(32)+pool_id(32)+tick_lower(4)+tick_upper(4)+liquidity(16)
-  //         +fee_growth_inside_0_last(16)+fee_growth_inside_1_last(16)
-  //         +token_fees_owed_0(8)+token_fees_owed_1(8)
   const buf = Buffer.from(data, 'base64');
   const tickLower = buf.readInt32LE(73);
   const tickUpper = buf.readInt32LE(77);
   const liqLo = buf.readBigUInt64LE(81);
   const liqHi = buf.readBigUInt64LE(89);
   const liquidity = liqLo | (liqHi << 64n);
-  // fee growth inside last (for fee calculation)
   const fgi0Lo = buf.readBigUInt64LE(97);  const fgi0Hi = buf.readBigUInt64LE(105);
   const fgi1Lo = buf.readBigUInt64LE(113); const fgi1Hi = buf.readBigUInt64LE(121);
   const fgInside0Last = fgi0Lo | (fgi0Hi << 64n);
   const fgInside1Last = fgi1Lo | (fgi1Hi << 64n);
-  // token fees owed (already confirmed on-chain, floor value)
   const feesOwed0 = buf.readBigUInt64LE(129);
   const feesOwed1 = buf.readBigUInt64LE(137);
   return { tickLower, tickUpper, liquidity, fgInside0Last, fgInside1Last, feesOwed0, feesOwed1 };
 }
 
 function parsePoolAccount(data) {
-  // Layout: disc(8) + bump(1) + amm_config(32) + creator(32) + mint0(32) + mint1(32) + vault0(32) + vault1(32) + obs(32) + dec0(1) + dec1(1) + tickSpacing(2) + liq(16) + sqrtPrice(16) + tickCurrent(4)
   const buf = Buffer.from(data, 'base64');
   const mint0Bytes = buf.slice(73, 105);
   const mint1Bytes = buf.slice(105, 137);
@@ -549,9 +596,6 @@ function parsePoolAccount(data) {
   const rawPrice = sqrtPriceFloat * sqrtPriceFloat;
   const tickCurrent = Math.round(Math.log(rawPrice) / Math.log(1.0001));
 
-  // fee_growth_global fields: after sqrtPrice(16)+tickCurrent(4)+obs_index(2)+obs_duration(2)
-  // sqrtPrice at 253-268, tickCurrent 269-272, obs_index 273-274, obs_duration 275-276
-  // fee_growth_global_0 at 277, fee_growth_global_1 at 293
   const fg0Lo = buf.readBigUInt64LE(277); const fg0Hi = buf.readBigUInt64LE(285);
   const fg1Lo = buf.readBigUInt64LE(293); const fg1Hi = buf.readBigUInt64LE(301);
   const feeGrowthGlobal0 = fg0Lo | (fg0Hi << 64n);
@@ -582,24 +626,19 @@ async function getRaydiumPositions() {
   for (const posConfig of xstockPositions) {
     const { key, nftMint, poolId } = posConfig;
     try {
-      // Find position account by nft_mint at offset 9 (disc=8, bump=1, then nft_mint)
       const programAccounts = await solRpc('getProgramAccounts', [
         RAYDIUM_CLMM_PROGRAM,
         { encoding: 'base64', filters: [{ dataSize: 281 }, { memcmp: { offset: 9, bytes: nftMint } }] },
       ]);
 
       const posAccount = programAccounts?.[0] ?? null;
-      if (!posAccount) {
-        console.log(`  ${key}: position account not found`);
-        continue;
-      }
+      if (!posAccount) { console.log(`  ${key}: position account not found`); continue; }
 
       const pos = parsePositionAccount(posAccount.account.data[0]);
       console.log(`  ${key}: ticks [${pos.tickLower}, ${pos.tickUpper}], liquidity: ${pos.liquidity}`);
 
       await new Promise(r => setTimeout(r, 2000));
 
-      // Fetch pool account
       let poolRes = null;
       for (let i = 1; i <= 3; i++) {
         poolRes = await solRpc('getAccountInfo', [poolId, { encoding: 'base64' }]);
@@ -610,7 +649,6 @@ async function getRaydiumPositions() {
       if (!poolRes?.value?.data) { console.error(`  ${key}: pool not found`); continue; }
 
       const pool = parsePoolAccount(poolRes.value.data[0]);
-      // Get prices
       const priceData = await fetchWithTimeout(`https://coins.llama.fi/prices/current/solana:${pool.mint0},solana:${pool.mint1}`);
       const price0    = priceData?.coins?.[`solana:${pool.mint0}`]?.price ?? null;
       const price1    = priceData?.coins?.[`solana:${pool.mint1}`]?.price ?? null;
@@ -622,64 +660,27 @@ async function getRaydiumPositions() {
       const tokens1 = amount1 / Math.pow(10, pool.decimals1);
       const positionValue = (price0 ?? 0) * tokens0 + (price1 ?? 0) * tokens1;
 
-      // Pending fee calculation using tick array fee_growth_outside values
-      // Steps: 1) find tick arrays via recent tx, 2) read fee_growth_outside from each bound,
-      //        3) derive feeGrowthInside, 4) apply (fgInside - fgInsideLast) * liq / Q64
       const Q64 = 2n ** 64n;
       const U128 = 2n ** 128n;
       let pendingYield = 0;
 
       try {
-        // Step 1: Find tick array addresses from a recent position transaction
         const sigRes = await solRpc('getSignaturesForAddress', [nftMint, { limit: 5 }]);
         let lowerTickArrayAddr = null, upperTickArrayAddr = null;
 
         for (const sigEntry of (sigRes || [])) {
-          const txRes = await solRpc('getTransaction', [
-            sigEntry.signature,
-            { encoding: 'json', maxSupportedTransactionVersion: 0 }
-          ]);
+          const txRes = await solRpc('getTransaction', [sigEntry.signature, { encoding: 'json', maxSupportedTransactionVersion: 0 }]);
           const keys = txRes?.transaction?.message?.accountKeys ?? [];
           if (!keys.includes(RAYDIUM_CLMM_PROGRAM)) continue;
 
-          // In Raydium CLMM instructions, tick array accounts appear at specific positions:
-          // openPosition/increaseLiquidity: [nftOwner, nftAccount, poolState, protocolPosition,
-          //   personalPosition, tickArrayLower, tickArrayUpper, tokenAccount0, tokenAccount1, ...]
-          // We identify tick arrays by their data size (10240 bytes)
-          const accountInfos = await solRpc('getMultipleAccounts', [
-            keys,
-            { encoding: 'base64', dataSlice: { offset: 0, length: 0 } }
-          ]);
-
-          const tickArrayAddrs = [];
-          for (let i = 0; i < keys.length; i++) {
-            const info = accountInfos?.value?.[i];
-            if (info?.data?.length === 0 && info?.rentEpoch !== undefined) {
-              // Check actual size via getAccountInfo
-            }
-          }
-
-          // Better approach: filter keys by checking which ones are tick arrays for this pool
-          // Tick arrays have dataSize=10240 and owner=RAYDIUM_CLMM_PROGRAM
-          // And contain the pool_id at offset 8
-          const candidateKeys = keys.filter((k, i) =>
-            k !== RAYDIUM_CLMM_PROGRAM &&
-            k !== nftMint &&
-            k !== poolId
-          );
-
-          // Fetch sizes in batch
-          const infosRes = await solRpc('getMultipleAccounts', [
-            candidateKeys.slice(0, 12),
-            { encoding: 'base64' }
-          ]);
+          const candidateKeys = keys.filter((k) => k !== RAYDIUM_CLMM_PROGRAM && k !== nftMint && k !== poolId);
+          const infosRes = await solRpc('getMultipleAccounts', [candidateKeys.slice(0, 12), { encoding: 'base64' }]);
 
           for (let i = 0; i < candidateKeys.length && i < 12; i++) {
             const d = infosRes?.value?.[i]?.data?.[0];
             if (!d) continue;
             const buf = Buffer.from(d, 'base64');
             if (buf.length === 10240) {
-              // Verify pool_id at offset 8
               const storedPoolId = base58EncodeBytes(Array.from(buf.slice(8, 40)));
               if (storedPoolId === poolId) {
                 const startTick = buf.readInt32LE(40);
@@ -696,15 +697,13 @@ async function getRaydiumPositions() {
           if (lowerTickArrayAddr) break;
         }
 
-        // Step 2 & 3: If tick arrays found, compute feeGrowthInside
-        // Always include tokenFeesOwed as floor (accrued regardless of range status)
         const feesOwed0USD = (price0 ?? 0) * Number(pos.feesOwed0) / Math.pow(10, pool.decimals0);
         const feesOwed1USD = (price1 ?? 0) * Number(pos.feesOwed1) / Math.pow(10, pool.decimals1);
         pendingYield = feesOwed0USD + feesOwed1USD;
 
-        if (lowerTickArrayAddr) {  // Apply tick array formula regardless of in-range status
+        if (lowerTickArrayAddr) {
           const TICK_SIZE = 168;
-          const TA_HEADER = 44; // disc(8)+pool_id(32)+start_tick(4)
+          const TA_HEADER = 44;
 
           function getTickFeeGrowth(taData, tickIndex, taStartTick, tickSpacing) {
             const buf = Buffer.from(taData, 'base64');
@@ -712,7 +711,7 @@ async function getRaydiumPositions() {
             const offset = (tickIndex - taStartTick) / tickArraySpacing;
             if (offset < 0 || offset >= 60 || !Number.isInteger(offset)) return { fg0: 0n, fg1: 0n };
             const tickStart = TA_HEADER + offset * TICK_SIZE;
-            const FG0 = 36; const FG1 = 52; // offsets within tick struct
+            const FG0 = 36; const FG1 = 52;
             const fg0Lo = buf.readBigUInt64LE(tickStart + FG0);
             const fg0Hi = buf.readBigUInt64LE(tickStart + FG0 + 8);
             const fg1Lo = buf.readBigUInt64LE(tickStart + FG1);
@@ -720,7 +719,6 @@ async function getRaydiumPositions() {
             return { fg0: fg0Lo | (fg0Hi << 64n), fg1: fg1Lo | (fg1Hi << 64n) };
           }
 
-          // Get tick spacing from pool (at offset 235 = dec0(1)+dec1(1)+offset 233)
           const poolBuf = Buffer.from(poolRes.value.data[0], 'base64');
           const tickSpacing = poolBuf.readUInt16LE(235);
 
@@ -730,15 +728,11 @@ async function getRaydiumPositions() {
           const lower = getTickFeeGrowth(lowerTA.data, pos.tickLower, lowerTA.startTick, tickSpacing);
           const upper = getTickFeeGrowth(upperTA.data, pos.tickUpper, upperTA.startTick, tickSpacing);
 
-          // feeGrowthBelow(tickLower): currentTick >= tickLower → fg_outside, else global - fg_outside
           const fgBelow0 = pool.tickCurrent >= pos.tickLower ? lower.fg0 : (pool.feeGrowthGlobal0 - lower.fg0 + U128) % U128;
           const fgBelow1 = pool.tickCurrent >= pos.tickLower ? lower.fg1 : (pool.feeGrowthGlobal1 - lower.fg1 + U128) % U128;
-
-          // feeGrowthAbove(tickUpper): currentTick < tickUpper → fg_outside, else global - fg_outside
           const fgAbove0 = pool.tickCurrent < pos.tickUpper ? upper.fg0 : (pool.feeGrowthGlobal0 - upper.fg0 + U128) % U128;
           const fgAbove1 = pool.tickCurrent < pos.tickUpper ? upper.fg1 : (pool.feeGrowthGlobal1 - upper.fg1 + U128) % U128;
 
-          // feeGrowthInside = global - below - above
           const fgInside0 = (pool.feeGrowthGlobal0 - fgBelow0 - fgAbove0 + U128 * 2n) % U128;
           const fgInside1 = (pool.feeGrowthGlobal1 - fgBelow1 - fgAbove1 + U128 * 2n) % U128;
 
@@ -752,7 +746,6 @@ async function getRaydiumPositions() {
           pendingYield = fee0USD + fee1USD;
           console.log(`  Fees (tick array): $${fee0USD.toFixed(2)} token0 + $${fee1USD.toFixed(2)} USDC = $${pendingYield.toFixed(2)}`);
         } else {
-          // Fallback: feesOwed floor only (tick arrays not found, already set above)
           console.log(`  Fees (feesOwed floor only): $${pendingYield.toFixed(2)}`);
         }
       } catch(feeErr) {
@@ -770,8 +763,6 @@ async function getRaydiumPositions() {
 
 // ============================================================
 // MODULE 5 — Lighter (LLP, Edge & Hedge, LIT Staking)
-// equity = shares_amount × (total_asset_value / total_shares)
-// LIT equity = LIT_STAKE_AMOUNT × LIT price from DeFi Llama
 // ============================================================
 
 async function getLighterPositions() {
@@ -781,7 +772,6 @@ async function getLighterPositions() {
   try {
     const headers = { 'Authorization': LIGHTER_TOKEN };
 
-    // LLP
     const llpRes = await fetchWithTimeout(
       `${LIGHTER_BASE}/publicPoolsMetadata?index=${LIGHTER_LLP_ID + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
       { headers }
@@ -797,7 +787,6 @@ async function getLighterPositions() {
       console.error('LLP: no account_share in response');
     }
 
-    // Edge & Hedge
     const edgeRes = await fetchWithTimeout(
       `${LIGHTER_BASE}/publicPoolsMetadata?index=${LIGHTER_EDGE_ID + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
       { headers }
@@ -813,10 +802,8 @@ async function getLighterPositions() {
       console.error('Edge & Hedge: no account_share in response');
     }
 
-    // LIT Staking — try to find staking pool with account_index to get live stake amount
-    // Staking pool is a protocol pool; scan IDs near known range with filter=protocol
-    let litStakeAmount = LIT_STAKE_AMOUNT; // fallback to hardcoded
-    let litAPR = 0.0684; // fallback APR from UI (6.84% as decimal)
+    let litStakeAmount = LIT_STAKE_AMOUNT;
+    let litAPR = 0.0684;
     const stakingSearchRes = await fetchWithTimeout(
       `${LIGHTER_BASE}/publicPoolsMetadata?index=0&limit=100&filter=protocol`,
       { headers }
@@ -825,14 +812,12 @@ async function getLighterPositions() {
     const litPool = stakingPools.find(p => p.name?.toLowerCase().includes('lit') || p.name?.toLowerCase().includes('staking'));
     if (litPool) {
       console.log(`LIT pool found: index=${litPool.account_index} name=${litPool.name}`);
-      // Fetch with account_index to get our shares
       const litPoolRes = await fetchWithTimeout(
         `${LIGHTER_BASE}/publicPoolsMetadata?index=${litPool.account_index + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
         { headers }
       );
       const litPoolData = litPoolRes?.public_pools?.[0];
       if (litPoolData?.account_share) {
-        // For staking pools, principal_amount = tokens staked
         litStakeAmount = Number(litPoolData.account_share.principal_amount ?? litPoolData.account_share.shares_amount);
         litAPR = litPoolData.annual_percentage_yield != null ? litPoolData.annual_percentage_yield / 100 : litAPR;
         console.log(`LIT stake from API: ${litStakeAmount} LIT, APR=${litAPR?.toFixed(2)}%`);
@@ -841,7 +826,6 @@ async function getLighterPositions() {
       console.log(`LIT staking pool not found in protocol filter — using hardcoded ${LIT_STAKE_AMOUNT} LIT`);
     }
 
-    // LIT price from DeFi Llama — CoinGecko ID is 'lighter'
     const litPriceData = await fetchWithTimeout('https://coins.llama.fi/prices/current/coingecko:lighter');
     const litPrice = litPriceData?.coins?.['coingecko:lighter']?.price ?? null;
     if (litPrice) {
@@ -861,15 +845,12 @@ async function getLighterPositions() {
 
 // ============================================================
 // MODULE 6 — ETH Short Hedge (Hyperliquid)
-// Position Value = USDC spot balance
-// PnL, Entry, Size written to Notes field
-// Protocol APR not written — funding rate not meaningful as APR
 // ============================================================
 
 async function getEthHedge() {
   console.log('\n--- ETH Short Hedge ---');
   try {
-    const [hlState, hlSpot, hlFunding] = await Promise.all([
+    const [hlState, hlSpot] = await Promise.all([
       fetchWithTimeout('https://api.hyperliquid.xyz/info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -880,14 +861,8 @@ async function getEthHedge() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'spotClearinghouseState', user: WALLET_HYPERLIQUID }),
       }),
-      fetchWithTimeout('https://api.hyperliquid.xyz/info', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'fundingHistory', coin: 'ETH', startTime: Date.now() - 3600000 }),
-      }),
     ]);
 
-    // USDC spot balance = position value
     let positionValue = null;
     const balances = hlSpot?.balances ?? [];
     const usdc = balances.find(b => b.coin === 'USDC' || b.coin === 'USDC.e');
@@ -896,7 +871,6 @@ async function getEthHedge() {
       console.log(`Portfolio Value (USDC): $${positionValue.toFixed(2)}`);
     }
 
-    // ETH perp position — PnL, entry, size
     let hedgeData = null;
     const ethPos = (hlState?.assetPositions ?? []).find(p => p.position?.coin === 'ETH');
     if (ethPos) {
@@ -911,7 +885,6 @@ async function getEthHedge() {
       console.log('No active ETH position found');
     }
 
-    // Build notes
     const noteParts = [];
     if (hedgeData?.unrealizedPnl != null) noteParts.push(`PnL: $${hedgeData.unrealizedPnl.toFixed(2)}`);
     if (hedgeData?.entryPx)               noteParts.push(`Entry: $${hedgeData.entryPx}`);
@@ -930,7 +903,7 @@ async function getEthHedge() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v29 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v30 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes] = await Promise.allSettled([
@@ -1047,9 +1020,7 @@ async function main() {
     }
   }
 
-  // Lighter (LLP, Edge & Hedge, LIT Staking)
-  // Note: APR values are normalized to decimal in the module (e.g. 0.1157 for 11.57%)
-  // Write directly — no conversion needed here
+  // Lighter
   if (lighter && Object.keys(lighter).length > 0) {
     const batch = [];
     if (lighter.llp) {
