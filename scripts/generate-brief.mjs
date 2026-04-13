@@ -12,6 +12,13 @@
  * Claude fetches its own data — nothing is pre-fetched and passed to it.
  * This eliminates the pagination bug where Reopen Position records were
  * missed because they live on page 2+ of Airtable results.
+ *
+ * Fixes applied 2026-04-12:
+ *   Fix 1 — System prompt hardened with single-output rule to prevent
+ *            Claude rewriting the brief multiple times in one response.
+ *   Fix 2 — Extraction uses lastIndexOf('Good morning') + lastIndexOf
+ *            ('Have a good one.') so only the final clean version is
+ *            captured even if Claude does produce multiple drafts.
  */
 
 import fs from 'fs';
@@ -201,13 +208,13 @@ async function runClaude(systemPrompt, userPrompt) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Content-Type':    'application/json',
-        'x-api-key':       CLAUDE_API_KEY,
+        'Content-Type':      'application/json',
+        'x-api-key':         CLAUDE_API_KEY,
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
         model:      CLAUDE_MODEL,
-        max_tokens: 4096,  // raised from 1024 — Claude needs room to reason through data before writing the brief
+        max_tokens: 4096,
         system:     systemPrompt,
         tools:      TOOLS,
         messages
@@ -227,16 +234,20 @@ async function runClaude(systemPrompt, userPrompt) {
     if (response.stop_reason === 'end_turn') {
       const textBlock = response.content.find(b => b.type === 'text');
       if (!textBlock) throw new Error('end_turn but no text block');
-      
-      // Extract only the brief — starts with "Good morning" and contains no code/JSON
-      // Claude may include preamble or reasoning before the brief text
+
       const raw = textBlock.text.trim();
-      const briefStart = raw.indexOf('Good morning');
-      if (briefStart === -1) {
-        console.warn('Warning: could not find "Good morning" in response — using full text');
+
+      // FIX 2: Use lastIndexOf to extract only the final clean brief,
+      // discarding any earlier drafts or self-revision Claude may have output.
+      const lastStart = raw.lastIndexOf('Good morning');
+      const lastEnd   = raw.lastIndexOf('Have a good one.');
+
+      if (lastStart === -1 || lastEnd === -1) {
+        console.warn('Warning: could not find brief markers — using full text');
         return raw;
       }
-      return raw.slice(briefStart).trim();
+
+      return raw.slice(lastStart, lastEnd + 'Have a good one.'.length).trim();
     }
 
     if (response.stop_reason === 'tool_use') {
@@ -254,7 +265,7 @@ async function runClaude(systemPrompt, userPrompt) {
       continue;
     }
 
-    // max_tokens during reasoning — continue the loop so Claude can finish
+    // max_tokens during reasoning — continue so Claude can finish
     if (response.stop_reason === 'max_tokens') {
       console.warn('  Warning: hit max_tokens mid-response — continuing loop');
       messages.push({ role: 'user', content: [{ type: 'text', text: 'Continue.' }] });
@@ -317,6 +328,9 @@ From the complete record set, determine:
   • Net return          = net price delta + total fees
   • Return %            = net return / total deployed × 100
   • Annualized %        = return % / (elapsed hours / 24) × 365
+                          If elapsed hours < 24: include the annualized figure but follow it with
+                          "though that figure carries little weight this early in the cycle" — then
+                          move on. Do not flag it as a problem or revise the brief.
 
 STEP 2 — Market Data (web search)
 Search for:
@@ -382,7 +396,15 @@ Tickers must be phonetic:
 Never use raw ticker symbols. Never explain the band structure or hedge mechanics.
 Target length: 60–75 seconds at 1.2× speed (~130–160 words).
 
-Return ONLY the brief text. No preamble, no explanation, no JSON.
+═══════════════════════════════════════
+OUTPUT RULES — CRITICAL
+═══════════════════════════════════════
+
+Output the brief EXACTLY ONCE.
+- If you catch an error or inconsistency while writing, correct it silently and continue.
+- Do not restart. Do not show multiple drafts. Do not explain your reasoning.
+- Do not include anything after "Have a good one." — not a note, not a correction, nothing.
+- Your entire response is one brief: starts with "Good morning." ends with "Have a good one."
 
 ═══════════════════════════════════════
 EXAMPLE OUTPUT — MATCH THIS STYLE EXACTLY
@@ -416,21 +438,13 @@ async function main() {
 
   const briefText = await runClaude(SYSTEM_PROMPT, userPrompt);
 
-  // Deduplicate — if Claude returns the brief twice in one response, strip the repeat
-  const half = Math.floor(briefText.length / 2);
-  const firstHalf  = briefText.slice(0, half).trim();
-  const secondHalf = briefText.slice(half).trim();
-  const cleanBrief = (secondHalf.length > 50 && firstHalf === secondHalf)
-    ? firstHalf
-    : briefText;
-
   console.log('\n=== BRIEF TEXT ===');
-  console.log(cleanBrief);
+  console.log(briefText);
   console.log('=================\n');
 
   const outputDir = path.dirname(OUTPUT_PATH);
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(OUTPUT_PATH, cleanBrief, 'utf8');
+  fs.writeFileSync(OUTPUT_PATH, briefText, 'utf8');
 
   console.log(`✓ Brief written to ${OUTPUT_PATH}`);
 }
