@@ -1,10 +1,13 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v31
-// Added: CRCLx cycle rollover — C2, 0.1% pool, new NFT mint
-//        recordId: rec8qUELzf7Ylit7M (new 0.1% asset)
-//        cycleId: CRCLx-C2
-//        nftMint: ExZUgnK86pHAqYbQA6dkyENPVx3TjxVxtUsSgmhsxQUK
-//        poolId unchanged (same pool G39wywq...)
+// Daily Portfolio Check — GitHub Actions v32
+// Added: Airtable-driven LP position discovery
+//        - WALLET_WETH_LP added for correct WETH/USDC wallet
+//        - Module 1 scans WALLET_WETH_LP (not WALLET_EVM)
+//        - Module 4 reads xStock positions from Airtable Assets
+//          table at runtime (NFT Mint, Pool Address, Cycle ID)
+//        - Hardcoded xStock ASSET entries removed
+//        - Cycle ID now written for WETH/USDC records too
+//        - On rollover: update Airtable Assets only, no code change
 // Schedule: 14:15 UTC = 7:15 AM PDT (triggered via cron-job.org)
 // ============================================================
 
@@ -14,10 +17,13 @@ const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const AIRTABLE_BASE    = 'appWojaxYR99bXC1f';
 const DAILY_TABLE      = 'tblKsk0QnkOoKNLuk';
 const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
+const ASSETS_TABLE     = 'tblrATIQI0ld9tz1y';
 
 const WALLET_EVM         = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
+const WALLET_WETH_LP     = '0x2375369D950D49897193EbCad32d99206C37D10A';
 const WALLET_SUI         = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
 const WALLET_HYPERLIQUID = '0x464b059B1AF55A408CB3c822D610c2D962d2cf4b';
+const WALLET_RAYDIUM     = '5yiTWdskR7yd5RXvs7MJLqWsn6n7geM8SzvYjUpRHrTX';
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
@@ -38,6 +44,7 @@ const RAYDIUM_CLMM_PROGRAM   = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
 
 const NOW_UTC = new Date().toISOString();
 
+// ---- Daily Actions field IDs ----
 const F = {
   asset:         'fldtiRIqznncRfJYG',
   actionType:    'fldUkwrxtS4AEr52W',
@@ -51,6 +58,7 @@ const F = {
   protocolAPR:   'fldL3Pa57i3fyaAf0',
 };
 
+// ---- Lending Actions field IDs ----
 const LF = {
   position:   'fldFi5nwRXNC5n0pU',
   actionType: 'fld5UpfU63qiYEZtp',
@@ -63,20 +71,26 @@ const LF = {
   notes:      'fldHzWRmzI1H3zueM',
 };
 
+// ---- Assets table field IDs ----
+const AF = {
+  asset:      'fldXyU6o1g35gciSb',
+  protocol:   'fldC8oxgDQtxfEKbs',
+  status:     'fldDRyGqgXJTuHTpx',
+  nftMint:    'fldpPTHyGfrSCQO0F',
+  poolAddr:   'fldCw0oAwKkAmigto',
+  cycleId:    'fld0T538WMoPQ5bgL',
+};
+
+// ---- Static asset record IDs (non-LP positions) ----
 const ASSET = {
   wethPrimary: 'recbVsmOWh9YOWPBZ',
   ethHedge:    'recgASxadhJMkNNry',
   lighterLLP:  'recEFiaxgavObYWzL',
   lighterEdge: 'rectz3Zo3aDbe4GgL',
   lighterLIT:  'receiu02rkzc3quDW',
-  tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2',  nftMint: '7R5JFSuXL23epYJmX6LhzbM2Nce39at4maWD7NeFK4tU', poolId: '8aDaBQkTrS6HVMjyc6EZebgdiaXhLYGriDWKWWp1NpFF' },
-  nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1',  nftMint: 'J7qm9jifiKg7CyWDbmdDUNokhgs7JvwZmy2jnJ7qmN5Z', poolId: '4KqQN6u1pFKroFE2jVEhoepAMRKPcuAzWVDCgm9zRBYN' },
-  aaplx:  { recordId: 'recGF59dwIOnE8fm2', cycleId: 'AAPLx-C1',  nftMint: '2NsZvobR13JuYbkYTt5EK1XyyEJh3xB8621FhUW3LYKp', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
-  googlx: { recordId: 'recRxStry17D0ZGB5', cycleId: 'GOOGLx-C1', nftMint: '2jznFFq36gfhUsWRzkEigGBY8hDqHBv4W6CdtsSGArWx', poolId: 'B8YAwjGYk6qidWzGBXMAxP7nYfG8g74EZ3Y4gFSsobRw' },
-  crclx:  { recordId: 'rec8qUELzf7Ylit7M', cycleId: 'CRCLx-C2',  nftMint: 'ExZUgnK86pHAqYbQA6dkyENPVx3TjxVxtUsSgmhsxQUK', poolId: 'G39wywquKbHK8F2wZZZFX3fcsyG91VCCbbr6WEVp5axy' },
-  spyx:   { recordId: 'rechX4b2anmi82enx', cycleId: 'SPYx-C1',   nftMint: 'HgcTrL1Tb57ZrycTbhcBgRviFcWrfSiJRWSmwELXSyrj', poolId: '6truu3rZuiB9rKQg4VYC3Dt3QwV7DgwGqXrYUcrvnDDE' },
 };
 
+// ---- Lending position record IDs ----
 const LPOS = {
   moonwellETH:    'rec1T0ll6aEkYoZwj',
   moonwellVIRT:   'rec6Zi6u6uK6x4M9F',
@@ -171,6 +185,21 @@ async function airtableCreate(tableId, records) {
   return true;
 }
 
+async function airtableFetch(tableId, fields, filterFormula) {
+  const { default: fetch } = await import('node-fetch');
+  const params = new URLSearchParams();
+  fields.forEach(f => params.append('fields[]', f));
+  if (filterFormula) params.append('filterByFormula', filterFormula);
+  params.append('pageSize', '100');
+  const res = await fetch(
+    `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}?${params}`,
+    { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
+  );
+  if (!res.ok) { console.error(`[Airtable fetch] ${await res.text().catch(() => '')}`); return []; }
+  const json = await res.json();
+  return json.records ?? [];
+}
+
 function dailyRecord(assetRecordId, inRange, extra = {}) {
   return { [F.asset]: [assetRecordId], [F.actionType]: 'Fee Check', [F.date]: NOW_UTC, [F.inRange]: inRange ? 'Yes' : 'No', ...extra };
 }
@@ -180,13 +209,44 @@ function lendingRecord(positionId, extra = {}) {
 }
 
 // ============================================================
-// MODULE 1 — WETH/USDC PRIMARY (Arbitrum)
-// Dynamic position discovery — no hardcoded NFT ID
+// STARTUP — Fetch active LP positions from Airtable
 // ============================================================
 
-async function getWethPosition() {
+async function fetchActiveLPAssets() {
+  console.log('\n--- Fetching active LP assets from Airtable ---');
+  const records = await airtableFetch(
+    ASSETS_TABLE,
+    [AF.asset, AF.protocol, AF.status, AF.nftMint, AF.poolAddr, AF.cycleId],
+    `AND({Status} = 'Active', OR({Protocol} = 'Raydium', {Asset} = 'WETH/USDC (Primary)'))`
+  );
+
+  const wethAsset = records.find(r => r.fields[AF.asset] === 'WETH/USDC (Primary)');
+  const raydiumAssets = records.filter(r => r.fields[AF.protocol]?.name === 'Raydium');
+
+  console.log(`Found WETH/USDC: ${wethAsset ? 'yes' : 'NO - MISSING'}`);
+  console.log(`Found Raydium positions: ${raydiumAssets.length}`);
+  raydiumAssets.forEach(r => console.log(`  ${r.fields[AF.asset]}: nft=${r.fields[AF.nftMint]?.slice(0,8)}... cycleId=${r.fields[AF.cycleId]}`));
+
+  return { wethAsset, raydiumAssets };
+}
+
+// ============================================================
+// MODULE 1 — WETH/USDC PRIMARY (Arbitrum)
+// Scans WALLET_WETH_LP for active WETH/USDC 0.05% position
+// NFT position ID read from Airtable Assets at runtime
+// ============================================================
+
+async function getWethPosition(wethAsset) {
   console.log('\n--- WETH/USDC Primary ---');
   try {
+    if (!wethAsset) { console.error('No active WETH/USDC asset found in Airtable'); return null; }
+
+    const nftIdFromAirtable = wethAsset.fields[AF.nftMint];
+    const cycleId           = wethAsset.fields[AF.cycleId];
+    const assetRecordId     = wethAsset.id;
+
+    console.log(`Airtable: NFT=${nftIdFromAirtable}, cycleId=${cycleId}`);
+
     const provider = new ethers.JsonRpcProvider(ARBITRUM_RPC);
     const NFT_MANAGER = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88';
     const WETH        = '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1';
@@ -203,32 +263,60 @@ async function getWethPosition() {
     const collectABI = ['function collect((uint256 tokenId, address recipient, uint128 amount0Max, uint128 amount1Max)) external returns (uint256 amount0, uint256 amount1)'];
 
     const nft = new ethers.Contract(NFT_MANAGER, nftManagerABI, provider);
-    const balance = await nft.balanceOf(WALLET_EVM);
-    const count = Number(balance);
-    console.log(`Wallet owns ${count} Uniswap V3 NFT(s) — scanning for active WETH/USDC 0.05% position...`);
-    if (count === 0) { console.error('No Uniswap V3 positions found in wallet'); return null; }
 
-    let WETH_POS_ID = null, raw = null;
-    for (let i = 0; i < count; i++) {
-      const tokenId = await nft.tokenOfOwnerByIndex(WALLET_EVM, i);
-      const pos = await nft.positions(tokenId);
-      const token0 = pos.token0.toLowerCase();
-      const token1 = pos.token1.toLowerCase();
-      const fee = Number(pos.fee);
-      const liq = pos.liquidity;
-      const isWethUsdc = (
-        (token0 === WETH.toLowerCase() && token1 === USDC.toLowerCase()) ||
-        (token0 === USDC.toLowerCase() && token1 === WETH.toLowerCase())
-      );
-      console.log(`  NFT #${tokenId}: fee=${fee}, liquidity=${liq}, WETH/USDC=${isWethUsdc}`);
-      if (isWethUsdc && fee === TARGET_FEE && liq > 0n) {
-        WETH_POS_ID = tokenId; raw = pos;
-        console.log(`  ✓ Active WETH/USDC 0.05% position found: NFT #${tokenId}`);
-        break;
+    // Try Airtable NFT ID first (direct lookup — faster, no wallet scan needed)
+    let WETH_POS_ID = null;
+    let raw = null;
+
+    if (nftIdFromAirtable) {
+      try {
+        const tokenId = BigInt(nftIdFromAirtable);
+        const pos = await nft.positions(tokenId);
+        const token0 = pos.token0.toLowerCase();
+        const token1 = pos.token1.toLowerCase();
+        const isWethUsdc = (
+          (token0 === WETH.toLowerCase() && token1 === USDC.toLowerCase()) ||
+          (token0 === USDC.toLowerCase() && token1 === WETH.toLowerCase())
+        );
+        if (isWethUsdc && Number(pos.fee) === TARGET_FEE && pos.liquidity > 0n) {
+          WETH_POS_ID = tokenId;
+          raw = pos;
+          console.log(`Using Airtable NFT #${nftIdFromAirtable} — liquidity confirmed`);
+        } else {
+          console.log(`Airtable NFT #${nftIdFromAirtable} — liquidity=0 or wrong pair, falling back to wallet scan`);
+        }
+      } catch (e) {
+        console.error(`Airtable NFT lookup failed: ${e.message.slice(0, 60)}, falling back to wallet scan`);
       }
     }
 
-    if (!WETH_POS_ID || !raw) { console.error('No active WETH/USDC 0.05% position with liquidity found in wallet'); return null; }
+    // Fallback: scan WALLET_WETH_LP for active position
+    if (!WETH_POS_ID) {
+      const balance = await nft.balanceOf(WALLET_WETH_LP);
+      const count = Number(balance);
+      console.log(`Scanning WALLET_WETH_LP — owns ${count} Uniswap V3 NFT(s)...`);
+      for (let i = 0; i < count; i++) {
+        const tokenId = await nft.tokenOfOwnerByIndex(WALLET_WETH_LP, i);
+        const pos = await nft.positions(tokenId);
+        const token0 = pos.token0.toLowerCase();
+        const token1 = pos.token1.toLowerCase();
+        const fee = Number(pos.fee);
+        const liq = pos.liquidity;
+        const isWethUsdc = (
+          (token0 === WETH.toLowerCase() && token1 === USDC.toLowerCase()) ||
+          (token0 === USDC.toLowerCase() && token1 === WETH.toLowerCase())
+        );
+        console.log(`  NFT #${tokenId}: fee=${fee}, liquidity=${liq}, WETH/USDC=${isWethUsdc}`);
+        if (isWethUsdc && fee === TARGET_FEE && liq > 0n) {
+          WETH_POS_ID = tokenId;
+          raw = pos;
+          console.log(`  ✓ Active WETH/USDC 0.05% position found: NFT #${tokenId}`);
+          break;
+        }
+      }
+    }
+
+    if (!WETH_POS_ID || !raw) { console.error('No active WETH/USDC 0.05% position with liquidity found'); return null; }
 
     const tickLowerN = Number(raw.tickLower);
     const tickUpperN = Number(raw.tickUpper);
@@ -260,7 +348,7 @@ async function getWethPosition() {
     const nftCollect = new ethers.Contract(NFT_MANAGER, collectABI, provider);
     let feeValue = 0;
     try {
-      const fees = await nftCollect.collect.staticCall({ tokenId: WETH_POS_ID, recipient: WALLET_EVM, amount0Max: MAX128, amount1Max: MAX128 });
+      const fees = await nftCollect.collect.staticCall({ tokenId: WETH_POS_ID, recipient: WALLET_WETH_LP, amount0Max: MAX128, amount1Max: MAX128 });
       const feeETH  = Number(fees[0]) / 1e18;
       const feeUSDC = Number(fees[1]) / 1e6;
       feeValue = (feeETH * ethPrice) + feeUSDC;
@@ -269,7 +357,8 @@ async function getWethPosition() {
       console.error(`Fee collect failed: ${e.message.slice(0, 60)}`);
       console.log(`ETH: $${ethPrice.toFixed(2)}, position: $${positionValue.toFixed(2)}, in range: ${inRange}, NFT: #${WETH_POS_ID}`);
     }
-    return { positionValue, feeValue, inRange, currentTick, tickLower: tickLowerN, tickUpper: tickUpperN, ethPrice };
+
+    return { positionValue, feeValue, inRange, currentTick, tickLower: tickLowerN, tickUpper: tickUpperN, ethPrice, cycleId, assetRecordId };
   } catch (e) { console.error(`WETH/USDC: ${e.message}`); return null; }
 }
 
@@ -478,6 +567,7 @@ async function getSuilendData() {
 
 // ============================================================
 // MODULE 4 — Raydium xStocks CLMM (Solana)
+// Position list driven by Airtable Assets table at runtime
 // ============================================================
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -552,16 +642,28 @@ function parsePoolAccount(data) {
   };
 }
 
-async function getRaydiumPositions() {
+async function getRaydiumPositions(raydiumAssets) {
   console.log(`\n--- Raydium xStocks CLMM ${RAYDIUM_DRY_RUN ? '[DRY RUN]' : '[LIVE]'} ---`);
   const results = [];
-  const xstockPositions = Object.entries(ASSET)
-    .filter(([, v]) => typeof v === 'object' && v.nftMint)
-    .map(([key, v]) => ({ key, ...v }));
-  console.log(`Processing ${xstockPositions.length} hardcoded xStock positions`);
+
+  if (!raydiumAssets || raydiumAssets.length === 0) {
+    console.error('No active Raydium assets found in Airtable');
+    return results;
+  }
+
+  // Build position list from Airtable records
+  const xstockPositions = raydiumAssets.map(r => ({
+    key:          r.fields[AF.asset],
+    recordId:     r.id,
+    cycleId:      r.fields[AF.cycleId],
+    nftMint:      r.fields[AF.nftMint],
+    poolId:       r.fields[AF.poolAddr],
+  })).filter(p => p.nftMint && p.poolId);
+
+  console.log(`Processing ${xstockPositions.length} Airtable-driven xStock positions`);
 
   for (const posConfig of xstockPositions) {
-    const { key, nftMint, poolId } = posConfig;
+    const { key, recordId, cycleId, nftMint, poolId } = posConfig;
     try {
       const programAccounts = await solRpc('getProgramAccounts', [
         RAYDIUM_CLMM_PROGRAM,
@@ -679,7 +781,7 @@ async function getRaydiumPositions() {
       } catch(feeErr) { console.error(`  Fee calc error: ${feeErr.message.slice(0, 80)}`); }
 
       console.log(`  ${key}: $${positionValue.toFixed(2)}, in range: ${inRange}, fees: $${pendingYield.toFixed(2)}`);
-      results.push({ key, positionValue, inRange, pendingYield });
+      results.push({ key, recordId, cycleId, positionValue, inRange, pendingYield });
 
     } catch (e) { console.error(`  ${key}: ${e.message}`); }
   }
@@ -730,7 +832,6 @@ async function getLighterPositions() {
     const stakingPools = stakingSearchRes?.public_pools ?? [];
     const litPool = stakingPools.find(p => p.name?.toLowerCase().includes('lit') || p.name?.toLowerCase().includes('staking'));
     if (litPool) {
-      console.log(`LIT pool found: index=${litPool.account_index} name=${litPool.name}`);
       const litPoolRes = await fetchWithTimeout(
         `${LIGHTER_BASE}/publicPoolsMetadata?index=${litPool.account_index + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
         { headers }
@@ -739,7 +840,6 @@ async function getLighterPositions() {
       if (litPoolData?.account_share) {
         litStakeAmount = Number(litPoolData.account_share.principal_amount ?? litPoolData.account_share.shares_amount);
         litAPR = litPoolData.annual_percentage_yield != null ? litPoolData.annual_percentage_yield / 100 : litAPR;
-        console.log(`LIT stake from API: ${litStakeAmount} LIT, APR=${litAPR?.toFixed(2)}%`);
       }
     } else {
       console.log(`LIT staking pool not found in protocol filter — using hardcoded ${LIT_STAKE_AMOUNT} LIT`);
@@ -809,14 +909,17 @@ async function getEthHedge() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v31 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v32 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('INFO: RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
+  // Fetch active LP assets from Airtable first
+  const { wethAsset, raydiumAssets } = await fetchActiveLPAssets();
+
   const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes] = await Promise.allSettled([
-    getWethPosition(),
+    getWethPosition(wethAsset),
     getMoonwellData(),
     getSuilendData(),
-    getRaydiumPositions(),
+    getRaydiumPositions(raydiumAssets),
     getLighterPositions(),
     getEthHedge(),
   ]);
@@ -833,12 +936,13 @@ async function main() {
 
   // WETH/USDC Primary
   if (weth) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
+    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(weth.assetRecordId, weth.inRange, {
       [F.positionValue]: weth.positionValue,
+      [F.cycleId]:       weth.cycleId,
       ...(weth.feeValue > 0 ? { [F.feeValue]: weth.feeValue } : {}),
       [F.notes]: `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
     })]);
-    if (ok) { written++; console.log(`WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}`); }
+    if (ok) { written++; console.log(`WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}, cycleId: ${weth.cycleId}`); }
   }
 
   // ETH Short Hedge
@@ -901,20 +1005,18 @@ async function main() {
   if (raydium.length > 0) {
     console.log(`\nRaydium — ${raydium.length} position(s)`);
     if (RAYDIUM_DRY_RUN) {
-      for (const pos of raydium) console.log(`  ${pos.key}: $${pos.positionValue.toFixed(2)}, inRange: ${pos.inRange}`);
+      for (const pos of raydium) console.log(`  ${pos.key}: $${pos.positionValue.toFixed(2)}, inRange: ${pos.inRange}, cycleId: ${pos.cycleId}`);
       console.log('DRY RUN — set RAYDIUM_DRY_RUN=false in GitHub Variables to go live');
     } else {
       const batch = [];
       for (const pos of raydium) {
-        const meta = ASSET[pos.key];
-        if (!meta) continue;
-        batch.push(dailyRecord(meta.recordId, pos.inRange, {
+        batch.push(dailyRecord(pos.recordId, pos.inRange, {
           [F.positionValue]: pos.positionValue,
-          [F.cycleId]:       meta.cycleId,
+          [F.cycleId]:       pos.cycleId,
           ...(pos.pendingYield > 0 ? { [F.feeValue]: pos.pendingYield } : {}),
-          [F.notes]: `Raydium CLMM | ${pos.key.toUpperCase()}${pos.pendingYield > 0 ? '' : ' | fees: out-of-range (no accumulation)'}`,
+          [F.notes]: `Raydium CLMM | ${pos.key}${pos.pendingYield > 0 ? '' : ' | fees: out-of-range (no accumulation)'}`,
         }));
-        console.log(`  Queued ${pos.key}: $${pos.positionValue.toFixed(2)}, inRange: ${pos.inRange}`);
+        console.log(`  Queued ${pos.key}: $${pos.positionValue.toFixed(2)}, inRange: ${pos.inRange}, cycleId: ${pos.cycleId}`);
       }
       if (batch.length > 0) {
         for (let i = 0; i < batch.length; i += 10) {
@@ -935,7 +1037,6 @@ async function main() {
         ...(lighter.llp.apr != null ? { [F.protocolAPR]: lighter.llp.apr } : {}),
         [F.notes]: `Lighter LLP | Equity: $${lighter.llp.equity.toFixed(2)} | APY: ${(lighter.llp.apr * 100)?.toFixed(2)}% | Shares: ${lighter.llp.shares}`,
       }));
-      console.log(`  Queued LLP: $${lighter.llp.equity.toFixed(2)}, APY ${(lighter.llp.apr * 100)?.toFixed(2)}%`);
     }
     if (lighter.edge) {
       batch.push(dailyRecord(ASSET.lighterEdge, true, {
@@ -943,7 +1044,6 @@ async function main() {
         ...(lighter.edge.apr != null ? { [F.protocolAPR]: lighter.edge.apr } : {}),
         [F.notes]: `Lighter Edge & Hedge | Equity: $${lighter.edge.equity.toFixed(2)} | APY: ${(lighter.edge.apr * 100)?.toFixed(2)}% | Shares: ${lighter.edge.shares}`,
       }));
-      console.log(`  Queued Edge & Hedge: $${lighter.edge.equity.toFixed(2)}, APY ${(lighter.edge.apr * 100)?.toFixed(2)}%`);
     }
     if (lighter.lit) {
       batch.push(dailyRecord(ASSET.lighterLIT, true, {
@@ -951,7 +1051,6 @@ async function main() {
         ...(lighter.lit.apr != null ? { [F.protocolAPR]: lighter.lit.apr } : {}),
         [F.notes]: `LIT Staking | ${lighter.lit.litStakeAmount} LIT x $${lighter.lit.litPrice?.toFixed(4)} = $${lighter.lit.equity.toFixed(2)} | APR: ${(lighter.lit.apr * 100)?.toFixed(2)}%`,
       }));
-      console.log(`  Queued LIT Staking: $${lighter.lit.equity.toFixed(2)}, APR ${(lighter.lit.apr * 100)?.toFixed(2)}%`);
     }
     if (batch.length > 0) {
       const ok = await airtableCreate(DAILY_TABLE, batch);
