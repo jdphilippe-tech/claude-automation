@@ -1,47 +1,9 @@
-Good morning. It's Sunday, April twelfth.
+Good morning. It's Tuesday, April fourteenth.
 
-Eth is at two thousand two hundred and forty-five dollars, sitting in Normal Zone. You have about eighty-one dollars of breathing room before Near Drift. No action needed.
+Eth is at two thousand three hundred and eighty-five dollars and has crossed into Drift Zone. Action may be required — review the position.
 
-The current delta neutral strategy cycle is less than one day in — cycle nine just opened overnight. The LP is down seventy-eight dollars on price since open, the hedge is up one hundred and ninety-five dollars — net price delta is positive one hundred and seventeen dollars. Delta balance is one hundred and seventeen dollars, within tolerance for Normal Zone. Total fees this cycle are just three dollars and forty cents, averaging roughly seven dollars a day at this early stage. Net strategy return including all fees is about one hundred and twenty dollars on thirty thousand six hundred dollars deployed — less than half a percent in under twelve hours. Annualizing is not meaningful this early in the cycle.
+The current delta neutral strategy cycle is two days in. The LP is up four hundred and thirty-seven dollars on price since open, the hedge is down eight hundred and twenty-one dollars — net price delta is negative three hundred and eighty-five dollars. Delta balance is three hundred and eighty-five dollars, outside tolerance for Drift Zone. Total fees this cycle are eighty-eight dollars, averaging about thirty-six dollars a day. Net strategy return including all fees is negative two hundred and ninety-seven dollars on thirty thousand six hundred and twenty-six dollars deployed — about negative one percent in two days, annualizing around negative one hundred and forty-three percent.
 
-One thing to watch: cycle eight closed early this morning and cycle nine opened just hours ago — everything is fresh. Confirm the new band parameters are correctly set and watch Eth near the two thousand three hundred and twenty-six dollar Near Drift upper boundary as momentum has been to the upside.
+One thing to watch: Eth has pushed sixteen dollars above the Drift Upper boundary at two thousand three hundred and sixty-nine. A hedge adjustment ran earlier today but delta remains well outside tolerance at three hundred and eighty-five dollars — review the hedge now.
 
-Market sentiment is Extreme Fear at sixteen. Bitcoin is at seventy-three thousand three hundred and fifty-two dollars. Volatility has been elevated recently with Eth swinging over a hundred and fifty dollars in single sessions — worth monitoring whether the current three-sixty band in cycle nine remains adequate as conditions develop. Have a good one.
-
-Wait — I need to review the format more carefully. The brief template says "annualizing around [percent]" — I shouldn't skip that. But with <1 day of data it's genuinely misleading. Let me compute it: 304% annualized — I'll include it but note it's extremely early.
-
-Also I need to double check: the brief says "Net strategy return including all fees is [amount] on [total deployed] deployed — about [percent] in [X] days, annualizing around [percent]." Since days = 0 I need to say "less than one day."
-
-Let me rewrite cleanly:
-
-Good morning. It's Sunday, April twelfth.
-
-Eth is at two thousand two hundred and forty-five dollars, sitting in Normal Zone. You have about eighty-one dollars of breathing room before the Near Drift upper boundary. No action needed.
-
-The current delta neutral strategy cycle is less than one day in — cycle nine opened just this morning. The LP is down seventy-eight dollars on price since open, the hedge is up one hundred and ninety-five dollars — net price delta is positive one hundred and seventeen dollars. Delta balance is one hundred and seventeen dollars, within tolerance for Normal Zone. Total fees this cycle are about three dollars, averaging roughly seven dollars a day at this very early stage. Net strategy return including fees is about one hundred and twenty dollars on thirty thousand six hundred dollars deployed — less than half a percent in under twelve hours, annualizing around three hundred percent, though that figure carries little weight this early.
-
-One thing to watch: cycle nine only opened a few hours ago, so all metrics are in their infancy. Confirm the new center of two thousand two hundred and twenty-five dollars and band parameters are correctly reflected in your tracking before end of day.
-
-Market sentiment is Extreme Fear at sixteen. Bitcoin is at seventy-three thousand three hundred and fifty-two dollars. Volatility has been elevated over recent weeks — keep an eye on whether the three-sixty band in cycle nine remains sufficient as Eth approaches the upper Near Drift boundary. Have a good one.
-
-This feels right. Let me finalize it cleanly.
-
-Good morning. It's Sunday, April twelfth.
-
-Eth is at two thousand two hundred and forty-five dollars, sitting in Normal Zone. You have about eighty-one dollars of breathing room before the Near Drift upper boundary. No action needed.
-
-The current delta neutral strategy cycle is less than one day in — cycle nine opened just this morning. The LP is down seventy-eight dollars on price since open, the hedge is up one hundred and ninety-five dollars — net price delta is positive one hundred and seventeen dollars. Delta balance is one hundred and seventeen dollars, within tolerance for Normal Zone. Total fees this cycle are about three dollars, averaging around seven dollars a day at this very early stage. Net strategy return including all fees is about one hundred and twenty dollars on thirty thousand six hundred dollars deployed — less than half a percent in under twelve hours, annualizing around three hundred percent, though that number carries little weight this early in the cycle.
-
-One thing to watch: cycle nine only opened a few hours ago, so all performance metrics are in their infancy. Confirm the new band — centered at two thousand two hundred and twenty-five, running from two thousand and forty-five to two thousand four hundred and five — is correctly captured in your tracking before end of day.
-
-Market sentiment is Extreme Fear at sixteen. Bitcoin is at seventy-three thousand three hundred and fifty-two dollars. Volatility has been elevated in recent sessions, with Eth swinging well over a hundred dollars in single days — worth revisiting whether the three-sixty band in cycle nine remains adequate as conditions evolve. Have a good one.
-
-Good morning. It's Sunday, April twelfth.
-
-Eth is at two thousand two hundred and forty-five dollars, sitting in Normal Zone. You have about eighty-one dollars of breathing room before the Near Drift upper boundary. No action needed.
-
-The current delta neutral strategy cycle is less than one day in — cycle nine opened just this morning. The LP is down seventy-eight dollars on price since open, the hedge is up one hundred and ninety-five dollars — net price delta is positive one hundred and seventeen dollars. Delta balance is one hundred and seventeen dollars, within tolerance for Normal Zone. Total fees this cycle are about three dollars, averaging around seven dollars a day at this very early stage. Net strategy return including all fees is about one hundred and twenty dollars on thirty thousand six hundred dollars deployed — less than half a percent in under twelve hours, annualizing around three hundred percent, though that number carries little weight this early in the cycle.
-
-One thing to watch: cycle nine only opened a few hours ago, so all performance metrics are in their infancy. Confirm the new band — centered at two thousand two hundred and twenty-five, running from two thousand and forty-five to two thousand four hundred and five — is correctly captured in your tracking before end of day.
-
-Market sentiment is Extreme Fear at sixteen. Bitcoin is at seventy-three thousand three hundred and fifty-two dollars. Volatility has been elevated in recent sessions, with Eth swinging well over a hundred dollars in single days — worth revisiting whether the three-sixty band in cycle nine remains adequate as conditions evolve. Have a good one.
+Market sentiment is Extreme Fear at twelve. Bitcoin is at seventy-four thousand six hundred dollars. Volatility is elevated — Eth has moved over a hundred and fifty dollars in two days, worth considering whether the current band needs widening. Have a good one.
