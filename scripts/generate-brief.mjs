@@ -19,6 +19,13 @@
  *   Fix 2 — Extraction uses lastIndexOf('Good morning') + lastIndexOf
  *            ('Have a good one.') so only the final clean version is
  *            captured even if Claude does produce multiple drafts.
+ *
+ * Fixes applied 2026-04-14:
+ *   Fix 3 — 429 rate limit retry with 60s backoff instead of Fatal crash.
+ *   Fix 4 — max_tokens reduced from 4096 to 2048 to slow context growth.
+ *   Fix 5 — System prompt band values removed — Claude now fetches current
+ *            cycle band values from Notion at runtime instead of using
+ *            hardcoded C8 values that go stale every cycle.
  */
 
 import fs from 'fs';
@@ -26,10 +33,14 @@ import path from 'path';
 
 const CLAUDE_API_KEY   = process.env.CLAUDE_API_KEY;
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+const NOTION_API_KEY   = process.env.NOTION_API_KEY;
 
-const AIRTABLE_BASE_ID     = 'appWojaxYR99bXC1f';
-const AIRTABLE_DAILY_TABLE = 'tblKsk0QnkOoKNLuk';
+const AIRTABLE_BASE_ID       = 'appWojaxYR99bXC1f';
+const AIRTABLE_DAILY_TABLE   = 'tblKsk0QnkOoKNLuk';
 const AIRTABLE_LENDING_TABLE = 'tblFw52kzeTRvxTSM';
+
+// Notion page ID for Current Cycle Parameters (Live) — contains live band values
+const NOTION_CYCLE_PARAMS_PAGE = '32a12a7e-409e-80f0-bbbe-c3e53fa89343';
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const OUTPUT_PATH  = 'audio/brief-text.txt';
@@ -48,13 +59,13 @@ Field IDs:
   fldWElDtJZRYTaZtD = Position Value
   fld6QnTv9CKHvglcX = Fee Value    (pending fees, only on Fee Check records)
   fldE5uO0nwZmgLQtF = Fees Claimed (only on Claim records)
-  fldFFts5ByR1EeYBk = Cycle ID     (e.g. WETH-PRIMARY-C8, HEDGE-C8)
+  fldFFts5ByR1EeYBk = Cycle ID     (e.g. WETH-PRIMARY-C9, HEDGE-C9)
   fldxWdSuQ09uhadFo = Notes        (HEDGE Fee Check records contain "PnL: $XX.XX | Entry: $XXXX | Size: -X.X ETH")
 
 LENDING ACTIONS TABLE: ${AIRTABLE_LENDING_TABLE}
 
 PAGINATION IS REQUIRED. Always pass the offset from each response into the
-next call until no offset is returned. The Reopen Position records that
+next call until has_more = false. The Reopen Position records that
 define opening deposit values are the OLDEST records in the cycle — they
 will NOT appear on the first page when sorted descending. You MUST paginate
 through all pages sorted ascending to find them.
@@ -85,11 +96,11 @@ Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
         fields: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of field IDs to return. Always include fldFFts5ByR1EeYBk (Cycle ID), fldUkwrxtS4AEr52W (Action Type), and fldxWdSuQ09uhadFo (Notes — required for hedge PnL).'
+          description: 'Array of field IDs to return. Always include fldFFts5ByR1EeYBk (Cycle ID), fldUkwrxtS4AEr52W (Action Type), and fldxWdSuQ09uhadFo (Notes — required for hedge PnL). Request ONLY the fields you need.'
         },
         page_size: {
           type: 'number',
-          description: 'Records per page. Max 100.'
+          description: 'Records per page. Max 100. Use 100 to minimize API calls.'
         },
         offset: {
           type: 'string',
@@ -100,11 +111,28 @@ Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
     }
   },
   {
+    name: 'notion_fetch',
+    description: `Fetch a Notion page by ID to read current cycle band values.
+Use this to fetch the Current Cycle Parameters page which contains live band values
+(Center, Lower, Upper, Drift Lower, Drift Upper, Near Drift Lower, Near Drift Upper).
+Always fetch this page to get current band values — never rely on hardcoded values.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        page_id: {
+          type: 'string',
+          description: 'Notion page ID (with or without dashes)'
+        }
+      },
+      required: ['page_id']
+    }
+  },
+  {
     name: 'web_search',
     description: `Search the web for current market data.
 Use short, specific queries:
 - ETH price: "ETH USD price today"
-- BTC price: "BTC USD price today"  
+- BTC price: "BTC USD price today"
 - Fear & Greed: "crypto fear greed index"
 Returns a summary of top results.`,
     input_schema: {
@@ -144,11 +172,41 @@ async function runAirtableQuery(input) {
 
   const data = await res.json();
   return {
-    records: data.records,
-    offset: data.offset || null,
+    records:       data.records,
+    offset:        data.offset || null,
     total_returned: data.records?.length ?? 0,
-    has_more: !!data.offset
+    has_more:      !!data.offset
   };
+}
+
+async function runNotionFetch(input) {
+  const { page_id } = input;
+  const cleanId = page_id.replace(/-/g, '');
+
+  if (!NOTION_API_KEY) {
+    return { error: 'NOTION_API_KEY not set' };
+  }
+
+  try {
+    const res = await fetch(`https://api.notion.com/v1/blocks/${cleanId}/children?page_size=100`, {
+      headers: {
+        'Authorization': `Bearer ${NOTION_API_KEY}`,
+        'Notion-Version': '2022-06-28',
+      }
+    });
+    if (!res.ok) {
+      return { error: `Notion ${res.status}: ${await res.text()}` };
+    }
+    const data = await res.json();
+    // Extract plain text from all blocks
+    const text = (data.results || []).map(block => {
+      const richText = block[block.type]?.rich_text ?? [];
+      return richText.map(rt => rt.plain_text).join('');
+    }).filter(Boolean).join('\n');
+    return { text };
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
 async function runWebSearch(input) {
@@ -188,12 +246,56 @@ async function executeTool(name, input) {
   let result;
   switch (name) {
     case 'airtable_query': result = await runAirtableQuery(input); break;
+    case 'notion_fetch':   result = await runNotionFetch(input);   break;
     case 'web_search':     result = await runWebSearch(input);     break;
     default:               result = { error: `Unknown tool: ${name}` };
   }
   const preview = JSON.stringify(result).substring(0, 120);
   console.log(`  [result] ${preview}${preview.length >= 120 ? '…' : ''}`);
   return result;
+}
+
+// ── Claude API call with 429 retry ──────────────────────────────────────────
+
+async function callClaude(messages, systemPrompt) {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 60000; // 60 seconds
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-api-key':         CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model:      CLAUDE_MODEL,
+        max_tokens: 2048,
+        system:     systemPrompt,
+        tools:      TOOLS,
+        messages
+      })
+    });
+
+    if (res.status === 429) {
+      if (attempt < MAX_RETRIES) {
+        console.warn(`  [429] Rate limit hit — waiting 60s before retry ${attempt}/${MAX_RETRIES - 1}...`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+        continue;
+      } else {
+        const err = await res.text();
+        throw new Error(`Claude API 429 after ${MAX_RETRIES} retries: ${err}`);
+      }
+    }
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Claude API ${res.status}: ${err}`);
+    }
+
+    return await res.json();
+  }
 }
 
 // ── Claude Agentic Loop ─────────────────────────────────────────────────────
@@ -205,28 +307,7 @@ async function runClaude(systemPrompt, userPrompt) {
   for (let i = 0; i < MAX_ITERS; i++) {
     console.log(`\n[claude] iteration ${i + 1}`);
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model:      CLAUDE_MODEL,
-        max_tokens: 4096,
-        system:     systemPrompt,
-        tools:      TOOLS,
-        messages
-      })
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Claude API ${res.status}: ${err}`);
-    }
-
-    const response = await res.json();
+    const response = await callClaude(messages, systemPrompt);
     console.log(`  stop_reason: ${response.stop_reason}`);
 
     messages.push({ role: 'assistant', content: response.content });
@@ -237,7 +318,7 @@ async function runClaude(systemPrompt, userPrompt) {
 
       const raw = textBlock.text.trim();
 
-      // FIX 2: Use lastIndexOf to extract only the final clean brief,
+      // Fix 2: Use lastIndexOf to extract only the final clean brief,
       // discarding any earlier drafts or self-revision Claude may have output.
       const lastStart = raw.lastIndexOf('Good morning');
       const lastEnd   = raw.lastIndexOf('Have a good one.');
@@ -288,11 +369,25 @@ Your job: fetch all required data using your tools, compute everything yourself,
 DATA FETCHING INSTRUCTIONS
 ═══════════════════════════════════════
 
-STEP 1 — PSF Cycle Data (Airtable Daily Actions)
+STEP 1 — Current Cycle Band Values (Notion)
+Fetch the Current Cycle Parameters page from Notion using the notion_fetch tool:
+  page_id: ${NOTION_CYCLE_PARAMS_PAGE}
+
+Extract from the page content:
+  • Center price
+  • Band Lower and Upper
+  • Drift Lower and Drift Upper
+  • Near Drift Lower and Near Drift Upper
+  • Current cycle number (e.g. C9)
+
+Use these values for all zone calculations. Never use hardcoded band values.
+
+STEP 2 — PSF Cycle Data (Airtable Daily Actions)
 Query table ${AIRTABLE_DAILY_TABLE} with:
   filterByFormula: OR(FIND('WETH-PRIMARY-C',{Cycle ID}),FIND('HEDGE-C',{Cycle ID}))
   sort: fldHG3MCcyhkXknyH ascending (oldest first)
   fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk, fldxWdSuQ09uhadFo
+  page_size: 100
 
 ⚠️  PAGINATION IS MANDATORY. Keep calling airtable_query with the offset from
 each response until has_more = false. The Reopen Position records you need to
@@ -300,7 +395,7 @@ determine opening deposit values are the OLDEST records — they will only appea
 once you have paginated through all pages. Do not stop after one page.
 
 From the complete record set, determine:
-  • Current cycle number = highest number in Cycle ID (e.g. C8 from WETH-PRIMARY-C8)
+  • Current cycle number = highest number in Cycle ID (e.g. C9 from WETH-PRIMARY-C9)
   • LP open value       = Position Value on earliest Reopen Position for WETH-PRIMARY-C[n]
   • Hedge open value    = Position Value on earliest Reopen Position for HEDGE-C[n]
   • Total deployed      = LP open + Hedge open
@@ -332,24 +427,19 @@ From the complete record set, determine:
                           "though that figure carries little weight this early in the cycle" — then
                           move on. Do not flag it as a problem or revise the brief.
 
-STEP 2 — Market Data (web search)
+STEP 3 — Market Data (web search)
 Search for:
   • ETH current price in USD
   • BTC current price in USD
   • Crypto Fear & Greed index — search "alternative.me fear greed index" and look for a number between 0-100 in the description. It will say something like "Now: 28" or "Current value is 28 (Fear)". Extract just the number and label. If you cannot find a specific number, say "Market sentiment data was unavailable at brief time" — do NOT estimate or guess a number.
-  • ETH 30-day volatility or ATR — search "ETH 30 day volatility" or "Ethereum ATR" to get a sense of whether current volatility is elevated, normal, or compressed relative to recent history. This is used to assess whether the current 360-point band width remains appropriate.
+  • ETH 30-day volatility or ATR — search "ETH 30 day volatility" or "Ethereum ATR" to get a sense of whether current volatility is elevated, normal, or compressed relative to recent history. This is used to assess whether the current band width remains appropriate.
 
-STEP 3 — Zone Determination
-You must know the current band parameters. Check the Airtable records — the
-Cycle ID tells you which cycle is active. The band for C8 is:
-  Center: $2,080 | Lower: $1,900 | Upper: $2,260
-  Drift Lower: $1,936 | Near Drift Lower: $1,979
-  Near Drift Upper: $2,181 | Drift Upper: $2,224
-(If a new cycle has opened, use the band values seeded in Notion for that cycle.)
+STEP 4 — Zone Determination
+Using the band values fetched from Notion in Step 1 and the ETH price from Step 3:
 
-Zone rules using ETH price:
+Zone rules:
   • Between Near Drift Lower and Near Drift Upper → Normal Zone
-  • Between Drift Lower and Near Drift Lower, OR between Near Drift Upper and Drift Upper → Near Drift Zone  
+  • Between Drift Lower and Near Drift Lower, OR between Near Drift Upper and Drift Upper → Near Drift Zone
   • Below Drift Lower OR above Drift Upper → Drift Zone (action required — flag clearly)
 
 Distance to nearest Near Drift = min(ETH − Near Drift Lower, Near Drift Upper − ETH)
@@ -376,7 +466,7 @@ BRIEF FORMAT (follow exactly, in order)
    Examples: unclaimed fees building up on an xStock LP, a lending rate that spiked, the position approaching Near Drift, delta outside tolerance.
 
 5. Market Close
-   "Market sentiment is [label] at [number]. Bitcoin is at [price]. [Band width verdict — one sentence assessing whether the current 360-point band remains appropriate given current ETH volatility: e.g. 'Volatility looks normal — the three-sixty band remains appropriate.' or 'Volatility is elevated — worth reviewing whether the three-sixty band needs widening.' or 'Volatility is compressed — the three-sixty band has comfortable room.'] Have a good one."
+   "Market sentiment is [label] at [number]. Bitcoin is at [price]. [Band width verdict — one sentence assessing whether the current band width remains appropriate given current ETH volatility: e.g. 'Volatility looks normal — the band remains appropriate.' or 'Volatility is elevated — worth reviewing whether the band needs widening.' or 'Volatility is compressed — the band has comfortable room.'] Have a good one."
 
 ═══════════════════════════════════════
 SPEAKING RULES — CRITICAL
@@ -418,7 +508,7 @@ The current delta neutral strategy cycle is thirteen days in. The LP is down one
 
 One thing to watch: the C-R-C-L-x position has three hundred and twenty-two dollars in unclaimed fees on a fifteen hundred dollar position. Worth deciding today whether to claim or let it ride into the weekend.
 
-Market sentiment is Extreme Fear at nine. Bitcoin is at sixty-six thousand eight hundred dollars. Volatility looks normal — the three-sixty band remains appropriate. Have a good one.`;
+Market sentiment is Extreme Fear at nine. Bitcoin is at sixty-six thousand eight hundred dollars. Volatility looks normal — the band remains appropriate. Have a good one.`;
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
