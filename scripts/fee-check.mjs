@@ -139,7 +139,7 @@ async function fetchActiveLPAssets() {
   const records = await airtableFetch(
     ASSETS_TABLE,
     [AF.asset, AF.protocol, AF.status, AF.nftMint, AF.poolAddr, AF.cycleId],
-    `AND({Status} = 'Active', OR({Protocol} = 'Raydium', {Asset} = 'WETH/USDC (Primary)'))`
+    `AND({fldDRyGqgXJTuHTpx} = 'Active', OR({fldC8oxgDQtxfEKbs} = 'Raydium', {fldXyU6o1g35gciSb} = 'WETH/USDC (Primary)'))`
   );
   const wethAsset = records.find(r => r.fields[AF.asset] === 'WETH/USDC (Primary)');
   const raydiumAssets = records.filter(r => r.fields[AF.protocol]?.name === 'Raydium');
