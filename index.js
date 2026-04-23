@@ -1,6 +1,8 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v32
+// Daily Portfolio Check — GitHub Actions v33
 // Added: Airtable-driven LP position discovery
+// Fix:   fetchActiveLPAssets filter uses field IDs instead of field names
+//        to correctly match singleSelect fields in Airtable REST API
 //        - WALLET_WETH_LP added for correct WETH/USDC wallet
 //        - Module 1 scans WALLET_WETH_LP (not WALLET_EVM)
 //        - Module 4 reads xStock positions from Airtable Assets
@@ -217,7 +219,7 @@ async function fetchActiveLPAssets() {
   const records = await airtableFetch(
     ASSETS_TABLE,
     [AF.asset, AF.protocol, AF.status, AF.nftMint, AF.poolAddr, AF.cycleId],
-    `AND({Status} = 'Active', OR({Protocol} = 'Raydium', {Asset} = 'WETH/USDC (Primary)'))`
+    `AND({fldDRyGqgXJTuHTpx} = 'Active', OR({fldC8oxgDQtxfEKbs} = 'Raydium', {fldXyU6o1g35gciSb} = 'WETH/USDC (Primary)'))`
   );
 
   const wethAsset = records.find(r => r.fields[AF.asset] === 'WETH/USDC (Primary)');
@@ -909,7 +911,7 @@ async function getEthHedge() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v32 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v33 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('INFO: RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   // Fetch active LP assets from Airtable first
