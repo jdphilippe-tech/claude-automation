@@ -109,7 +109,7 @@ async function fetchWethAsset() {
   const records = await airtableFetch(
     ASSETS_TABLE,
     [AF.asset, AF.status, AF.nftMint, AF.cycleId],
-    `AND({Status} = 'Active', {Asset} = 'WETH/USDC (Primary)')`
+    `AND({fldDRyGqgXJTuHTpx} = 'Active', {fldXyU6o1g35gciSb} = 'WETH/USDC (Primary)')`
   );
   return records[0] ?? null;
 }
