@@ -1,9 +1,9 @@
-Good morning. It's Thursday, April twenty-third.
+Good morning. It's Friday, April 24th.
 
-Eth is at two thousand four hundred and eighteen dollars and has crossed into Drift Zone — sitting about forty-nine dollars above the Drift Upper boundary. Action may be required — review the position.
+Eth is at two thousand three hundred and five dollars, sitting in Normal Zone. You have about twenty-one dollars of breathing room before Near Drift Upper. That's thin — worth keeping an eye on today.
 
-The current delta neutral strategy cycle is eleven days in. The LP is up four hundred and twenty-four dollars on price since open, the hedge is down four hundred and fifty dollars — net price delta is negative twenty-six dollars. Delta balance is twenty-six dollars, which is within tolerance even for Near Drift Zone. Total fees this cycle are four hundred and sixty-one dollars, averaging about forty dollars a day. Net strategy return including all fees is four hundred and thirty-five dollars on thirty thousand six hundred and twenty-six dollars deployed — about one point four percent in eleven days, annualizing around forty-five percent.
+The current delta neutral strategy cycle is twelve days in. The LP is up four hundred and twenty-four dollars on price since open, the hedge is down four hundred and five dollars — net price delta is positive nineteen dollars. Delta balance is nineteen dollars, well within tolerance for Normal Zone. Total fees this cycle are four hundred and sixty-one dollars, averaging about thirty-seven dollars a day. Net strategy return including all fees is four hundred and eighty dollars on thirty thousand six hundred and twenty-six dollars deployed — about one point six percent in twelve days, annualizing around forty-six percent.
 
-One thing to watch: Eth has pushed above the Drift Upper at two thousand three hundred and sixty-nine dollars. A hedge adjustment may have already been triggered this morning — confirm whether the short size is current and whether any rebalancing action is still needed before the next cooldown window expires.
+One thing to watch: Eth is just twenty-one dollars below Near Drift Upper at two thousand three hundred and twenty-six dollars. A modest push higher puts the position into Near Drift Zone and could trigger a delta check — monitor closely through the day.
 
-Market sentiment data was unavailable at brief time. Bitcoin is at seventy-seven thousand three hundred and sixty-six dollars. Volatility looks elevated — Eth has breached the upper band boundary, so it may be worth reviewing whether the band needs to be recentered or widened for the current cycle. Have a good one.
+Market sentiment data was unavailable at brief time. Bitcoin is at seventy-eight thousand three hundred and sixteen dollars. Volatility looks normal at around five and a half percent over thirty days — the current band remains appropriate. Have a good one.
