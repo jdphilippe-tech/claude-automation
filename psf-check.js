@@ -106,12 +106,17 @@ function dailyRecord(assetRecordId, inRange, extra = {}) {
 // ============================================================
 
 async function fetchWethAsset() {
-  const records = await airtableFetch(
-    ASSETS_TABLE,
-    [AF.asset, AF.status, AF.nftMint, AF.cycleId],
-    `AND({fldDRyGqgXJTuHTpx} = 'Active', {fldXyU6o1g35gciSb} = 'WETH/USDC (Primary)')`
-  );
-  return records[0] ?? null;
+  // Fetch directly by record ID — avoids slash encoding issues in filterByFormula
+  const { default: fetch } = await import('node-fetch');
+  try {
+    const res = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ`,
+      { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
+    );
+    if (!res.ok) { console.error(`WETH asset fetch failed: ${res.status}`); return null; }
+    const record = await res.json();
+    return record?.fields ? record : null;
+  } catch (e) { console.error(`WETH asset fetch error: ${e.message}`); return null; }
 }
 
 // ============================================================
