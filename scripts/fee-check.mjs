@@ -136,13 +136,28 @@ function dailyRecord(assetRecordId, inRange, extra = {}) {
 
 async function fetchActiveLPAssets() {
   console.log('Fetching active LP assets from Airtable...');
-  const records = await airtableFetch(
+  const { default: fetch } = await import('node-fetch');
+
+  // Fetch WETH/USDC directly by record ID — avoids slash encoding issues in filterByFormula
+  let wethAsset = null;
+  try {
+    const wethRes = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ`,
+      { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
+    );
+    if (wethRes.ok) {
+      const wethRecord = await wethRes.json();
+      if (wethRecord?.fields) wethAsset = wethRecord;
+    }
+  } catch (e) { console.error(`WETH/USDC asset fetch failed: ${e.message}`); }
+
+  // Fetch Raydium assets — simple single-value filter, no slash encoding issues
+  const raydiumAssets = await airtableFetch(
     ASSETS_TABLE,
     [AF.asset, AF.protocol, AF.status, AF.nftMint, AF.poolAddr, AF.cycleId],
-    `AND({fldDRyGqgXJTuHTpx} = 'Active', OR({fldC8oxgDQtxfEKbs} = 'Raydium', {fldXyU6o1g35gciSb} = 'WETH/USDC (Primary)'))`
+    `AND({fldDRyGqgXJTuHTpx} = 'Active', {fldC8oxgDQtxfEKbs} = 'Raydium')`
   );
-  const wethAsset = records.find(r => r.fields[AF.asset] === 'WETH/USDC (Primary)');
-  const raydiumAssets = records.filter(r => r.fields[AF.protocol]?.name === 'Raydium');
+
   console.log(`Found WETH/USDC: ${wethAsset ? 'yes' : 'NO - MISSING'}`);
   console.log(`Found Raydium positions: ${raydiumAssets.length}`);
   return { wethAsset, raydiumAssets };
