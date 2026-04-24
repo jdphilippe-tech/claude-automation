@@ -44,6 +44,7 @@ const NOTION_CYCLE_PARAMS_PAGE = '32a12a7e-409e-80f0-bbbe-c3e53fa89343';
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const OUTPUT_PATH  = 'audio/brief-text.txt';
+const DESC_PATH    = process.env.DESCRIPTION_FILE || '/tmp/description.txt';
 
 // ── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -318,6 +319,16 @@ async function runClaude(systemPrompt, userPrompt) {
 
       const raw = textBlock.text.trim();
 
+      // Extract DESCRIPTION line if present and save to DESC_PATH
+      const descMatch = raw.match(/^DESCRIPTION:\s*(.+)$/m);
+      if (descMatch) {
+        const description = descMatch[1].trim();
+        fs.writeFileSync(DESC_PATH, description, 'utf8');
+        console.log(`Description saved: "${description}"`);
+      } else {
+        console.warn('Warning: no DESCRIPTION line found — RSS will use fallback');
+      }
+
       // Fix 2: Use lastIndexOf to extract only the final clean brief,
       // discarding any earlier drafts or self-revision Claude may have output.
       const lastStart = raw.lastIndexOf('Good morning');
@@ -490,11 +501,27 @@ Target length: 60–75 seconds at 1.2× speed (~130–160 words).
 OUTPUT RULES — CRITICAL
 ═══════════════════════════════════════
 
-Output the brief EXACTLY ONCE.
+Output the brief EXACTLY ONCE, preceded by a single description line.
+
+FORMAT YOUR ENTIRE RESPONSE LIKE THIS:
+DESCRIPTION: [one sentence capturing the single most notable thing about today's portfolio situation — written in plain prose, no dollar signs, no percent symbols, no tickers. This becomes the podcast episode description in Overcast.]
+Good morning. It's [day]...
+[rest of brief]
+...Have a good one.
+
+DESCRIPTION line rules:
+- Must be the very first line of your response
+- One sentence only, ending with a period
+- Plain prose — spell out numbers and avoid symbols (same rules as the brief itself)
+- Capture the single most actionable or notable thing today: zone status, delta situation, fee milestone, market condition
+- Examples:
+  "Delta neutral cycle sits in Normal Zone with fees averaging fifty dollars a day and ETH holding near the center."
+  "Near Drift alert as Eth approaches the upper boundary — hedge adjustment may be needed today."
+  "Strategy enters day two of cycle ten with strong fee momentum following yesterday's market rally."
+
 - If you catch an error or inconsistency while writing, correct it silently and continue.
 - Do not restart. Do not show multiple drafts. Do not explain your reasoning.
 - Do not include anything after "Have a good one." — not a note, not a correction, nothing.
-- Your entire response is one brief: starts with "Good morning." ends with "Have a good one."
 
 ═══════════════════════════════════════
 EXAMPLE OUTPUT — MATCH THIS STYLE EXACTLY
