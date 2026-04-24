@@ -1,8 +1,9 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v33
+// Daily Portfolio Check — GitHub Actions v34
 // Added: Airtable-driven LP position discovery
-// Fix:   fetchActiveLPAssets filter uses field IDs instead of field names
-//        to correctly match singleSelect fields in Airtable REST API
+// Fix v33: fetchActiveLPAssets filter uses field IDs instead of field names
+// Fix v34: WETH/USDC fetched directly by record ID — slash in name breaks
+//          filterByFormula URL encoding, causing silent 0-result returns
 //        - WALLET_WETH_LP added for correct WETH/USDC wallet
 //        - Module 1 scans WALLET_WETH_LP (not WALLET_EVM)
 //        - Module 4 reads xStock positions from Airtable Assets
@@ -216,14 +217,28 @@ function lendingRecord(positionId, extra = {}) {
 
 async function fetchActiveLPAssets() {
   console.log('\n--- Fetching active LP assets from Airtable ---');
-  const records = await airtableFetch(
+  const { default: fetch } = await import('node-fetch');
+
+  // Fetch WETH/USDC directly by record ID — avoids slash encoding issues in filterByFormula
+  let wethAsset = null;
+  try {
+    const wethRes = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ`,
+      { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
+    );
+    if (wethRes.ok) {
+      const wethRecord = await wethRes.json();
+      if (wethRecord?.fields) wethAsset = wethRecord;
+    }
+  } catch (e) { console.error(`WETH/USDC asset fetch failed: ${e.message}`); }
+
+  // Fetch Raydium assets — simple single-value filter, no slash encoding issues
+  const raydiumRecords = await airtableFetch(
     ASSETS_TABLE,
     [AF.asset, AF.protocol, AF.status, AF.nftMint, AF.poolAddr, AF.cycleId],
-    `AND({fldDRyGqgXJTuHTpx} = 'Active', OR({fldC8oxgDQtxfEKbs} = 'Raydium', {fldXyU6o1g35gciSb} = 'WETH/USDC (Primary)'))`
+    `AND({fldDRyGqgXJTuHTpx} = 'Active', {fldC8oxgDQtxfEKbs} = 'Raydium')`
   );
-
-  const wethAsset = records.find(r => r.fields[AF.asset] === 'WETH/USDC (Primary)');
-  const raydiumAssets = records.filter(r => r.fields[AF.protocol]?.name === 'Raydium');
+  const raydiumAssets = raydiumRecords;
 
   console.log(`Found WETH/USDC: ${wethAsset ? 'yes' : 'NO - MISSING'}`);
   console.log(`Found Raydium positions: ${raydiumAssets.length}`);
@@ -911,7 +926,7 @@ async function getEthHedge() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v33 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v34 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('INFO: RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   // Fetch active LP assets from Airtable first
