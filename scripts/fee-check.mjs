@@ -117,6 +117,7 @@ async function airtableFetch(tableId, fields, filterFormula) {
   fields.forEach(f => params.append('fields[]', f));
   if (filterFormula) params.append('filterByFormula', filterFormula);
   params.append('pageSize', '100');
+  params.append('returnFieldsByFieldId', 'true');
   const res = await fetch(
     `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}?${params}`,
     { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
@@ -142,7 +143,7 @@ async function fetchActiveLPAssets() {
   let wethAsset = null;
   try {
     const wethRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ`,
+      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ?returnFieldsByFieldId=true`,
       { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
     );
     if (wethRes.ok) {
