@@ -110,7 +110,7 @@ async function fetchWethAsset() {
   const { default: fetch } = await import('node-fetch');
   try {
     const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ`,
+      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ?returnFieldsByFieldId=true`,
       { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
     );
     if (!res.ok) { console.error(`WETH asset fetch failed: ${res.status}`); return null; }
