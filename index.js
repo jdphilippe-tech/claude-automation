@@ -1,9 +1,11 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v34
+// Daily Portfolio Check — GitHub Actions v35
 // Added: Airtable-driven LP position discovery
 // Fix v33: fetchActiveLPAssets filter uses field IDs instead of field names
 // Fix v34: WETH/USDC fetched directly by record ID — slash in name breaks
 //          filterByFormula URL encoding, causing silent 0-result returns
+// Fix v35: Add returnFieldsByFieldId=true to all Airtable fetches — fields
+//          were keyed by name not ID, causing all AF.* lookups to return undefined
 //        - WALLET_WETH_LP added for correct WETH/USDC wallet
 //        - Module 1 scans WALLET_WETH_LP (not WALLET_EVM)
 //        - Module 4 reads xStock positions from Airtable Assets
@@ -194,6 +196,7 @@ async function airtableFetch(tableId, fields, filterFormula) {
   fields.forEach(f => params.append('fields[]', f));
   if (filterFormula) params.append('filterByFormula', filterFormula);
   params.append('pageSize', '100');
+  params.append('returnFieldsByFieldId', 'true');
   const res = await fetch(
     `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}?${params}`,
     { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
@@ -223,7 +226,7 @@ async function fetchActiveLPAssets() {
   let wethAsset = null;
   try {
     const wethRes = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ`,
+      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ?returnFieldsByFieldId=true`,
       { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
     );
     if (wethRes.ok) {
@@ -926,7 +929,7 @@ async function getEthHedge() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v34 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v35 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('INFO: RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   // Fetch active LP assets from Airtable first
