@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Wednesday, April 29, 2026</title>
+      <description><![CDATA[The delta neutral strategy is seventeen days into cycle nine with fees approaching six hundred dollars and Eth sitting just thirty-one dollars below the Near Drift Upper boundary, worth keeping an eye on today.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-29.mp3" length="1304494" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-04-29</guid>
+      <pubDate>Wed, 29 Apr 2026 14:17:34 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Tuesday, April 28, 2026</title>
       <description><![CDATA[The delta neutral strategy cycle is sixteen days in with fees just above five hundred and eighty dollars and delta balance sitting comfortably within Normal Zone tolerance, though Eth is only forty dollars below the Near Drift Upper boundary.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-28.mp3" length="1357157" type="audio/mpeg"/>
