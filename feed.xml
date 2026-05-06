@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Wednesday, May 6, 2026</title>
+      <description><![CDATA[Delta neutral cycle is twenty-four days in with Eth pressing into Near Drift Zone just six dollars from the Drift boundary, and delta outside tolerance — a hedge adjustment may be needed today.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-06.mp3" length="1399371" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-05-06</guid>
+      <pubDate>Wed, 06 May 2026 14:19:36 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Tuesday, May 5, 2026</title>
       <description><![CDATA[Eth has crossed above the Drift Upper boundary into Drift Zone at two thousand three hundred and seventy-nine dollars, with delta outside tolerance at two hundred and fifty-two dollars — hedge review is likely needed today.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-05.mp3" length="1545657" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-05T09-11-53.mp3" length="737324" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-04-05T09-11-53</guid>
       <pubDate>Sun, 05 Apr 2026 09:11:54 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Sunday, April 5, 2026</title>
-      <description><![CDATA[Eth sits at Normal Zone center while extreme fear sentiment hits 12, potentially signaling oversold conditions ahead of strategy deployment.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-05.mp3" length="810884" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-04-05</guid>
-      <pubDate>Sun, 05 Apr 2026 08:58:48 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
