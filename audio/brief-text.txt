@@ -1,9 +1,9 @@
-Good morning. It's Wednesday, May 6th.
+Good morning. It's Thursday, May seventh.
 
-Eth is at two thousand three hundred and sixty-three dollars, sitting in Near Drift Zone — just six dollars from the Drift boundary. Monitor closely.
+Eth is at two thousand three hundred and thirty-six dollars, sitting in Near Drift Zone — thirty-three dollars from the Drift Upper boundary. Monitor closely.
 
-The current delta neutral strategy cycle is twenty-four days in. The LP is up four hundred and forty-six dollars on price since open, the hedge is down six hundred and twenty-nine dollars — net price delta is negative one hundred and eighty-four dollars. Delta balance is one hundred and eighty-four dollars, which is outside tolerance for Near Drift Zone — hedge adjustment may be needed. Total fees this cycle are seven hundred and ninety-one dollars, averaging about thirty-two dollars a day. Net strategy return including all fees is six hundred and eight dollars on thirty thousand six hundred and twenty-six dollars deployed — about two percent in twenty-four days, annualizing around thirty percent.
+The current delta neutral strategy cycle is twenty-five days in. The LP is up three hundred and sixty-four dollars on price since open, the hedge is down four hundred and eleven dollars — net price delta is negative forty-seven dollars. Delta balance is forty-seven dollars, within tolerance for Near Drift Zone. Total fees this cycle are eight hundred and fourteen dollars, averaging about thirty-two dollars a day. Net strategy return including all fees is seven hundred and sixty-seven dollars on thirty thousand six hundred and twenty-six dollars deployed — about two and a half percent in twenty-five days, annualizing around thirty-six percent.
 
-One thing to watch: Eth is six dollars from the Drift boundary with delta already outside tolerance. If price pushes through two thousand three hundred and sixty-nine dollars, the position enters Drift Zone and a rebalance decision becomes urgent.
+One thing to watch: Eth is only thirty-three dollars below the Drift Upper boundary. The hedge was trimmed yesterday after a Near Drift delta breach, so if Eth pushes higher today, another adjustment window could open quickly.
 
-Market sentiment is Fear at forty-nine. Bitcoin is at eighty-one thousand five hundred dollars. Volatility appears moderately elevated with Eth pressing the upper Near Drift boundary — worth keeping an eye on whether the band needs revisiting if price continues higher. Have a good one.
+Market sentiment is Fear at fifty. Bitcoin is at ninety-six thousand two hundred and sixty-two dollars. Volatility looks moderate and in line with recent history — the band remains appropriate. Have a good one.
