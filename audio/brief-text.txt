@@ -1,9 +1,9 @@
-Good morning. It's Thursday, May fourteenth.
+Good morning. It's Friday, May fifteenth.
 
-Eth is at two thousand two hundred and fifty-seven dollars, sitting in Normal Zone. You have about sixty-nine dollars of breathing room before Near Drift. No action needed.
+Eth is at two thousand two hundred and fifty-eight dollars, sitting in Normal Zone. You have about sixty-eight dollars of breathing room before Near Drift Upper. No action needed.
 
-The current delta neutral strategy cycle is thirty-two days in. The LP is up one hundred and forty-nine dollars on price since open, the hedge is down one hundred and forty-four dollars — net price delta is positive five dollars. Delta balance is five dollars, well within tolerance for Normal Zone. Total fees this cycle are nine hundred and fifty-nine dollars, averaging about thirty dollars a day. Net strategy return including all fees is nine hundred and sixty-four dollars on thirty thousand six hundred and twenty-six dollars deployed — about three percent in thirty-two days, annualizing around thirty-five percent.
+The current delta neutral strategy cycle is thirty-three days in. The LP is down forty-four dollars on price since open, the hedge is up twenty-six dollars — net price delta is negative seventeen dollars. Delta balance is seventeen dollars, well within tolerance for Normal Zone. Total fees this cycle are nine hundred and ninety-one dollars, averaging about thirty dollars a day. Net strategy return including all fees is nine hundred and seventy-four dollars on thirty thousand six hundred and twenty-six dollars deployed — about three point two percent in thirty-three days, annualizing around thirty-five percent.
 
-One thing to watch: fee generation has slowed noticeably over the past week, averaging closer to twenty dollars a day recently as Eth drifts toward the lower end of the range. Worth keeping an eye on whether price stays active enough to sustain fee momentum.
+One thing to watch: Eth is only sixty-eight dollars below Near Drift Upper at two thousand three hundred and twenty-six dollars. The hedge has already been trimmed four times this cycle chasing upside moves — if Eth pushes higher today, delta tolerance could tighten quickly and another adjustment may be on the table.
 
-Market sentiment is Fear at fifty. Bitcoin is at seventy-nine thousand five hundred dollars. Volatility is compressed at under two percent over thirty days — the band has comfortable room and no adjustment appears warranted. Have a good one.
+Market sentiment is Fear at forty-nine. Bitcoin is at eighty thousand eight hundred and thirty-two dollars. Volatility looks moderate and contained — thirty-day price swings are running around one and a half percent, and the current band appears appropriately sized. Have a good one.
