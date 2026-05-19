@@ -34,6 +34,12 @@
  *            Replaced with Fee APR = total fees / total deployed × annualized.
  *            total deployed = LP open + hedge open (full capital normalization).
  *            Net price delta reported separately as health indicator only.
+ *
+ * Fixes applied 2026-05-19 (2):
+ *   Fix 8 — Removed Notion dependency for band values. Band levels now derived
+ *            from cycle open ETH price already in Airtable Reopen Position Notes.
+ *            Formula: Center = open ETH price, Band ±180, Drift ±144, Near Drift ±87.
+ *            notion_fetch tool and NOTION_API_KEY no longer needed for band values.
  */
 
 import fs from 'fs';
@@ -41,14 +47,10 @@ import path from 'path';
 
 const CLAUDE_API_KEY   = process.env.CLAUDE_API_KEY;
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const NOTION_API_KEY   = process.env.NOTION_API_KEY;
 
 const AIRTABLE_BASE_ID       = 'appWojaxYR99bXC1f';
 const AIRTABLE_DAILY_TABLE   = 'tblKsk0QnkOoKNLuk';
 const AIRTABLE_LENDING_TABLE = 'tblFw52kzeTRvxTSM';
-
-// Notion page ID for Current Cycle Parameters (Live) — contains live band values
-const NOTION_CYCLE_PARAMS_PAGE = '32a12a7e-409e-80f0-bbbe-c3e53fa89343';
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const OUTPUT_PATH  = 'audio/brief-text.txt';
@@ -120,23 +122,6 @@ Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
     }
   },
   {
-    name: 'notion_fetch',
-    description: `Fetch a Notion page by ID to read current cycle band values.
-Use this to fetch the Current Cycle Parameters page which contains live band values
-(Center, Lower, Upper, Drift Lower, Drift Upper, Near Drift Lower, Near Drift Upper).
-Always fetch this page to get current band values — never rely on hardcoded values.`,
-    input_schema: {
-      type: 'object',
-      properties: {
-        page_id: {
-          type: 'string',
-          description: 'Notion page ID (with or without dashes)'
-        }
-      },
-      required: ['page_id']
-    }
-  },
-  {
     name: 'web_search',
     description: `Search the web for current market data.
 Use short, specific queries:
@@ -188,36 +173,6 @@ async function runAirtableQuery(input) {
   };
 }
 
-async function runNotionFetch(input) {
-  const { page_id } = input;
-  const cleanId = page_id.replace(/-/g, '');
-
-  if (!NOTION_API_KEY) {
-    return { error: 'NOTION_API_KEY not set' };
-  }
-
-  try {
-    const res = await fetch(`https://api.notion.com/v1/blocks/${cleanId}/children?page_size=100`, {
-      headers: {
-        'Authorization': `Bearer ${NOTION_API_KEY}`,
-        'Notion-Version': '2022-06-28',
-      }
-    });
-    if (!res.ok) {
-      return { error: `Notion ${res.status}: ${await res.text()}` };
-    }
-    const data = await res.json();
-    // Extract plain text from all blocks
-    const text = (data.results || []).map(block => {
-      const richText = block[block.type]?.rich_text ?? [];
-      return richText.map(rt => rt.plain_text).join('');
-    }).filter(Boolean).join('\n');
-    return { text };
-  } catch (e) {
-    return { error: e.message };
-  }
-}
-
 async function runWebSearch(input) {
   const { query } = input;
   const BRAVE_API_KEY = process.env.BRAVE_SEARCH_API_KEY;
@@ -255,7 +210,6 @@ async function executeTool(name, input) {
   let result;
   switch (name) {
     case 'airtable_query': result = await runAirtableQuery(input); break;
-    case 'notion_fetch':   result = await runNotionFetch(input);   break;
     case 'web_search':     result = await runWebSearch(input);     break;
     default:               result = { error: `Unknown tool: ${name}` };
   }
@@ -388,18 +342,28 @@ Your job: fetch all required data using your tools, compute everything yourself,
 DATA FETCHING INSTRUCTIONS
 ═══════════════════════════════════════
 
-STEP 1 — Current Cycle Band Values (Notion)
-Fetch the Current Cycle Parameters page from Notion using the notion_fetch tool:
-  page_id: ${NOTION_CYCLE_PARAMS_PAGE}
+STEP 1 — Band Values (derived from Airtable cycle open price)
+Do NOT fetch Notion for band values. Instead, derive them from the cycle open ETH price
+you will read from Airtable in Step 2.
 
-Extract from the page content:
-  • Center price
-  • Band Lower and Upper
-  • Drift Lower and Drift Upper
-  • Near Drift Lower and Near Drift Upper
-  • Current cycle number (e.g. C9)
+The cycle open ETH price is in the Notes field of the earliest Reopen Position record
+for WETH-PRIMARY-C[n]. The Notes field looks like:
+  "ETH: $2226 | Tick: -XXXXX | Range: [-XXXXXX, -XXXXXX]"
+Extract the ETH price after "ETH: $".
 
-Use these values for all zone calculations. Never use hardcoded band values.
+Then compute all band levels using the fixed 360-point band formula:
+  • Center        = cycle open ETH price (rounded to nearest dollar)
+  • Band Upper    = Center + 180
+  • Band Lower    = Center − 180
+  • Drift Upper   = Center + 144  (40% of half-band = 180 × 0.80 = 144)
+  • Drift Lower   = Center − 144
+  • Near Drift Upper = Center + 87   (Drift boundary minus 57 = 144 − 57)
+  • Near Drift Lower = Center − 87
+
+Example at C9 open price $2,227:
+  Band: $2,047 – $2,407 | Drift: $2,083 – $2,371 | Near Drift: $2,140 – $2,314
+
+Use these computed values for all zone calculations throughout the brief.
 
 STEP 2 — PSF Cycle Data (Airtable Daily Actions)
 Query table ${AIRTABLE_DAILY_TABLE} with:
