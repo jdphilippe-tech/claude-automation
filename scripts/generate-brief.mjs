@@ -26,6 +26,14 @@
  *   Fix 5 — System prompt band values removed — Claude now fetches current
  *            cycle band values from Notion at runtime instead of using
  *            hardcoded C8 values that go stale every cycle.
+ *
+ * Fixes applied 2026-05-19:
+ *   Fix 6 — Removed duplicate net price delta dollar amount from P&L sentence.
+ *            Delta balance sentence now carries the number — not both.
+ *   Fix 7 — Removed net return (fees + delta) as primary performance metric.
+ *            Replaced with Fee APR = total fees / total deployed × annualized.
+ *            total deployed = LP open + hedge open (full capital normalization).
+ *            Net price delta reported separately as health indicator only.
  */
 
 import fs from 'fs';
@@ -409,7 +417,7 @@ From the complete record set, determine:
   • Current cycle number = highest number in Cycle ID (e.g. C9 from WETH-PRIMARY-C9)
   • LP open value       = Position Value on earliest Reopen Position for WETH-PRIMARY-C[n]
   • Hedge open value    = Position Value on earliest Reopen Position for HEDGE-C[n]
-  • Total deployed      = LP open + Hedge open
+  • Total deployed      = LP open + hedge open
   • LP current value    = Position Value on latest Fee Check for WETH-PRIMARY-C[n]
   • Hedge current value = Position Value on latest Fee Check for HEDGE-C[n]
   • Pending fees        = Fee Value on latest Fee Check for WETH-PRIMARY-C[n]
@@ -420,23 +428,27 @@ From the complete record set, determine:
                           The Notes field contains text like "PnL: $48.95 | Entry: $2078.1 | Size: -5.5 ETH".
                           Extract the dollar amount after "PnL: $". This can be negative (e.g. "PnL: $-431.75").
                           NEVER compute hedge PnL from position value delta — always use the Notes field value.
-  • Delta balance       = |Net price delta| = |LP PnL + Hedge PnL|
+  • Net price delta     = LP PnL + Hedge PnL
+  • Delta balance       = |Net price delta|
                           Example: LP PnL = +$428, Hedge PnL = -$798 → Net price delta = -$370 → Delta balance = $370
   • Delta tolerance     = Normal Zone: 0.5% of LP current value | Near Drift Zone: 0.25% of LP current value
   • Delta status        = if delta balance ≤ tolerance → "within tolerance, no action needed"
                           if delta balance > tolerance → "outside tolerance, hedge adjustment may be needed"
-  • Net price delta     = LP PnL + Hedge PnL
   • Cycle open date     = Date on earliest Reopen Position for WETH-PRIMARY-C[n]
   • Elapsed hours       = hours from cycle open date to now
   • Days in cycle       = floor(elapsed hours / 24) — always a WHOLE NUMBER, never a decimal.
                           Example: 16.1 days → say "sixteen days". 13.8 days → say "thirteen days".
   • Avg daily fee       = (total fees / elapsed hours) × 24
-  • Net return          = net price delta + total fees
-  • Return %            = net return / total deployed × 100
-  • Annualized %        = return % / (elapsed hours / 24) × 365
-                          If elapsed hours < 24: include the annualized figure but follow it with
-                          "though that figure carries little weight this early in the cycle" — then
-                          move on. Do not flag it as a problem or revise the brief.
+
+  • Fee APR             = (total fees / total deployed) × (365 / days in cycle) × 100
+                          total deployed = LP open value + hedge open value.
+                          This normalizes fees against ALL capital in the strategy including
+                          the hedge balance that earns no fees — giving the true yield rate
+                          on total committed capital.
+                          Example: $1,061 / $30,626 × (365/37) = ~34%
+                          NEVER use LP current value alone as the denominator — that overstates the rate.
+                          NEVER add net price delta to fees to compute this figure.
+                          This is a fees-only metric. Delta is reported separately.
 
 STEP 3 — Market Data (web search)
 Search for:
@@ -468,9 +480,13 @@ BRIEF FORMAT (follow exactly, in order)
    Drift example: "Eth is at [price] and has crossed into Drift Zone. Action may be required — review the position."
 
 3. Strategy P&L
-   "The current delta neutral strategy cycle is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount] — net price delta is [positive/negative] [amount]. Delta balance is [amount], which is [within/outside] tolerance for [Normal/Near Drift] Zone. [If outside tolerance: hedge adjustment may be needed.] Total fees this cycle are [amount], averaging about [amount] a day. Net strategy return including all fees is [amount] on [total deployed] deployed — about [percent] in [X] days, annualizing around [percent]."
+   "The current delta neutral strategy cycle is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount]. Delta balance is [amount], which is [within/outside] tolerance for [Normal/Near Drift] Zone. [If outside tolerance: hedge adjustment may be needed.] Total fees this cycle are [amount], averaging about [amount] a day — a fee rate of around [fee APR]% annualized on total deployed capital."
 
-   Always refer to the strategy as "The current delta neutral strategy cycle" — never "PSF", "P S F", "WETH-USDC strategy", or any other name.
+   KEY RULES for this section:
+   - Do NOT repeat the net price delta dollar amount before the Delta balance sentence.
+     The LP up/down and hedge up/down figures tell the story. Delta balance carries the combined number.
+   - Fee APR is fees-only. Never mix delta into the APR calculation.
+   - Always state fee APR as a whole number or one decimal: "thirty-four percent" not "thirty-four point one percent"
 
 4. One Thing to Watch
    The single most notable item requiring attention today. Two sentences max.
@@ -531,7 +547,7 @@ Good morning. It's Friday, April 4th.
 
 Eth is at two thousand and fifty-eight dollars, sitting in Normal Zone. You have about one hundred and twenty dollars of breathing room before Near Drift. No action needed.
 
-The current delta neutral strategy cycle is thirteen days in. The LP is down one hundred and forty-six dollars on price since open, the hedge is up one hundred and seventy-eight dollars — net price delta is positive thirty-two dollars. Delta balance is thirty-two dollars, within tolerance for Normal Zone. Total fees this cycle are six hundred and fifteen dollars, averaging about fifty-one dollars a day. Net strategy return including all fees is six hundred and forty-seven dollars on thirty thousand six hundred and eighty-seven dollars deployed — about two percent in thirteen days, annualizing around sixty-four percent.
+The current delta neutral strategy cycle is thirteen days in. The LP is down one hundred and forty-six dollars on price since open, the hedge is up one hundred and seventy-eight dollars. Delta balance is thirty-two dollars, within tolerance for Normal Zone. Total fees this cycle are six hundred and fifteen dollars, averaging about fifty-one dollars a day — a fee rate of around forty-one percent annualized on total deployed capital.
 
 One thing to watch: the C-R-C-L-x position has three hundred and twenty-two dollars in unclaimed fees on a fifteen hundred dollar position. Worth deciding today whether to claim or let it ride into the weekend.
 
@@ -555,13 +571,21 @@ async function main() {
 
   const briefText = await runClaude(SYSTEM_PROMPT, userPrompt);
 
+  // Deduplicate — if Claude returns the brief twice in one response, strip the repeat
+  const half = Math.floor(briefText.length / 2);
+  const firstHalf  = briefText.slice(0, half).trim();
+  const secondHalf = briefText.slice(half).trim();
+  const cleanBrief = (secondHalf.length > 50 && firstHalf === secondHalf)
+    ? firstHalf
+    : briefText;
+
   console.log('\n=== BRIEF TEXT ===');
-  console.log(briefText);
+  console.log(cleanBrief);
   console.log('=================\n');
 
   const outputDir = path.dirname(OUTPUT_PATH);
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(OUTPUT_PATH, briefText, 'utf8');
+  fs.writeFileSync(OUTPUT_PATH, cleanBrief, 'utf8');
 
   console.log(`✓ Brief written to ${OUTPUT_PATH}`);
 }
