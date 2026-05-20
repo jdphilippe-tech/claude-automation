@@ -1,9 +1,9 @@
-Good morning. It's Tuesday, May nineteenth.
+Good morning. It's Wednesday, May 20th.
 
-Eth is at two thousand one hundred and ten dollars, sitting in Near Drift Zone on the lower side — just twenty-nine dollars above the Drift Lower boundary. Monitor closely.
+Eth is at two thousand one hundred and eighteen dollars, sitting in Near Drift Zone on the lower side — just thirty-five dollars above the Drift boundary. Monitor closely.
 
-The current delta neutral strategy cycle is thirty-seven days in. The LP is down nine hundred and thirteen dollars on price since open, the hedge is up five hundred and ten dollars — net price delta is negative four hundred and three dollars. Delta balance is four hundred and three dollars, which is outside tolerance for Near Drift Zone. Hedge adjustment may be needed. Total fees this cycle are one thousand and sixty-one dollars, averaging about twenty-eight dollars a day. Net strategy return including all fees is six hundred and fifty-eight dollars on thirty thousand six hundred and twenty-six dollars deployed — about two percent in thirty-seven days, annualizing around twenty-one percent.
+The current delta neutral strategy cycle is thirty-eight days in. The LP is down seven hundred and twenty-five dollars on price since open, the hedge is up four hundred and twenty-two dollars. Delta balance is three hundred and three dollars, which is outside tolerance for Near Drift Zone — hedge adjustment may be needed. Total fees this cycle are one thousand one hundred and eleven dollars, averaging about twenty-nine dollars a day — a fee rate of around thirty-five percent annualized on total deployed capital.
 
-One thing to watch: Eth is only twenty-nine dollars above the Drift Lower boundary at two thousand and eighty-one dollars. If price continues to slide, the position enters Drift Zone and action will be required — keep a close eye on price today.
+One thing to watch: Eth is sitting just thirty-five dollars above the Drift Lower boundary, and the hedge has been adjusted four times in the past two days alone. If Eth continues drifting lower, another adjustment or a position review may be required before the day is out.
 
-Market sentiment is Greed at sixty-three. Bitcoin is at seventy-seven thousand three hundred dollars. Volatility has been elevated over the past two weeks with Eth dropping roughly eleven percent from recent highs — worth reviewing whether the band needs adjustment if price continues lower. Have a good one.
+Market sentiment is Fear at forty. Bitcoin is at seventy-six thousand four hundred and eighty-nine dollars. Volatility has been elevated — Eth has swung across most of the band width in recent weeks, and with price pressing the lower drift boundary, it may be worth reviewing whether the band or hedge sizing still fits the current environment. Have a good one.
