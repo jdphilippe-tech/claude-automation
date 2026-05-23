@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, May 23, 2026</title>
+      <description><![CDATA[Cycle nine closed today after Eth broke below Drift Lower for five consecutive four-hour candles, leaving the portfolio flat with no active position and a net fee yield of thirty-four percent annualized over forty-one days.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-23.mp3" length="1317869" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-05-23</guid>
+      <pubDate>Sat, 23 May 2026 14:20:32 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, May 22, 2026</title>
       <description><![CDATA[Delta neutral cycle nine enters day forty in Near Drift Zone with Eth sitting just below the lower Near Drift boundary and delta outside tolerance — a hedge adjustment may be warranted today.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-22.mp3" length="1255175" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-24.mp3" length="1413582" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-04-24</guid>
       <pubDate>Fri, 24 Apr 2026 14:17:05 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, April 23, 2026</title>
-      <description><![CDATA[Daily portfolio and market intelligence brief.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-23.mp3" length="1513056" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-04-23</guid>
-      <pubDate>Thu, 23 Apr 2026 14:18:02 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
