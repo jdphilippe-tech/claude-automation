@@ -1,9 +1,9 @@
-Good morning. It's Sunday, May 24th.
+Good morning. It's Monday, May 25th.
 
-Eth is at around two thousand and forty-three dollars. The current band center was two thousand two hundred and twenty-five dollars on cycle nine, which closed yesterday after five consecutive four-hour candles below Drift Lower at two thousand and eighty-one dollars. There is no active LP position at this time.
+Eth is at two thousand one hundred dollars, sitting just above the lower boundary of cycle nine's band — the cycle that closed on Saturday after five consecutive four-hour closes below Drift Lower. There is no active LP position right now.
 
-The completed cycle nine ran forty-one days. The LP finished down one thousand five hundred and ninety-eight dollars on price since open, with the hedge closing out a gain of eight hundred and ninety-three dollars. The net delta loss on the cycle was approximately seven hundred and five dollars. Total fees collected over the cycle were one thousand one hundred and seventy-four dollars, averaging about twenty-nine dollars a day — a fee rate of around thirty-four percent annualized on total deployed capital.
+Cycle nine ran for forty-one days. The LP finished down fifteen hundred and seventy-six dollars on price, the hedge recovered eight hundred and ninety-three dollars. The net price impact was a loss of six hundred and eighty-three dollars. Total fees over the cycle came to eleven hundred and seventy-three dollars — averaging about twenty-nine dollars a day, a fee rate of around thirty-four percent annualized on total deployed capital. Fees more than offset the net delta loss, keeping the cycle solidly in the green overall.
 
-One thing to watch: there is no active cycle open. The strategy exited yesterday on a confirmed Drift Lower breach. The next step is to decide whether to open cycle ten at current prices near two thousand and forty-three dollars, or wait for stabilization.
+One thing to watch: the strategy is between cycles with roughly thirty-one thousand dollars sitting idle. Eth at two thousand one hundred is hovering just above the old Drift Lower at two thousand and eighty-one. Watch for a sustained reclaim of that level before committing to a new cycle open — two or three consecutive four-hour closes back above would be a reasonable trigger.
 
-Market sentiment is Fear at twenty-eight. Bitcoin is at around ninety-six thousand two hundred and sixty-two dollars. Volatility has been elevated — Eth dropped roughly one hundred dollars in two days to trigger the cycle exit, so it's worth letting price settle before sizing into a new band. Have a good one.
+Market sentiment data was unavailable at brief time. Bitcoin is at ninety-six thousand two hundred and sixty-two dollars. Eth dropped over three hundred dollars in a week before stabilizing, suggesting elevated volatility — worth factoring a slightly wider band or a cautious entry timing into the cycle ten decision. Have a good one.

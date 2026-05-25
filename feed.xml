@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, May 25, 2026</title>
+      <description><![CDATA[Cycle nine closed two days ago after Eth broke below Drift Lower, and the strategy is currently between cycles with total fees of eleven hundred and seventy-three dollars over forty-one days — a strong run at around thirty-four percent annualized, now waiting for reentry conditions near two thousand one hundred dollars.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-25.mp3" length="1592050" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-05-25</guid>
+      <pubDate>Mon, 25 May 2026 14:19:00 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Sunday, May 24, 2026</title>
       <description><![CDATA[Cycle nine closed yesterday after Eth broke below the Drift Lower boundary, locking in eleven hundred and seventy-four dollars in fees over forty-one days — no new cycle is open yet and the strategy is currently sitting in cash.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-24.mp3" length="1357157" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-26.mp3" length="1367606" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-04-26</guid>
       <pubDate>Sun, 26 Apr 2026 14:18:52 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, April 25, 2026</title>
-      <description><![CDATA[Delta neutral cycle is thirteen days in with Eth sitting just eight dollars below the Near Drift upper boundary — the closest it has been to leaving Normal Zone this cycle.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-25.mp3" length="1476693" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-04-25</guid>
-      <pubDate>Sat, 25 Apr 2026 14:17:39 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
