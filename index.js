@@ -1,7 +1,7 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v30.1
+// Daily Portfolio Check — GitHub Actions v37
 // Added: Dynamic WETH/USDC position discovery
-// Updated: CRCLx→C3 new mint, SPYx→C2 new mint, GOOGLx→C2 new mint
+// Updated: TSLAx→C3 new mint+pool+recordId, AAPLx→C2 new mint
 //        Removes hardcoded NFT position ID (WETH_POS_ID)
 //        Script now auto-discovers active WETH/USDC 0.05% position
 //        by scanning wallet's Uniswap V3 NFTs — no code change
@@ -76,9 +76,9 @@ const ASSET = {
   lighterLLP:   'recEFiaxgavObYWzL',
   lighterEdge:  'rectz3Zo3aDbe4GgL',
   lighterLIT:   'receiu02rkzc3quDW',
-  tslax:  { recordId: 'recd33iBRKrMMq710', cycleId: 'TSLAx-C2',  nftMint: '7R5JFSuXL23epYJmX6LhzbM2Nce39at4maWD7NeFK4tU', poolId: '8aDaBQkTrS6HVMjyc6EZebgdiaXhLYGriDWKWWp1NpFF' },
+  tslax:  { recordId: 'recYwaRC8FTZQaMJK', cycleId: 'TSLAx-C3',  nftMint: '58k7KQAYULuNygmxjuRyvbv9xFshVANGb61xMokn5UKw', poolId: 'HHQUnUbmWLrYzkscDY1C3deEFbGtiGBGoHjpANogmvum' },
   nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1',  nftMint: 'J7qm9jifiKg7CyWDbmdDUNokhgs7JvwZmy2jnJ7qmN5Z', poolId: '4KqQN6u1pFKroFE2jVEhoepAMRKPcuAzWVDCgm9zRBYN' },
-  aaplx:  { recordId: 'recGF59dwIOnE8fm2', cycleId: 'AAPLx-C1',  nftMint: '2NsZvobR13JuYbkYTt5EK1XyyEJh3xB8621FhUW3LYKp', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
+  aaplx:  { recordId: 'recGF59dwIOnE8fm2', cycleId: 'AAPLx-C2',  nftMint: 'ByFkf4R7cjXVG33Xo8fDmx86cmbAbketb8DCZfvwLidY', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
   googlx: { recordId: 'recRxStry17D0ZGB5', cycleId: 'GOOGLx-C2', nftMint: 'FhE1nymLRWGnAGfsx2EdLFYqeSPfRsuEZVk2Zx7ridcU', poolId: 'B8YAwjGYk6qidWzGBXMAxP7nYfG8g74EZ3Y4gFSsobRw' },
   crclx:  { recordId: 'recPq2Ee2MsoMa21S', cycleId: 'CRCLx-C3',  nftMint: 'C5ASQaMW9sUfNSFLds692y5AYhucbZo48hyxoc1tedD6', poolId: 'G39wywquKbHK8F2wZZZFX3fcsyG91VCCbbr6WEVp5axy' },
   spyx:   { recordId: 'rechX4b2anmi82enx', cycleId: 'SPYx-C2',   nftMint: '9mPV6DTfnowWKtfW96hEfffpPruVs6YBiNsBUCAvHxo7', poolId: '6truu3rZuiB9rKQg4VYC3Dt3QwV7DgwGqXrYUcrvnDDE' },
