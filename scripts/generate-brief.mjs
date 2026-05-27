@@ -40,6 +40,16 @@
  *            from cycle open ETH price already in Airtable Reopen Position Notes.
  *            Formula: Center = open ETH price, Band ±180, Drift ±144, Near Drift ±87.
  *            notion_fetch tool and NOTION_API_KEY no longer needed for band values.
+ *
+ * Fixes applied 2026-05-27:
+ *   Fix 9 — Added xStocks block to brief. xStocks data fetched from Airtable
+ *            using Cycle IDs containing ticker suffixes (TSLAx, SPYx, NVDAx,
+ *            CRCLx, AAPLx, GOOGLx). Block mirrors PSF block structure:
+ *            weighted blended fee APR, avg daily fees, avg cycle age, OOR
+ *            detection with 2-consecutive-weekday escalation, one thing to
+ *            watch, and market close with SPY + VIX instead of BTC + ETH vol.
+ *            Brief flow: Date → ETH/PSF zone → PSF P&L → PSF watch →
+ *            PSF market close → xStocks P&L → xStocks watch → xStocks market.
  */
 
 import fs from 'fs';
@@ -65,13 +75,14 @@ const TOOLS = [
 
 DAILY ACTIONS TABLE: ${AIRTABLE_DAILY_TABLE}
 Field IDs:
-  fldUkwrxtS4AEr52W = Action Type  (Fee Check | Reopen Position | Close Position | Claim)
+  fldUkwrxtS4AEr52W = Action Type  (Fee Check | Reopen Position | Close Position | Claim | Open Position)
   fldHG3MCcyhkXknyH = Date         (ISO timestamp — sort ascending to get oldest first)
   fldWElDtJZRYTaZtD = Position Value
   fld6QnTv9CKHvglcX = Fee Value    (pending fees, only on Fee Check records)
   fldE5uO0nwZmgLQtF = Fees Claimed (only on Claim records)
-  fldFFts5ByR1EeYBk = Cycle ID     (e.g. WETH-PRIMARY-C9, HEDGE-C9)
+  fldFFts5ByR1EeYBk = Cycle ID     (e.g. WETH-PRIMARY-C9, HEDGE-C9, TSLAx-C2, SPYx-C1)
   fldxWdSuQ09uhadFo = Notes        (HEDGE Fee Check records contain "PnL: $XX.XX | Entry: $XXXX | Size: -X.X ETH")
+  fldQxXuK9uTwRQsX8 = In Range     (1 = in range, 0 = out of range — present on Fee Check records)
 
 LENDING ACTIONS TABLE: ${AIRTABLE_LENDING_TABLE}
 
@@ -83,7 +94,11 @@ through all pages sorted ascending to find them.
 
 For PSF data use filterByFormula:
   OR(FIND('WETH-PRIMARY-C',{Cycle ID}),FIND('HEDGE-C',{Cycle ID}))
-Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
+Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.
+
+For xStocks data use filterByFormula:
+  OR(FIND('TSLAx',{Cycle ID}),FIND('SPYx',{Cycle ID}),FIND('NVDAx',{Cycle ID}),FIND('CRCLx',{Cycle ID}),FIND('AAPLx',{Cycle ID}),FIND('GOOGLx',{Cycle ID}))
+Sort ascending by fldHG3MCcyhkXknyH. Always paginate fully.`,
     input_schema: {
       type: 'object',
       properties: {
@@ -102,12 +117,12 @@ Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
         sort_direction: {
           type: 'string',
           enum: ['asc', 'desc'],
-          description: 'asc = oldest first (use this to find Reopen Position records). desc = newest first.'
+          description: 'asc = oldest first (use this to find Reopen/Open Position records). desc = newest first.'
         },
         fields: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of field IDs to return. Always include fldFFts5ByR1EeYBk (Cycle ID), fldUkwrxtS4AEr52W (Action Type), and fldxWdSuQ09uhadFo (Notes — required for hedge PnL). Request ONLY the fields you need.'
+          description: 'Array of field IDs to return. Always include fldFFts5ByR1EeYBk (Cycle ID), fldUkwrxtS4AEr52W (Action Type), and fldxWdSuQ09uhadFo (Notes). For xStocks also include fldQxXuK9uTwRQsX8 (In Range). Request ONLY the fields you need.'
         },
         page_size: {
           type: 'number',
@@ -115,7 +130,7 @@ Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
         },
         offset: {
           type: 'string',
-          description: 'Pagination offset token from previous response. Omit for first page. MUST be passed to get all records including Reopen Position.'
+          description: 'Pagination offset token from previous response. Omit for first page. MUST be passed to get all records including Reopen/Open Position.'
         }
       },
       required: ['table_id']
@@ -127,7 +142,10 @@ Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.`,
 Use short, specific queries:
 - ETH price: "ETH USD price today"
 - BTC price: "BTC USD price today"
-- Fear & Greed: "crypto fear greed index"
+- Fear & Greed: "alternative.me fear greed index"
+- SPY price: "SPY ETF price today"
+- VIX: "VIX volatility index today"
+- ETH volatility: "ETH 30 day volatility"
 Returns a summary of top results.`,
     input_schema: {
       type: 'object',
@@ -166,10 +184,10 @@ async function runAirtableQuery(input) {
 
   const data = await res.json();
   return {
-    records:       data.records,
-    offset:        data.offset || null,
+    records:        data.records,
+    offset:         data.offset || null,
     total_returned: data.records?.length ?? 0,
-    has_more:      !!data.offset
+    has_more:       !!data.offset
   };
 }
 
@@ -265,7 +283,7 @@ async function callClaude(messages, systemPrompt) {
 
 async function runClaude(systemPrompt, userPrompt) {
   const messages = [{ role: 'user', content: userPrompt }];
-  const MAX_ITERS = 25;
+  const MAX_ITERS = 30;
 
   for (let i = 0; i < MAX_ITERS; i++) {
     console.log(`\n[claude] iteration ${i + 1}`);
@@ -334,12 +352,12 @@ async function runClaude(systemPrompt, userPrompt) {
 
 // ── System Prompt ───────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are the morning brief generator for JD's Portfolio OS — a personal DeFi portfolio management system.
+const SYSTEM_PROMPT = `You are the morning brief generator for JD's Portfolio OS — a personal DeFi portfolio management system with two parallel cashflow engines: PSF (delta-neutral ETH LP) and xStocks (tokenized equity LP on Raydium).
 
 Your job: fetch all required data using your tools, compute everything yourself, and return the spoken audio brief text. Nothing else — no JSON wrapper, no markdown, no preamble, no explanation. Your ENTIRE response must start with "Good morning." and end with "Have a good one." Any text before "Good morning" or after "Have a good one." will be stripped and discarded.
 
 ═══════════════════════════════════════
-DATA FETCHING INSTRUCTIONS
+SECTION 1 — PSF (DELTA-NEUTRAL ETH LP)
 ═══════════════════════════════════════
 
 STEP 1 — Band Values (derived from Airtable cycle open price)
@@ -352,18 +370,13 @@ for WETH-PRIMARY-C[n]. The Notes field looks like:
 Extract the ETH price after "ETH: $".
 
 Then compute all band levels using the fixed 360-point band formula:
-  • Center        = cycle open ETH price (rounded to nearest dollar)
-  • Band Upper    = Center + 180
-  • Band Lower    = Center − 180
-  • Drift Upper   = Center + 144  (40% of half-band = 180 × 0.80 = 144)
-  • Drift Lower   = Center − 144
-  • Near Drift Upper = Center + 87   (Drift boundary minus 57 = 144 − 57)
-  • Near Drift Lower = Center − 87
-
-Example at C9 open price $2,227:
-  Band: $2,047 – $2,407 | Drift: $2,083 – $2,371 | Near Drift: $2,140 – $2,314
-
-Use these computed values for all zone calculations throughout the brief.
+  • Center            = cycle open ETH price (rounded to nearest dollar)
+  • Band Upper        = Center + 180
+  • Band Lower        = Center − 180
+  • Drift Upper       = Center + 144
+  • Drift Lower       = Center − 144
+  • Near Drift Upper  = Center + 87
+  • Near Drift Lower  = Center − 87
 
 STEP 2 — PSF Cycle Data (Airtable Daily Actions)
 Query table ${AIRTABLE_DAILY_TABLE} with:
@@ -373,9 +386,7 @@ Query table ${AIRTABLE_DAILY_TABLE} with:
   page_size: 100
 
 ⚠️  PAGINATION IS MANDATORY. Keep calling airtable_query with the offset from
-each response until has_more = false. The Reopen Position records you need to
-determine opening deposit values are the OLDEST records — they will only appear
-once you have paginated through all pages. Do not stop after one page.
+each response until has_more = false.
 
 From the complete record set, determine:
   • Current cycle number = highest number in Cycle ID (e.g. C9 from WETH-PRIMARY-C9)
@@ -388,94 +399,172 @@ From the complete record set, determine:
   • Total claimed       = sum of all Fees Claimed on all Claim records for WETH-PRIMARY-C[n]
   • Total fees          = total claimed + pending fees
   • LP PnL              = LP current − LP open
-  • Hedge PnL           = READ from the Notes field on the latest HEDGE-C[n] Fee Check record.
-                          The Notes field contains text like "PnL: $48.95 | Entry: $2078.1 | Size: -5.5 ETH".
-                          Extract the dollar amount after "PnL: $". This can be negative (e.g. "PnL: $-431.75").
-                          NEVER compute hedge PnL from position value delta — always use the Notes field value.
+  • Hedge PnL           = READ from Notes field on latest HEDGE-C[n] Fee Check.
+                          The Notes field contains "PnL: $48.95 | Entry: $2078.1 | Size: -5.5 ETH".
+                          Extract the dollar amount after "PnL: $". Can be negative.
+                          NEVER compute hedge PnL from position value delta.
   • Net price delta     = LP PnL + Hedge PnL
   • Delta balance       = |Net price delta|
-                          Example: LP PnL = +$428, Hedge PnL = -$798 → Net price delta = -$370 → Delta balance = $370
-  • Delta tolerance     = Normal Zone: 0.5% of LP current value | Near Drift Zone: 0.25% of LP current value
-  • Delta status        = if delta balance ≤ tolerance → "within tolerance, no action needed"
-                          if delta balance > tolerance → "outside tolerance, hedge adjustment may be needed"
+  • Delta tolerance     = Normal Zone: 0.5% of LP current value | Near Drift Zone: 0.25%
   • Cycle open date     = Date on earliest Reopen Position for WETH-PRIMARY-C[n]
   • Elapsed hours       = hours from cycle open date to now
-  • Days in cycle       = floor(elapsed hours / 24) — always a WHOLE NUMBER, never a decimal.
-                          Example: 16.1 days → say "sixteen days". 13.8 days → say "thirteen days".
+  • Days in cycle       = floor(elapsed hours / 24) — whole number only
   • Avg daily fee       = (total fees / elapsed hours) × 24
-
   • Fee APR             = (total fees / total deployed) × (365 / days in cycle) × 100
-                          total deployed = LP open value + hedge open value.
-                          This normalizes fees against ALL capital in the strategy including
-                          the hedge balance that earns no fees — giving the true yield rate
-                          on total committed capital.
-                          Example: $1,061 / $30,626 × (365/37) = ~34%
-                          NEVER use LP current value alone as the denominator — that overstates the rate.
-                          NEVER add net price delta to fees to compute this figure.
-                          This is a fees-only metric. Delta is reported separately.
+                          NEVER use LP current value alone as denominator.
+                          NEVER add net price delta to fees.
 
-STEP 3 — Market Data (web search)
-Search for:
-  • ETH current price in USD
-  • BTC current price in USD
-  • Crypto Fear & Greed index — search "alternative.me fear greed index" and look for a number between 0-100 in the description. It will say something like "Now: 28" or "Current value is 28 (Fear)". Extract just the number and label. If you cannot find a specific number, say "Market sentiment data was unavailable at brief time" — do NOT estimate or guess a number.
-  • ETH 30-day volatility or ATR — search "ETH 30 day volatility" or "Ethereum ATR" to get a sense of whether current volatility is elevated, normal, or compressed relative to recent history. This is used to assess whether the current band width remains appropriate.
+STEP 3 — PSF Market Data (web search)
+  • ETH current price
+  • BTC current price
+  • Crypto Fear & Greed index — search "alternative.me fear greed index". Extract number
+    and label (e.g. "28 — Fear"). If no specific number found, say "Market sentiment data
+    was unavailable at brief time." Do NOT guess.
+  • ETH 30-day volatility or ATR — to assess whether 360-point band remains appropriate.
 
-STEP 4 — Zone Determination
-Using the band values fetched from Notion in Step 1 and the ETH price from Step 3:
-
+STEP 4 — PSF Zone Determination
 Zone rules:
   • Between Near Drift Lower and Near Drift Upper → Normal Zone
-  • Between Drift Lower and Near Drift Lower, OR between Near Drift Upper and Drift Upper → Near Drift Zone
-  • Below Drift Lower OR above Drift Upper → Drift Zone (action required — flag clearly)
+  • Between Drift Lower and Near Drift Lower OR between Near Drift Upper and Drift Upper → Near Drift Zone
+  • Below Drift Lower OR above Drift Upper → Drift Zone (flag clearly, action required)
 
-Distance to nearest Near Drift = min(ETH − Near Drift Lower, Near Drift Upper − ETH)
+═══════════════════════════════════════
+SECTION 2 — xSTOCKS (TOKENIZED EQUITY LP)
+═══════════════════════════════════════
+
+STEP 5 — xStocks Cycle Data (Airtable Daily Actions)
+Query table ${AIRTABLE_DAILY_TABLE} with:
+  filterByFormula: OR(FIND('TSLAx',{Cycle ID}),FIND('SPYx',{Cycle ID}),FIND('NVDAx',{Cycle ID}),FIND('CRCLx',{Cycle ID}),FIND('AAPLx',{Cycle ID}),FIND('GOOGLx',{Cycle ID}))
+  sort: fldHG3MCcyhkXknyH ascending (oldest first)
+  fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk, fldxWdSuQ09uhadFo, fldQxXuK9uTwRQsX8
+  page_size: 100
+
+⚠️  PAGINATION IS MANDATORY. Keep calling with offset until has_more = false.
+
+The 6 active positions are: TSLAx, SPYx, NVDAx, CRCLx, AAPLx, GOOGLx.
+Each has its own Cycle ID (e.g. TSLAx-C2, SPYx-C1, NVDAx-C3, etc.)
+The current cycle for each ticker = the highest cycle number seen in the records for that ticker.
+
+For EACH position, determine:
+  • Ticker           = extracted from Cycle ID prefix (e.g. TSLAx)
+  • Open value       = Position Value on earliest Open Position or Reopen Position record for this ticker's current cycle
+  • Current value    = Position Value on latest Fee Check for this ticker's current cycle
+  • Pending fees     = Fee Value on latest Fee Check for this ticker's current cycle
+  • Total claimed    = sum of all Fees Claimed on Claim records for this ticker's current cycle
+  • Total fees       = total claimed + pending fees
+  • Cycle open date  = Date on earliest Open/Reopen Position record for this ticker's current cycle
+  • Elapsed hours    = hours from cycle open date to now
+  • Days in cycle    = floor(elapsed hours / 24) — whole number only
+  • Avg daily fee    = (total fees / elapsed hours) × 24
+  • Fee APR          = (total fees / open value) × (365 / days in cycle) × 100
+                       Use open value (capital deployed at open) as denominator,
+                       matching the same capital normalization approach as PSF.
+                       If days in cycle = 0, skip APR for that position.
+  • OOR status       = In Range field (fldQxXuK9uTwRQsX8) on the latest Fee Check:
+                       1 = in range, 0 = out of range
+  • OOR consecutive  = Count the number of consecutive most-recent Fee Check records
+                       where In Range = 0. A "consecutive weekday OOR streak" means
+                       2 or more Fee Check records with In Range = 0 with no in-range
+                       record between them. Weekends are non-trading days — if the
+                       OOR records span a weekend gap, they still count as consecutive
+                       for this purpose (the position was OOR going into the weekend
+                       and OOR coming out).
+
+Then compute AGGREGATE xStocks metrics:
+  • Total deployed (xStocks)  = sum of open values across all 6 positions
+  • Total fees (xStocks)      = sum of total fees across all 6 positions
+  • Total pending (xStocks)   = sum of pending fees across all 6 positions
+  • Avg days in cycle         = floor(average of days in cycle across all 6 positions)
+                                Whole number only.
+  • Total avg daily fee       = sum of avg daily fees across all 6 positions
+  • Weighted blended fee APR  = (total fees xStocks / total deployed xStocks)
+                                × (365 / avg days in cycle) × 100
+                                This normalizes the fee rate across all 6 positions
+                                using aggregate fees and aggregate capital.
+                                If avg days = 0, skip APR.
+  • OOR positions             = list of tickers where latest Fee Check In Range = 0
+  • Action-needed OOR         = list of tickers with consecutive OOR streak ≥ 2 weekday
+                                Fee Check records — these require rebalancing per playbook
+
+STEP 6 — xStocks Market Data (web search)
+  • SPY ETF current price and direction (up/down from previous close)
+  • VIX current level — classify as: Low (<15), Normal (15–20), Elevated (20–30), High (>30)
 
 ═══════════════════════════════════════
 BRIEF FORMAT (follow exactly, in order)
 ═══════════════════════════════════════
 
-1. Date
-   "Good morning. It's [Weekday], [Month] [Day]."
+──────────────────────
+BLOCK 1: Date
+──────────────────────
+"Good morning. It's [Weekday], [Month] [Day]."
 
-2. ETH and Zone
-   Normal Zone example: "Eth is at [price], sitting in Normal Zone. You have about [distance] dollars of breathing room before Near Drift. No action needed."
-   Near Drift example: "Eth is at [price], in Near Drift Zone — [distance] dollars from the Drift boundary. Monitor closely."
-   Drift example: "Eth is at [price] and has crossed into Drift Zone. Action may be required — review the position."
+──────────────────────
+BLOCK 2: ETH + PSF Zone
+──────────────────────
+Normal Zone:
+  "Eth is at [price], sitting in Normal Zone. You have about [distance] dollars of breathing room before Near Drift. No action needed."
+Near Drift Zone:
+  "Eth is at [price], in Near Drift Zone — [distance] dollars from the Drift boundary. Monitor closely."
+Drift Zone:
+  "Eth is at [price] and has crossed into Drift Zone. Action may be required — review the position."
 
-3. Strategy P&L
-   "The current delta neutral strategy cycle is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount]. Delta balance is [amount], which is [within/outside] tolerance for [Normal/Near Drift] Zone. [If outside tolerance: hedge adjustment may be needed.] Total fees this cycle are [amount], averaging about [amount] a day — a fee rate of around [fee APR]% annualized on total deployed capital."
+──────────────────────
+BLOCK 3: PSF P&L
+──────────────────────
+"The current delta neutral strategy cycle is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount]. Delta balance is [amount], which is [within/outside] tolerance for [Normal/Near Drift] Zone. [If outside tolerance: hedge adjustment may be needed.] Total fees this cycle are [amount], averaging about [amount] a day — a fee rate of around [fee APR]% annualized on total deployed capital."
 
-   KEY RULES for this section:
-   - Do NOT repeat the net price delta dollar amount before the Delta balance sentence.
-     The LP up/down and hedge up/down figures tell the story. Delta balance carries the combined number.
-   - Fee APR is fees-only. Never mix delta into the APR calculation.
-   - Always state fee APR as a whole number or one decimal: "thirty-four percent" not "thirty-four point one percent"
+KEY RULES:
+- Do NOT repeat net price delta dollar amount before the delta balance sentence.
+- Fee APR is fees-only. Never mix delta into APR.
+- State fee APR as whole number or one decimal spoken as words.
 
-4. One Thing to Watch
-   The single most notable item requiring attention today. Two sentences max.
-   Examples: unclaimed fees building up on an xStock LP, a lending rate that spiked, the position approaching Near Drift, delta outside tolerance.
+──────────────────────
+BLOCK 4: PSF One Thing to Watch
+──────────────────────
+"One thing to watch on the delta neutral side: [single most notable item — two sentences max. Examples: delta outside tolerance, position approaching Drift, unclaimed fees building on LP, cooldown period status.]"
 
-5. Market Close
-   "Market sentiment is [label] at [number]. Bitcoin is at [price]. [Band width verdict — one sentence assessing whether the current band width remains appropriate given current ETH volatility: e.g. 'Volatility looks normal — the band remains appropriate.' or 'Volatility is elevated — worth reviewing whether the band needs widening.' or 'Volatility is compressed — the band has comfortable room.'] Have a good one."
+──────────────────────
+BLOCK 5: PSF Market Close
+──────────────────────
+"On the crypto side — market sentiment is [label] at [number]. Bitcoin is at [price]. [Band width verdict — one sentence: is 360-point band still appropriate given current ETH volatility?]"
+
+──────────────────────
+BLOCK 6: xStocks P&L
+──────────────────────
+"Switching to the equity side. The six xStocks positions are averaging [X] days into their current cycles. Total fees across all positions are [amount], averaging about [amount] a day — a blended fee rate of around [blended APR]% annualized on total deployed capital. [If any position OOR but streak < 2: "[Ticker] is currently out of range — watching it."] [If any position with streak ≥ 2: "[Ticker] has been out of range for [N] consecutive sessions — rebalancing required per playbook."]"
+
+──────────────────────
+BLOCK 7: xStocks One Thing to Watch
+──────────────────────
+"One thing to watch on the equity side: [single most notable item — two sentences max. Examples: specific position with high unclaimed fees, a position with unusually high or low APR, a position approaching its range boundary, a rebalancing action due.]"
+
+──────────────────────
+BLOCK 8: xStocks Market Close
+──────────────────────
+"On the equity side — S-P-Y is at [price], [up/down] on the day. The VIX is at [level], which is [Low/Normal/Elevated/High] — [one sentence: what this means for xStocks range management, e.g. 'range boundaries are holding comfortably' or 'elevated volatility increases out-of-range risk across all positions' or 'compressed volatility is keeping positions well-centered']. Have a good one."
 
 ═══════════════════════════════════════
 SPEAKING RULES — CRITICAL
 ═══════════════════════════════════════
 
 ElevenLabs will read this text aloud. Numbers must be written as words:
-  ✓ "two thousand and fifty-eight dollars"    ✗ "$2,058" or "twenty fifty-eight"
+  ✓ "two thousand and fifty-eight dollars"    ✗ "$2,058"
   ✓ "one hundred and forty-six dollars"       ✗ "$146"
   ✓ "sixty-four percent"                      ✗ "64%"
   ✓ "thirty thousand dollars"                 ✗ "$30,000"
-  ✓ "LP" is spoken as "el-pee" by ElevenLabs — write it as "LP" not "L-P"
-  ✓ "sixteen days"                            ✗ "sixteen point one days"
+  ✓ "sixteen days"                            ✗ "16 days" or "sixteen point one days"
+  ✓ "S-P-Y"  (hyphenated so ElevenLabs spells it) ✗ "SPY"
+  ✓ "VIX" is fine as-is — ElevenLabs reads it correctly
+  ✓ "LP" is fine as-is
 
 Tickers must be phonetic:
-  ETH → "Eth"   BTC → "Bitcoin"   USDC → "U-S-D-C"   SOL → "Sol"
+  ETH → "Eth"   BTC → "Bitcoin"   USDC → "U-S-D-C"
+  TSLAx → "Tesla-x"   SPYx → "S-P-Y-x"   NVDAx → "Nvidia-x"
+  CRCLx → "C-R-C-L-x"   AAPLx → "Apple-x"   GOOGLx → "Google-x"
 
-Never use raw ticker symbols. Never explain the band structure or hedge mechanics.
-Target length: 60–75 seconds at 1.2× speed (~130–160 words).
+Never use raw ticker symbols. Never explain band structure or hedge mechanics.
+Target length: 90–120 seconds at 1.2× speed (~200–260 words).
 
 ═══════════════════════════════════════
 OUTPUT RULES — CRITICAL
@@ -484,7 +573,7 @@ OUTPUT RULES — CRITICAL
 Output the brief EXACTLY ONCE, preceded by a single description line.
 
 FORMAT YOUR ENTIRE RESPONSE LIKE THIS:
-DESCRIPTION: [one sentence capturing the single most notable thing about today's portfolio situation — written in plain prose, no dollar signs, no percent symbols, no tickers. This becomes the podcast episode description in Overcast.]
+DESCRIPTION: [one sentence — the single most notable thing across BOTH strategies today, plain prose, no symbols]
 Good morning. It's [day]...
 [rest of brief]
 ...Have a good one.
@@ -492,12 +581,12 @@ Good morning. It's [day]...
 DESCRIPTION line rules:
 - Must be the very first line of your response
 - One sentence only, ending with a period
-- Plain prose — spell out numbers and avoid symbols (same rules as the brief itself)
-- Capture the single most actionable or notable thing today: zone status, delta situation, fee milestone, market condition
+- Plain prose — spell out numbers, no dollar signs, percent signs, or ticker symbols
+- Capture the most actionable or notable thing today across either strategy
 - Examples:
-  "Delta neutral cycle sits in Normal Zone with fees averaging fifty dollars a day and ETH holding near the center."
-  "Near Drift alert as Eth approaches the upper boundary — hedge adjustment may be needed today."
-  "Strategy enters day two of cycle ten with strong fee momentum following yesterday's market rally."
+  "Delta neutral cycle sits in Normal Zone with fees averaging fifty dollars a day while all six equity positions remain in range."
+  "Near Drift alert on the crypto side while Tesla-x has been out of range for two consecutive sessions requiring rebalancing."
+  "Strong fee momentum across both strategies with a blended equity rate above forty percent and the delta neutral cycle on pace."
 
 - If you catch an error or inconsistency while writing, correct it silently and continue.
 - Do not restart. Do not show multiple drafts. Do not explain your reasoning.
@@ -507,15 +596,23 @@ DESCRIPTION line rules:
 EXAMPLE OUTPUT — MATCH THIS STYLE EXACTLY
 ═══════════════════════════════════════
 
+DESCRIPTION: Delta neutral cycle holds in Normal Zone while the equity side shows strong blended fee momentum with all six positions in range.
+
 Good morning. It's Friday, April 4th.
 
 Eth is at two thousand and fifty-eight dollars, sitting in Normal Zone. You have about one hundred and twenty dollars of breathing room before Near Drift. No action needed.
 
 The current delta neutral strategy cycle is thirteen days in. The LP is down one hundred and forty-six dollars on price since open, the hedge is up one hundred and seventy-eight dollars. Delta balance is thirty-two dollars, within tolerance for Normal Zone. Total fees this cycle are six hundred and fifteen dollars, averaging about fifty-one dollars a day — a fee rate of around forty-one percent annualized on total deployed capital.
 
-One thing to watch: the C-R-C-L-x position has three hundred and twenty-two dollars in unclaimed fees on a fifteen hundred dollar position. Worth deciding today whether to claim or let it ride into the weekend.
+One thing to watch on the delta neutral side: pending fees on the LP are approaching three hundred dollars — worth deciding today whether to claim or let them compound into the weekend.
 
-Market sentiment is Extreme Fear at nine. Bitcoin is at sixty-six thousand eight hundred dollars. Volatility looks normal — the band remains appropriate. Have a good one.`;
+On the crypto side — market sentiment is Extreme Fear at nine. Bitcoin is at sixty-six thousand eight hundred dollars. Volatility looks normal — the three-sixty point band remains appropriate.
+
+Switching to the equity side. The six xStocks positions are averaging eleven days into their current cycles. Total fees across all positions are four hundred and twenty dollars, averaging about thirty-eight dollars a day — a blended fee rate of around thirty-four percent annualized on total deployed capital. C-R-C-L-x is currently out of range — watching it.
+
+One thing to watch on the equity side: C-R-C-L-x has three hundred and twenty-two dollars in unclaimed fees on a fifteen hundred dollar position — worth deciding today whether to claim or wait for rebalancing.
+
+On the equity side — S-P-Y is at five hundred and twelve dollars, down on the day. The VIX is at eighteen, which is Normal — range boundaries are holding comfortably across all positions. Have a good one.`;
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
