@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Wednesday, May 27, 2026</title>
+      <description><![CDATA[Daily portfolio and market intelligence brief.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-27.mp3" length="1425284" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-05-27</guid>
+      <pubDate>Wed, 27 May 2026 14:28:23 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Tuesday, May 26, 2026</title>
       <description><![CDATA[Cycle nine closed on May twenty-third after Eth broke below Drift Lower for five consecutive candles, and no new cycle has been opened yet — the strategy is sitting in cash waiting for re-entry.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-26.mp3" length="1454542" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-28.mp3" length="1357157" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-04-28</guid>
       <pubDate>Tue, 28 Apr 2026 23:08:12 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Monday, April 27, 2026</title>
-      <description><![CDATA[The strategy cycle is fifteen days in with Eth sitting just thirteen dollars below the Near Drift upper boundary, making today a close watch for a potential zone transition.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-27.mp3" length="1530192" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-04-27</guid>
-      <pubDate>Mon, 27 Apr 2026 14:17:42 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
