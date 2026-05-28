@@ -23,6 +23,7 @@
  * Fixes applied 2026-04-14:
  *   Fix 3 — 429 rate limit retry with 60s backoff instead of Fatal crash.
  *   Fix 4 — max_tokens reduced from 4096 to 2048 to slow context growth.
+ *            (Reversed by Fix 10 — 2048 was insufficient for expanded brief.)
  *   Fix 5 — System prompt band values removed — Claude now fetches current
  *            cycle band values from Notion at runtime instead of using
  *            hardcoded C8 values that go stale every cycle.
@@ -50,6 +51,24 @@
  *            watch, and market close with SPY + VIX instead of BTC + ETH vol.
  *            Brief flow: Date → ETH/PSF zone → PSF P&L → PSF watch →
  *            PSF market close → xStocks P&L → xStocks watch → xStocks market.
+ *
+ * Fixes applied 2026-05-27 (2):
+ *   Fix 10 — max_tokens raised from 2048 → 4096. Expanded brief (PSF + xStocks)
+ *            was hitting the token ceiling mid-sentence during final generation,
+ *            causing multiple max_tokens continuations, context fragmentation,
+ *            and loss of the "Good morning"/"Have a good one." markers.
+ *   Fix 11 — xStocks weighted blended APR now computed as capital-weighted
+ *            average of per-position APRs, not aggregate-fees/aggregate-capital
+ *            annualized by avg days. Each position's APR = (fees / open value)
+ *            × (365 / own days). Blend = Σ(APR × open value) / Σ(open value).
+ *            This correctly handles mixed-age positions (e.g. day-1 positions
+ *            alongside day-30 positions) without annualization distortion.
+ *   Fix 12 — Positions with 0 elapsed days (opened same day, no full day yet)
+ *            are excluded from the blended APR and flagged in spoken text as
+ *            "too new to rate" so they don't distort the blended figure.
+ *   Fix 13 — Brief extraction now scans ALL assistant text blocks across the
+ *            full message history, not just the final response block. Prevents
+ *            marker loss when Claude resumes mid-brief after a max_tokens split.
  */
 
 import fs from 'fs';
@@ -252,7 +271,7 @@ async function callClaude(messages, systemPrompt) {
       },
       body: JSON.stringify({
         model:      CLAUDE_MODEL,
-        max_tokens: 2048,
+        max_tokens: 4096,
         system:     systemPrompt,
         tools:      TOOLS,
         messages
@@ -294,10 +313,18 @@ async function runClaude(systemPrompt, userPrompt) {
     messages.push({ role: 'assistant', content: response.content });
 
     if (response.stop_reason === 'end_turn') {
-      const textBlock = response.content.find(b => b.type === 'text');
-      if (!textBlock) throw new Error('end_turn but no text block');
+      // Fix 13: Scan ALL assistant text blocks across the entire message history.
+      // When Claude hits max_tokens mid-brief and resumes via "Continue.", the
+      // "Good morning" marker may be in an earlier assistant block while "Have a
+      // good one." is in a later one. Concatenating all blocks recovers the full brief.
+      const allAssistantText = messages
+        .filter(m => m.role === 'assistant')
+        .flatMap(m => (Array.isArray(m.content) ? m.content : [m.content]))
+        .filter(b => b && b.type === 'text')
+        .map(b => b.text)
+        .join('');
 
-      const raw = textBlock.text.trim();
+      const raw = allAssistantText.trim();
 
       // Extract DESCRIPTION line if present and save to DESC_PATH
       const descMatch = raw.match(/^DESCRIPTION:\s*(.+)$/m);
@@ -457,9 +484,10 @@ For EACH position, determine:
   • Days in cycle    = floor(elapsed hours / 24) — whole number only
   • Avg daily fee    = (total fees / elapsed hours) × 24
   • Fee APR          = (total fees / open value) × (365 / days in cycle) × 100
-                       Use open value (capital deployed at open) as denominator,
-                       matching the same capital normalization approach as PSF.
-                       If days in cycle = 0, skip APR for that position.
+                       Use open value (capital deployed at open) as denominator.
+                       If days in cycle = 0 (position opened today, less than 24hrs old):
+                         → Mark as "too new to rate" — EXCLUDE from blended APR entirely.
+                         → Note it in spoken text: "[Ticker] opened today — APR not yet meaningful."
   • OOR status       = In Range field (fldQxXuK9uTwRQsX8) on the latest Fee Check:
                        1 = in range, 0 = out of range
   • OOR consecutive  = Count the number of consecutive most-recent Fee Check records
@@ -471,17 +499,31 @@ For EACH position, determine:
                        and OOR coming out).
 
 Then compute AGGREGATE xStocks metrics:
-  • Total deployed (xStocks)  = sum of open values across all 6 positions
-  • Total fees (xStocks)      = sum of total fees across all 6 positions
-  • Total pending (xStocks)   = sum of pending fees across all 6 positions
-  • Avg days in cycle         = floor(average of days in cycle across all 6 positions)
-                                Whole number only.
-  • Total avg daily fee       = sum of avg daily fees across all 6 positions
-  • Weighted blended fee APR  = (total fees xStocks / total deployed xStocks)
-                                × (365 / avg days in cycle) × 100
-                                This normalizes the fee rate across all 6 positions
-                                using aggregate fees and aggregate capital.
-                                If avg days = 0, skip APR.
+  • Eligible positions        = positions where days in cycle ≥ 1 (exclude 0-day positions)
+  • Too-new positions         = positions where days in cycle = 0 (opened today)
+  • Total deployed (xStocks)  = sum of open values across ALL 6 positions
+  • Total fees (xStocks)      = sum of total fees across ALL 6 positions
+  • Total avg daily fee       = sum of avg daily fees across ALL 6 positions
+  • Avg days in cycle         = floor(average of days in cycle across ALL 6 positions) — whole number
+  • Weighted blended fee APR  = capital-weighted average of per-position Fee APRs
+                                for ELIGIBLE positions only (days ≥ 1).
+
+                                Formula:
+                                  Weighted Blended APR = Σ(position_APR × open_value) / Σ(open_value)
+                                  where the sum is only over eligible positions.
+
+                                Example:
+                                  CRCLx: APR=63%, open=$1,579 → contribution = 63 × 1579 = 99,477
+                                  NVDAx: APR=28%, open=$2,100 → contribution = 28 × 2100 = 58,800
+                                  SPYx:  APR=41%, open=$3,200 → contribution = 41 × 3200 = 131,200
+                                  TSLAx: days=0, EXCLUDED
+                                  AAPLx: days=0, EXCLUDED
+                                  Blended APR = (99477 + 58800 + 131200) / (1579 + 2100 + 3200) = 41.8%
+
+                                This correctly handles mixed-age positions — a day-1 position
+                                earning fees over its own actual 1 day gets its own real APR,
+                                not under-annualized by a longer avg days figure.
+                                If no eligible positions exist, skip APR entirely.
   • OOR positions             = list of tickers where latest Fee Check In Range = 0
   • Action-needed OOR         = list of tickers with consecutive OOR streak ≥ 2 weekday
                                 Fee Check records — these require rebalancing per playbook
@@ -532,7 +574,11 @@ BLOCK 5: PSF Market Close
 ──────────────────────
 BLOCK 6: xStocks P&L
 ──────────────────────
-"Switching to the equity side. The six xStocks positions are averaging [X] days into their current cycles. Total fees across all positions are [amount], averaging about [amount] a day — a blended fee rate of around [blended APR]% annualized on total deployed capital. [If any position OOR but streak < 2: "[Ticker] is currently out of range — watching it."] [If any position with streak ≥ 2: "[Ticker] has been out of range for [N] consecutive sessions — rebalancing required per playbook."]"
+"Switching to the equity side. The six xStocks positions are averaging [X] days into their current cycles. Total fees across all positions are [amount], averaging about [amount] a day — a blended fee rate of around [blended APR]% annualized on deployed capital. [If any position has days = 0: "[Ticker] opened today — APR not yet meaningful."] [If any position OOR but streak < 2: "[Ticker] is currently out of range — watching it."] [If any position with streak ≥ 2: "[Ticker] has been out of range for [N] consecutive sessions — rebalancing required per playbook."]"
+
+NOTE: The blended APR is the capital-weighted average of eligible positions only (days ≥ 1).
+If ALL positions are too new (all days = 0), omit the APR sentence entirely and say
+"All positions opened today — fee rate not yet meaningful."
 
 ──────────────────────
 BLOCK 7: xStocks One Thing to Watch
