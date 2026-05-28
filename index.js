@@ -1,12 +1,8 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v37
-// Added: Dynamic WETH/USDC position discovery
-// Updated: TSLAx→C3 new mint+pool+recordId, AAPLx→C2 new mint
-//        Removes hardcoded NFT position ID (WETH_POS_ID)
-//        Script now auto-discovers active WETH/USDC 0.05% position
-//        by scanning wallet's Uniswap V3 NFTs — no code change
-//        needed when opening a new cycle
-// Schedule: 14:15 UTC = 7:15 AM PDT (triggered via cron-job.org)
+// Daily Portfolio Check — GitHub Actions v38
+// Updated: Dynamic cycle ID fetch for WETH/USDC and ETH Hedge
+//          from Asset table (tblrATIQI0ld9tz1y) at runtime.
+//          No code changes needed when opening a new cycle.
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -19,23 +15,20 @@ const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
 const WALLET_EVM        = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
 const WALLET_SUI        = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
 const WALLET_HYPERLIQUID = '0x464b059B1AF55A408CB3c822D610c2D962d2cf4b';
-// WETH_POS_ID removed — now dynamically discovered each run
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 const SUI_RPC      = 'https://fullnode.mainnet.sui.io';
 const SOL_RPC      = process.env.SOL_RPC_URL ?? 'https://api.mainnet-beta.solana.com';
 
-// Set RAYDIUM_DRY_RUN=false in GitHub repo Variables to go live
 const RAYDIUM_DRY_RUN = (process.env.RAYDIUM_DRY_RUN ?? 'true') !== 'false';
 
-// Lighter
 const LIGHTER_BASE      = 'https://mainnet.zklighter.elliot.ai/api/v1';
 const LIGHTER_TOKEN     = process.env.LIGHTER_READ_TOKEN;
 const LIGHTER_ACCT      = 449217;
 const LIGHTER_LLP_ID    = 281474976710654;
 const LIGHTER_EDGE_ID   = 281474976688087;
-const LIT_STAKE_AMOUNT  = 185.97; // hardcoded — staking API not available; update if stake changes
+const LIT_STAKE_AMOUNT  = 185.97;
 
 const OBLIGATION_CAP_KEYWORD = 'ObligationOwnerCap';
 const RAYDIUM_CLMM_PROGRAM   = 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK';
@@ -179,6 +172,16 @@ async function airtableCreate(tableId, records) {
   return true;
 }
 
+async function airtableFetchRecord(tableId, recordId) {
+  const { default: fetch } = await import('node-fetch');
+  const res = await fetch(
+    `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}/${recordId}`,
+    { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
+  );
+  if (!res.ok) { console.error(`[Airtable fetch] ${tableId}/${recordId} — HTTP ${res.status}`); return null; }
+  return await res.json();
+}
+
 function dailyRecord(assetRecordId, inRange, extra = {}) {
   return { [F.asset]: [assetRecordId], [F.actionType]: 'Fee Check', [F.date]: NOW_UTC, [F.inRange]: inRange ? 'Yes' : 'No', ...extra };
 }
@@ -189,10 +192,6 @@ function lendingRecord(positionId, extra = {}) {
 
 // ============================================================
 // MODULE 1 — WETH/USDC PRIMARY (Arbitrum)
-// Dynamic position discovery — no hardcoded NFT ID
-// Scans wallet's Uniswap V3 NFTs, finds active WETH/USDC 0.05%
-// position automatically. Works across all cycles with zero
-// code changes needed when opening a new cycle.
 // ============================================================
 
 async function getWethPosition() {
@@ -203,7 +202,7 @@ async function getWethPosition() {
     const NFT_MANAGER = '0xC36442b4a4522E871399CD717aBDD847Ab11FE88';
     const WETH        = '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1';
     const USDC        = '0xaf88d065e77c8cC2239327C5EDb3A432268e5831';
-    const TARGET_FEE  = 500; // 0.05%
+    const TARGET_FEE  = 500;
 
     const nftManagerABI = [
       'function balanceOf(address owner) external view returns (uint256)',
@@ -216,7 +215,6 @@ async function getWethPosition() {
 
     const nft = new ethers.Contract(NFT_MANAGER, nftManagerABI, provider);
 
-    // Step 1: get count of Uniswap V3 NFTs owned by wallet
     const balance = await nft.balanceOf(WALLET_EVM);
     const count = Number(balance);
     console.log(`Wallet owns ${count} Uniswap V3 NFT(s) — scanning for active WETH/USDC 0.05% position...`);
@@ -226,7 +224,6 @@ async function getWethPosition() {
       return null;
     }
 
-    // Step 2: scan each NFT, find active WETH/USDC 0.05% with liquidity > 0
     let WETH_POS_ID = null;
     let raw = null;
 
@@ -258,7 +255,6 @@ async function getWethPosition() {
       return null;
     }
 
-    // Step 3: position math — same as v29
     const tickLowerN = Number(raw.tickLower);
     const tickUpperN = Number(raw.tickUpper);
     const liquidity  = raw.liquidity;
@@ -904,7 +900,7 @@ async function getEthHedge() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v30 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v38 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes] = await Promise.allSettled([
@@ -923,6 +919,25 @@ async function main() {
   const lighter  = lighterRes.status  === 'fulfilled' ? lighterRes.value  : {};
   const hedge    = hedgeRes.status    === 'fulfilled' ? hedgeRes.value    : null;
 
+  console.log('\n--- Fetching dynamic cycle IDs from Asset table ---');
+  let wethCycleId  = 'WETH-PRIMARY-C10'; // fallback
+  let hedgeCycleId = 'HEDGE-C10';        // fallback
+  try {
+    const [wethAssetRes, hedgeAssetRes] = await Promise.all([
+      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.wethPrimary),
+      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.ethHedge),
+    ]);
+    if (wethAssetRes?.fields?.['fld0T538WMoPQ5bgL']) {
+      wethCycleId = wethAssetRes.fields['fld0T538WMoPQ5bgL'];
+    }
+    if (hedgeAssetRes?.fields?.['fld0T538WMoPQ5bgL']) {
+      hedgeCycleId = hedgeAssetRes.fields['fld0T538WMoPQ5bgL'];
+    }
+    console.log(`✓ Cycle IDs — LP: ${wethCycleId} | Hedge: ${hedgeCycleId}`);
+  } catch (e) {
+    console.error(`Cycle ID fetch failed: ${e.message} — using fallbacks (${wethCycleId} / ${hedgeCycleId})`);
+  }
+
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
 
@@ -930,19 +945,21 @@ async function main() {
   if (weth) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
       [F.positionValue]: weth.positionValue,
+      [F.cycleId]:       wethCycleId,
       ...(weth.feeValue > 0 ? { [F.feeValue]: weth.feeValue } : {}),
       [F.notes]: `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
     })]);
-    if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}`); }
+    if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)} | Cycle: ${wethCycleId}`); }
   }
 
   // ETH Short Hedge (Hyperliquid)
   if (hedge?.positionValue != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.ethHedge, true, {
       [F.positionValue]: hedge.positionValue,
+      [F.cycleId]:       hedgeCycleId,
       [F.notes]:         hedge.notes,
     })]);
-    if (ok) { written++; console.log(`✓ ETH Hedge: $${hedge.positionValue.toFixed(2)} | ${hedge.notes}`); }
+    if (ok) { written++; console.log(`✓ ETH Hedge: $${hedge.positionValue.toFixed(2)} | ${hedge.notes} | Cycle: ${hedgeCycleId}`); }
   }
 
   // Moonwell
