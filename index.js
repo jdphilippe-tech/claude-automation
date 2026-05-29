@@ -1,8 +1,13 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v38
+// Daily Portfolio Check — GitHub Actions v39
 // Updated: Dynamic cycle ID fetch for WETH/USDC and ETH Hedge
 //          from Asset table (tblrATIQI0ld9tz1y) at runtime.
 //          No code changes needed when opening a new cycle.
+//
+// v39 fix: WALLET_WETH_LP added — Uniswap V3 WETH/USDC position
+//          lives at 0x2375369D950D49897193EbCad32d99206C37D10A,
+//          not WALLET_EVM. getWethPosition() now scans the correct
+//          wallet so NFT #5505883 (C10) is found.
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -12,7 +17,8 @@ const AIRTABLE_BASE    = 'appWojaxYR99bXC1f';
 const DAILY_TABLE      = 'tblKsk0QnkOoKNLuk';
 const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
 
-const WALLET_EVM        = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289';
+const WALLET_EVM        = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289'; // Moonwell/Aave wallet
+const WALLET_WETH_LP    = '0x2375369D950D49897193EbCad32d99206C37D10A'; // Uniswap V3 WETH/USDC LP wallet
 const WALLET_SUI        = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
 const WALLET_HYPERLIQUID = '0x464b059B1AF55A408CB3c822D610c2D962d2cf4b';
 
@@ -215,7 +221,8 @@ async function getWethPosition() {
 
     const nft = new ethers.Contract(NFT_MANAGER, nftManagerABI, provider);
 
-    const balance = await nft.balanceOf(WALLET_EVM);
+    // v39: scan WALLET_WETH_LP — the wallet that actually holds the Uniswap V3 position
+    const balance = await nft.balanceOf(WALLET_WETH_LP);
     const count = Number(balance);
     console.log(`Wallet owns ${count} Uniswap V3 NFT(s) — scanning for active WETH/USDC 0.05% position...`);
 
@@ -228,7 +235,7 @@ async function getWethPosition() {
     let raw = null;
 
     for (let i = 0; i < count; i++) {
-      const tokenId = await nft.tokenOfOwnerByIndex(WALLET_EVM, i);
+      const tokenId = await nft.tokenOfOwnerByIndex(WALLET_WETH_LP, i);
       const pos = await nft.positions(tokenId);
       const token0 = pos.token0.toLowerCase();
       const token1 = pos.token1.toLowerCase();
@@ -290,7 +297,7 @@ async function getWethPosition() {
     try {
       const fees = await nftCollect.collect.staticCall({
         tokenId:    WETH_POS_ID,
-        recipient:  WALLET_EVM,
+        recipient:  WALLET_WETH_LP,
         amount0Max: MAX128,
         amount1Max: MAX128,
       });
@@ -468,7 +475,7 @@ async function getSuilendData() {
         const utilPoints = utils.map(u => Number(u) / 100);
         const aprPoints  = aprs.map(a => Number(a) / 10000);
         if (utilRate <= utilPoints[0]) { borrowAprPerYear = aprPoints[0]; }
-        else if (utilRate >= utilPoints[utilPoints.length - 1]) { borrowAprPerYear = aprPoints[aprPoints.length - 1]; }
+        else if (utilRate >= utilPoints[utilPoints.length - 1]) { borrowAprPerYear = aprPoints[utilPoints.length - 1]; }
         else {
           for (let i = 1; i < utilPoints.length; i++) {
             if (utilRate <= utilPoints[i]) {
@@ -900,7 +907,7 @@ async function getEthHedge() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v38 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v39 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes] = await Promise.allSettled([
