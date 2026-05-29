@@ -69,6 +69,14 @@
  *   Fix 13 — Brief extraction now scans ALL assistant text blocks across the
  *            full message history, not just the final response block. Prevents
  *            marker loss when Claude resumes mid-brief after a max_tokens split.
+ *
+ * Fixes applied 2026-05-29:
+ *   Fix 14 — Context pruning added to runClaude(). After each tool result has
+ *            been consumed (i.e. once Claude has replied to it), the raw payload
+ *            is replaced with a short stub in the message history. This prevents
+ *            accumulated Airtable 100-record payloads from blowing past the
+ *            30,000 input tokens/minute org rate limit by iterations 4+.
+ *            Stub format: "[tool_result pruned — N chars — already processed]"
  */
 
 import fs from 'fs';
@@ -361,6 +369,36 @@ async function runClaude(systemPrompt, userPrompt) {
         });
       }
       messages.push({ role: 'user', content: toolResults });
+
+      // Fix 14: Context pruning — once Claude has replied to a tool result,
+      // that raw payload is no longer needed in full. Replace older tool_result
+      // messages (anything before the last two user turns) with a short stub
+      // to keep input token count below the 30k/min org rate limit.
+      // We keep the last two user turns intact so Claude always has the
+      // most recent tool results available for reasoning.
+      const userTurnIndices = messages
+        .map((m, idx) => (m.role === 'user' ? idx : -1))
+        .filter(idx => idx !== -1);
+
+      if (userTurnIndices.length > 2) {
+        const pruneUpTo = userTurnIndices[userTurnIndices.length - 3];
+        for (let idx = 0; idx <= pruneUpTo; idx++) {
+          const msg = messages[idx];
+          if (msg.role === 'user' && Array.isArray(msg.content)) {
+            msg.content = msg.content.map(block => {
+              if (block.type === 'tool_result' && typeof block.content === 'string' && block.content.length > 200) {
+                const originalLen = block.content.length;
+                return {
+                  ...block,
+                  content: `[tool_result pruned — ${originalLen} chars — already processed]`
+                };
+              }
+              return block;
+            });
+          }
+        }
+      }
+
       continue;
     }
 
