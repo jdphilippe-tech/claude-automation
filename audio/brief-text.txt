@@ -1,7 +1,15 @@
-and two hundred and sixty-two dollars. Eth volatility has been elevated recently with multiple drift-zone breaches in cycle nine, but price has stabilized around the two thousand dollar range — the three-sixty point band looks appropriate for current conditions.
+Good morning. It's Friday, May twenty-ninth.
 
-Switching to the equity side. The six xStocks positions are averaging twelve days into their current cycles. Total fees across all positions are eighty-seven dollars, averaging about nineteen dollars a day — a blended fee rate of around thirteen percent annualized on total deployed capital. All six positions appear to be in range with no out-of-range flags on today's checks.
+Eth is at two thousand dollars, sitting in Normal Zone — but just barely. You have about thirty dollars of breathing room before Near Drift to the downside. No action required yet, but worth keeping an eye on.
 
-One thing to watch on the equity side: Tesla-x and Apple-x both opened fresh cycles this morning with significantly larger position sizes — Tesla-x at eight thousand four hundred and sixty-nine dollars and Apple-x at five thousand four hundred and six dollars. These two positions alone account for most of the deployed capital on the equity side. C-R-C-L-x is the standout fee earner at around sixty-three percent annualized on a fifteen hundred and seventy-nine dollar position — worth watching as a benchmark for the newer positions to grow into.
+The current delta neutral strategy cycle is two days in. The LP is down four hundred and forty-one dollars on price since open, the hedge is up five hundred and two dollars. Delta balance is sixty dollars, which is within tolerance for Normal Zone. Total fees this cycle are one hundred and five dollars, averaging about thirty-nine dollars a day — a fee rate of around fifty-four percent annualized on total deployed capital.
 
-On the equity side — S-P-Y is at seven hundred and forty-nine dollars, down on the day. The VIX is at sixteen point seven five, which is Normal — range boundaries are holding comfortably across all positions. Have a good one.
+One thing to watch on the delta neutral side: Eth is sitting just thirty dollars above the Near Drift lower boundary at one thousand nine hundred and seventy dollars — if it dips further today, you'll be in Near Drift Zone and tolerance tightens to a quarter percent. Monitor the price heading into the weekend.
+
+On the crypto side — market sentiment data was unavailable at brief time. Bitcoin is at one hundred and eight thousand five hundred dollars. Eth volatility over the past thirty days has covered a range of nearly five hundred dollars, so the three-sixty point band remains appropriate for current conditions.
+
+Switching to the equity side. The six xStocks positions are averaging fourteen days into their current cycles. Total fees across all positions are one hundred and thirty-four dollars, averaging about sixteen dollars a day — a blended fee rate of around twenty-four percent annualized on deployed capital. All six positions are currently in range — no rebalancing needed.
+
+One thing to watch on the equity side: Nvidia-x is fifty-two days into its cycle — the longest-running position in the book — with thirty-three dollars in pending fees sitting unclaimed since the last claim on May third. Worth deciding today whether to harvest those or let them ride into the weekend.
+
+On the equity side — S-P-Y is at five hundred and ninety-one dollars, up on the day. The VIX is at sixteen, which is Normal — range boundaries are holding comfortably across all six positions. Have a good one.
