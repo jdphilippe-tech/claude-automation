@@ -77,6 +77,18 @@
  *            accumulated Airtable 100-record payloads from blowing past the
  *            30,000 input tokens/minute org rate limit by iterations 4+.
  *            Stub format: "[tool_result pruned — N chars — already processed]"
+ *   Fix 15 — xStocks APR formula overhauled:
+ *            (a) Net cycle capital = Σ deposits − Σ withdrawals for whole cycle,
+ *                not just open value. Handles mid-cycle Deposit New Money / Supply More.
+ *            (b) Reset window = most recent of Open/Reopen/Deposit New Money/
+ *                Deposit Old Money/Supply More. Fees and time measured from there.
+ *            (c) Exact elapsed hours used for annualization (no floor). Eliminates
+ *                APR overstatement on young positions (e.g. 35h floored to 1 day
+ *                inflated CRCLx from 80% to 119%).
+ *            (d) Eligibility threshold changed from days≥1 to hours≥24 to match
+ *                exact-hours logic.
+ *            (e) Deposit Amount (fldWLVUqSCRJ4NtnQ) and Withdrawal Amount
+ *                (fldJc61ql8kILUfJU) added to Airtable field fetch list.
  */
 
 import fs from 'fs';
@@ -501,70 +513,86 @@ STEP 5 — xStocks Cycle Data (Airtable Daily Actions)
 Query table ${AIRTABLE_DAILY_TABLE} with:
   filterByFormula: OR(FIND('TSLAx',{Cycle ID}),FIND('SPYx',{Cycle ID}),FIND('NVDAx',{Cycle ID}),FIND('CRCLx',{Cycle ID}),FIND('AAPLx',{Cycle ID}),FIND('GOOGLx',{Cycle ID}))
   sort: fldHG3MCcyhkXknyH ascending (oldest first)
-  fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk, fldxWdSuQ09uhadFo, fldQxXuK9uTwRQsX8
+  fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk, fldxWdSuQ09uhadFo, fldQxXuK9uTwRQsX8, fldWLVUqSCRJ4NtnQ, fldJc61ql8kILUfJU
   page_size: 100
 
 ⚠️  PAGINATION IS MANDATORY. Keep calling with offset until has_more = false.
+    fldWLVUqSCRJ4NtnQ = Deposit Amount (on Open/Reopen/Deposit/Supply More records)
+    fldJc61ql8kILUfJU = Withdrawal Amount (on Close Position records)
 
 The 6 active positions are: TSLAx, SPYx, NVDAx, CRCLx, AAPLx, GOOGLx.
 Each has its own Cycle ID (e.g. TSLAx-C2, SPYx-C1, NVDAx-C3, etc.)
 The current cycle for each ticker = the highest cycle number seen in the records for that ticker.
 
+RESET EVENT ACTION TYPES (trigger a new measurement window):
+  Open Position | Reopen Position | Deposit New Money | Deposit Old Money | Supply More
+The MOST RECENT reset event in the current cycle defines the active measurement window.
+
 For EACH position, determine:
-  • Ticker           = extracted from Cycle ID prefix (e.g. TSLAx)
-  • Open value       = Position Value on earliest Open Position or Reopen Position record for this ticker's current cycle
-  • Current value    = Position Value on latest Fee Check for this ticker's current cycle
-  • Pending fees     = Fee Value on latest Fee Check for this ticker's current cycle
-  • Total claimed    = sum of all Fees Claimed on Claim records for this ticker's current cycle
-  • Total fees       = total claimed + pending fees
-  • Cycle open date  = Date on earliest Open/Reopen Position record for this ticker's current cycle
-  • Elapsed hours    = hours from cycle open date to now
-  • Days in cycle    = floor(elapsed hours / 24) — whole number only
-  • Avg daily fee    = (total fees / elapsed hours) × 24
-  • Fee APR          = (total fees / open value) × (365 / days in cycle) × 100
-                       Use open value (capital deployed at open) as denominator.
-                       If days in cycle = 0 (position opened today, less than 24hrs old):
-                         → Mark as "too new to rate" — EXCLUDE from blended APR entirely.
-                         → Note it in spoken text: "[Ticker] opened today — APR not yet meaningful."
-  • OOR status       = In Range field (fldQxXuK9uTwRQsX8) on the latest Fee Check:
-                       1 = in range, 0 = out of range
-  • OOR consecutive  = Count the number of consecutive most-recent Fee Check records
-                       where In Range = 0. A "consecutive weekday OOR streak" means
-                       2 or more Fee Check records with In Range = 0 with no in-range
-                       record between them. Weekends are non-trading days — if the
-                       OOR records span a weekend gap, they still count as consecutive
-                       for this purpose (the position was OOR going into the weekend
-                       and OOR coming out).
+
+  ── NET CYCLE CAPITAL (denominator) ──
+  • Net cycle capital = Σ(Deposit Amount on all reset event records in current cycle)
+                      − Σ(Withdrawal Amount on all Close Position records in current cycle)
+                      This covers the full cycle lifetime regardless of which reset event
+                      is most recent. It represents total capital ever committed to this cycle.
+  Example: CRCLx-C3 has Reopen ($1,589) + Deposit New Money ($5,557.07) − no withdrawals = $7,146.07
+
+  ── RESET WINDOW (time + fees) ──
+  • Last reset date  = Date on the most recent reset event record in the current cycle
+                       (Open Position, Reopen Position, Deposit New Money, Deposit Old Money,
+                       or Supply More — whichever is most recent)
+  • Elapsed hours    = exact hours from last reset date to now (do NOT floor — use decimal)
+  • Exact days       = elapsed hours / 24 (decimal, e.g. 1.46 days — NOT floored)
+  • Eligible         = elapsed hours ≥ 24. If < 24h since last reset, exclude from blended APR
+                       and flag in speech: "[Ticker] reset less than a day ago — APR not yet meaningful."
+  • Fees since reset = sum of all Fees Claimed records AFTER last reset date
+                     + Fee Value on latest Fee Check (this represents current pending fees,
+                       which accumulate since the last claim — if last claim was before the
+                       last reset, all pending fees are post-reset)
+  • Avg daily fee    = fees since reset / exact days
+
+  ── PER-POSITION APR ──
+  • Fee APR = (fees since reset / net cycle capital) × (365 / exact days) × 100
+              Uses exact days (decimal) — never floored. This avoids overstating APR
+              for young positions (e.g. 35 hours floors to 1 day inflating by 40%+).
+              Uses net cycle capital as denominator — total committed capital for the cycle.
+
+  ── OOR STATUS ──
+  • OOR status      = In Range field (fldQxXuK9uTwRQsX8) on the latest Fee Check:
+                      1 = in range, 0 = out of range
+  • OOR consecutive = Count consecutive most-recent Fee Check records where In Range = 0
+                      with no in-range record between them. Weekends span through —
+                      OOR going into weekend + OOR coming out = consecutive streak.
 
 Then compute AGGREGATE xStocks metrics:
-  • Eligible positions        = positions where days in cycle ≥ 1 (exclude 0-day positions)
-  • Too-new positions         = positions where days in cycle = 0 (opened today)
-  • Total deployed (xStocks)  = sum of open values across ALL 6 positions
-  • Total fees (xStocks)      = sum of total fees across ALL 6 positions
-  • Total avg daily fee       = sum of avg daily fees across ALL 6 positions
-  • Avg days in cycle         = floor(average of days in cycle across ALL 6 positions) — whole number
-  • Weighted blended fee APR  = capital-weighted average of per-position Fee APRs
-                                for ELIGIBLE positions only (days ≥ 1).
+  • Eligible positions       = positions where elapsed hours since last reset ≥ 24
+  • Too-new positions        = positions where elapsed hours since last reset < 24
+  • Total net capital        = sum of net cycle capital across ALL 6 positions
+  • Total fees since reset   = sum of fees since reset across ALL 6 positions
+  • Total avg daily fee      = sum of avg daily fees across ALL 6 positions
+  • Avg exact days           = average of exact days across eligible positions only
+  • Weighted blended fee APR = capital-weighted average of per-position Fee APRs
+                               for ELIGIBLE positions only (hours ≥ 24).
 
-                                Formula:
-                                  Weighted Blended APR = Σ(position_APR × open_value) / Σ(open_value)
-                                  where the sum is only over eligible positions.
+                               Formula:
+                                 Weighted Blended APR = Σ(position_APR × net_cycle_capital)
+                                                      / Σ(net_cycle_capital)
+                                 where sums are over eligible positions only.
 
-                                Example:
-                                  CRCLx: APR=63%, open=$1,579 → contribution = 63 × 1579 = 99,477
-                                  NVDAx: APR=28%, open=$2,100 → contribution = 28 × 2100 = 58,800
-                                  SPYx:  APR=41%, open=$3,200 → contribution = 41 × 3200 = 131,200
-                                  TSLAx: days=0, EXCLUDED
-                                  AAPLx: days=0, EXCLUDED
-                                  Blended APR = (99477 + 58800 + 131200) / (1579 + 2100 + 3200) = 41.8%
+                               Example with deposit-reset logic:
+                                 CRCLx: APR=80.5%, net capital=$7,146 → 80.5 × 7146 = 575,253
+                                 NVDAx: APR=21.4%, net capital=$1,758 → 21.4 × 1758 = 37,621
+                                 SPYx:  APR=8.4%,  net capital=$1,162 → 8.4  × 1162 = 9,761
+                                 TSLAx: APR=28.1%, net capital=$8,764 → 28.1 × 8764 = 246,268
+                                 AAPLx: APR=14.1%, net capital=$5,406 → 14.1 × 5406 = 76,225
+                                 GOOGLx: APR=13.9%, net capital=$2,476 → 13.9 × 2476 = 34,416
+                                 Blended = (575253+37621+9761+246268+76225+34416) / (7146+1758+1162+8764+5406+2476)
+                                         = 979,544 / 26,712 = 36.7%
 
-                                This correctly handles mixed-age positions — a day-1 position
-                                earning fees over its own actual 1 day gets its own real APR,
-                                not under-annualized by a longer avg days figure.
-                                If no eligible positions exist, skip APR entirely.
-  • OOR positions             = list of tickers where latest Fee Check In Range = 0
-  • Action-needed OOR         = list of tickers with consecutive OOR streak ≥ 2 weekday
-                                Fee Check records — these require rebalancing per playbook
+                               If no eligible positions exist, skip APR entirely.
+  • OOR positions            = list of tickers where latest Fee Check In Range = 0
+  • Action-needed OOR        = list of tickers with consecutive OOR streak ≥ 2 weekday
+                               Fee Check records — these require rebalancing per playbook
 
 STEP 6 — xStocks Market Data (web search)
   • SPY ETF current price and direction (up/down from previous close)
