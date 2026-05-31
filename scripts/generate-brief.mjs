@@ -77,6 +77,22 @@
  *            accumulated Airtable 100-record payloads from blowing past the
  *            30,000 input tokens/minute org rate limit by iterations 4+.
  *            Stub format: "[tool_result pruned — N chars — already processed]"
+ *
+ * Fixes applied 2026-05-31:
+ *   Fix 16 — System prompt: hard cap of 2 search attempts per market data point.
+ *            After 2 failures, declare unavailable and continue — never retry a 3rd
+ *            time. Root cause of the 30-iteration fatal on May 31: Claude spun on
+ *            VIX for 15+ iterations because it had no retry limit and no weekend
+ *            awareness. Weekend rule added: on Sat/Sun equity markets are closed —
+ *            use last Friday close from first search result, say "as of Friday's
+ *            close". Fear & Greed backup query (milkroad.com) added after alt.me.
+ *   Fix 17 — runAirtableQuery: handle Airtable 422 LIST_RECORDS_ITERATOR_NOT_AVAILABLE
+ *            by stripping the expired offset token and restarting from page 1.
+ *            Offset tokens expire after ~5 min; long sessions (caused by Fix 16's
+ *            spinning) triggered this. Now recovers gracefully instead of returning
+ *            an error that causes Claude to re-query without context.
+ *   Fix 18 — MAX_ITERS raised from 30 → 40 as additional safety headroom.
+ *
  *   Fix 15 — xStocks APR formula overhauled:
  *            (a) Net cycle capital = Σ deposits − Σ withdrawals for whole cycle,
  *                not just open value. Handles mid-cycle Deposit New Money / Supply More.
@@ -216,6 +232,14 @@ async function runAirtableQuery(input) {
     headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
   });
 
+  // Fix 17: 422 LIST_RECORDS_ITERATOR_NOT_AVAILABLE means the pagination offset
+  // token expired (Airtable tokens expire after ~5 min of inactivity). Strip the
+  // offset and restart from page 1 so a long-running session can recover.
+  if (res.status === 422 && offset) {
+    console.warn('  [422] Airtable pagination token expired — restarting from page 1');
+    return runAirtableQuery({ ...input, offset: undefined });
+  }
+
   if (!res.ok) {
     const err = await res.text();
     return { error: `Airtable ${res.status}: ${err}` };
@@ -322,7 +346,7 @@ async function callClaude(messages, systemPrompt) {
 
 async function runClaude(systemPrompt, userPrompt) {
   const messages = [{ role: 'user', content: userPrompt }];
-  const MAX_ITERS = 30;
+  const MAX_ITERS = 40; // Fix 18: raised from 30 — weekend search loops need more headroom
 
   for (let i = 0; i < MAX_ITERS; i++) {
     console.log(`\n[claude] iteration ${i + 1}`);
@@ -492,12 +516,23 @@ From the complete record set, determine:
                           NEVER add net price delta to fees.
 
 STEP 3 — PSF Market Data (web search)
-  • ETH current price
-  • BTC current price
-  • Crypto Fear & Greed index — search "alternative.me fear greed index". Extract number
-    and label (e.g. "28 — Fear"). If no specific number found, say "Market sentiment data
-    was unavailable at brief time." Do NOT guess.
-  • ETH 30-day volatility or ATR — to assess whether 360-point band remains appropriate.
+⚠️  SEARCH DISCIPLINE — STRICTLY ENFORCED:
+    • Maximum 2 search attempts per data point. If both fail to return a specific number,
+      declare it unavailable and move on immediately. NEVER attempt a 3rd search for the
+      same data point. Spinning on unavailable data is the primary cause of brief failures.
+    • Today is ${new Date().toLocaleDateString('en-US', {weekday:'long'})}. If it is
+      Saturday or Sunday, equity markets (SPY, VIX) are CLOSED. Use the most recent
+      Friday closing price from the first search result. Say "as of Friday's close" in
+      the brief. Do not search more than ONCE for weekend equity data.
+
+  • ETH current price — 1 search. Use whatever number appears in the snippet.
+  • BTC current price — 1 search. Use whatever number appears in the snippet.
+  • Crypto Fear & Greed index — search "alternative.me fear greed index" first. If the
+    snippet does not contain a specific number (0–100), try ONE backup search for
+    "milkroad.com fear greed index today". If still no number after 2 total attempts,
+    say "Market sentiment data was unavailable at brief time." Do NOT guess or retry further.
+  • ETH 30-day volatility or ATR — 1 search. If no clear data, say "volatility data
+    unavailable" and use neutral band verdict.
 
 STEP 4 — PSF Zone Determination
 Zone rules:
@@ -595,8 +630,19 @@ Then compute AGGREGATE xStocks metrics:
                                Fee Check records — these require rebalancing per playbook
 
 STEP 6 — xStocks Market Data (web search)
-  • SPY ETF current price and direction (up/down from previous close)
-  • VIX current level — classify as: Low (<15), Normal (15–20), Elevated (20–30), High (>30)
+⚠️  SAME SEARCH DISCIPLINE APPLIES — max 2 attempts per data point, then declare unavailable.
+    On weekends (Saturday/Sunday) equity markets are CLOSED:
+      • Use the most recent available Friday closing price for SPY and VIX.
+      • Say "as of Friday's close" when referencing these values in the brief.
+      • Do not search more than ONCE for weekend equity data — Friday close will be in
+        the first result's snippet or historical table.
+
+  • SPY ETF price — 1 search on weekdays, 1 search on weekends (use Friday close).
+    Direction (up/down) only needed on weekdays when markets are open.
+    On weekends say "S-P-Y closed Friday at [price]" instead of up/down framing.
+  • VIX current level — 1 search. Classify as: Low (<15), Normal (15–20), Elevated (20–30),
+    High (>30). On weekends use Friday close. If unavailable after 2 attempts, say
+    "VIX data was unavailable" and skip the range verdict sentence.
 
 ═══════════════════════════════════════
 BRIEF FORMAT (follow exactly, in order)
