@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, June 1, 2026</title>
+      <description><![CDATA[Near Drift Zone alert on the delta neutral side — the delta balance is outside tolerance at two hundred dollars with Eth sitting just thirty-nine dollars above the Drift Lower boundary, while all six equity positions hold in range with C-R-C-L-x leading at over fifty percent annualized.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-01.mp3" length="1941882" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-01</guid>
+      <pubDate>Mon, 01 Jun 2026 14:30:03 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, May 30, 2026</title>
       <description><![CDATA[Delta neutral cycle sits comfortably in Normal Zone though delta balance is nearly at its tolerance ceiling, while the equity side shows a blended fee rate of thirty-eight percent with all six positions in range.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-30.mp3" length="2248664" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-01.mp3" length="1375129" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-01</guid>
       <pubDate>Fri, 01 May 2026 14:18:47 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, April 30, 2026</title>
-      <description><![CDATA[The delta neutral strategy cycle is eighteen days in with a nearly flat net price delta of just over three dollars and fees building steadily toward six hundred and thirty-seven dollars, averaging about thirty-four dollars a day.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-04-30.mp3" length="1450780" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-04-30</guid>
-      <pubDate>Thu, 30 Apr 2026 14:19:37 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>

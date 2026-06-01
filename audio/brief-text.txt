@@ -1,15 +1,15 @@
-Good morning. It's Saturday, May thirtieth.
+Good morning. It's Monday, June 1st.
 
-Eth is at two thousand and twenty-two dollars, sitting in Normal Zone. You have about thirty-eight dollars of breathing room before Near Drift — the lower boundary is the closer one. No action needed, but worth keeping an eye on.
+Eth is at one thousand nine hundred and sixty-six dollars, in Near Drift Zone — thirty-nine dollars from the Drift Lower boundary. Monitor closely.
 
-The current delta neutral strategy cycle is three days in. The LP is down one hundred and seventy-three dollars on price since open, the hedge is up three hundred and fourteen dollars. Delta balance is one hundred and forty-two dollars, which is within tolerance for Normal Zone — but only about four dollars under the limit, so it's tight. Total fees this cycle are one hundred and thirty-four dollars, averaging about thirty-six dollars a day — a fee rate of around forty-six percent annualized on total deployed capital.
+The current delta neutral strategy cycle is five days in. The LP is down eight hundred and ninety-six dollars on price since open, the hedge is up six hundred and ninety-five dollars. Delta balance is two hundred dollars, which is outside tolerance for Near Drift Zone — hedge adjustment may be needed. Total fees this cycle are one hundred and eighty-one dollars, averaging about thirty-two dollars a day — a fee rate of around thirty-seven percent annualized on total deployed capital.
 
-One thing to watch on the delta neutral side: delta balance is right at the edge of Normal Zone tolerance — one hundred and forty-two dollars against a ceiling of one hundred and forty-six. Any further downward move in Eth over the weekend could push it over and warrant a hedge adjustment on Monday.
+One thing to watch on the delta neutral side: the delta balance of two hundred dollars is nearly three times the Near Drift Zone tolerance of seventy-two dollars, and Eth is only thirty-nine dollars above the Drift Lower boundary — if Eth slips further, the cycle moves into Drift Zone and a hedge adjustment becomes required.
 
-On the crypto side — market sentiment is Greed at sixty-one. Bitcoin is at one hundred and eight thousand dollars. Eth has moved less than fifty dollars from the cycle open price in three days, so the three-sixty point band remains well-suited to current conditions.
+On the crypto side — market sentiment is Fear at twenty-eight. Bitcoin is at one hundred and seven thousand dollars. Eth volatility looks moderate — the three-sixty point band remains appropriate for current conditions.
 
-Switching to the equity side. The six xStocks positions are averaging about six days into their current cycles. Total fees across all positions are two hundred and twenty-eight dollars, averaging about twenty-nine dollars a day — a blended fee rate of around thirty-eight percent annualized on deployed capital. All six positions are currently in range — nothing requiring action today.
+Switching to the equity side. The six xStocks positions are averaging seven and a half days into their current cycles. Total fees across all positions are ninety-eight dollars, averaging about nineteen dollars a day — a blended fee rate of around twenty-two percent annualized on deployed capital.
 
-One thing to watch on the equity side: C-R-C-L-x is the standout this cycle — one hundred and fifty-nine dollars in fees since its last reset on a seven thousand dollar position, running at about fifty-eight percent annualized. With twenty-eight dollars pending right now, worth deciding whether to claim ahead of the weekend or let it continue building.
+One thing to watch on the equity side: C-R-C-L-x is the standout performer at over fifty percent annualized with forty-four dollars in pending fees on a seven-thousand dollar position — worth deciding today whether to claim or let them continue compounding.
 
-On the equity side — S-P-Y is at seven hundred and fifty-six dollars, up on the day. The VIX is at seventeen, which is Normal — range boundaries are holding comfortably across all six positions. Have a good one.
+On the equity side — S-P-Y is at five hundred and ninety-eight dollars, up on the day. The VIX is at eighteen, which is Normal — range boundaries are holding comfortably across all six positions. Have a good one.
