@@ -1,10 +1,15 @@
 // ============================================================
-// PSF Check — On-demand WETH/USDC Primary + ETH Short Hedge v2
+// PSF Check — On-demand WETH/USDC Primary + ETH Short Hedge v3
 // Airtable-driven WETH/USDC position discovery
 // WALLET_WETH_LP added — correct wallet for active LP position
 // NFT position ID read from Airtable Assets at runtime
 // On rollover: update Airtable Assets only, no code change needed
 // Triggered manually via GitHub Actions UI
+//
+// v3 fix: hedge cycle ID now read from Airtable Assets table
+//         (recgASxadhJMkNNry) at runtime, matching WETH pattern.
+//         Previously the hedge write had no [F.cycleId] field,
+//         causing the wrong or blank cycle ID on every record.
 // ============================================================
 
 import { ethers } from 'ethers';
@@ -82,41 +87,21 @@ async function airtableCreate(tableId, records) {
   return true;
 }
 
-async function airtableFetch(tableId, fields, filterFormula) {
+// Fetch a single asset record by record ID from the Assets table
+async function fetchAssetRecord(recordId) {
   const { default: fetch } = await import('node-fetch');
-  const params = new URLSearchParams();
-  fields.forEach(f => params.append('fields[]', f));
-  if (filterFormula) params.append('filterByFormula', filterFormula);
-  params.append('pageSize', '100');
-  const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}?${params}`,
-    { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
-  );
-  if (!res.ok) { console.error(`[Airtable fetch] ${await res.text().catch(() => '')}`); return []; }
-  const json = await res.json();
-  return json.records ?? [];
+  try {
+    const res = await fetch(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/${recordId}?returnFieldsByFieldId=true`,
+      { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
+    );
+    if (!res.ok) { console.error(`Asset fetch failed (${recordId}): ${res.status}`); return null; }
+    return await res.json();
+  } catch (e) { console.error(`Asset fetch error (${recordId}): ${e.message}`); return null; }
 }
 
 function dailyRecord(assetRecordId, inRange, extra = {}) {
   return { [F.asset]: [assetRecordId], [F.actionType]: 'Fee Check', [F.date]: NOW_UTC, [F.inRange]: inRange ? 'Yes' : 'No', ...extra };
-}
-
-// ============================================================
-// STARTUP — Fetch WETH/USDC asset from Airtable
-// ============================================================
-
-async function fetchWethAsset() {
-  // Fetch directly by record ID — avoids slash encoding issues in filterByFormula
-  const { default: fetch } = await import('node-fetch');
-  try {
-    const res = await fetch(
-      `https://api.airtable.com/v0/${AIRTABLE_BASE}/${ASSETS_TABLE}/recbVsmOWh9YOWPBZ?returnFieldsByFieldId=true`,
-      { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
-    );
-    if (!res.ok) { console.error(`WETH asset fetch failed: ${res.status}`); return null; }
-    const record = await res.json();
-    return record?.fields ? record : null;
-  } catch (e) { console.error(`WETH asset fetch error: ${e.message}`); return null; }
 }
 
 // ============================================================
@@ -148,7 +133,6 @@ async function getWethPosition(wethAsset) {
 
     const nft = new ethers.Contract(NFT_MANAGER, nftManagerABI, provider);
 
-    // Try Airtable NFT ID first
     let WETH_POS_ID = null;
     let raw = null;
 
@@ -174,7 +158,6 @@ async function getWethPosition(wethAsset) {
       }
     }
 
-    // Fallback: scan WALLET_WETH_LP
     if (!WETH_POS_ID) {
       const balance = await nft.balanceOf(WALLET_WETH_LP);
       const count = Number(balance);
@@ -305,7 +288,16 @@ async function getEthHedge() {
 async function main() {
   console.log(`\n====== PSF Check — ${NOW_UTC} ======`);
 
-  const wethAsset = await fetchWethAsset();
+  // v3: fetch both asset records in parallel to get cycle IDs at runtime
+  const [wethAsset, hedgeAsset] = await Promise.all([
+    fetchAssetRecord(ASSET.wethPrimary),
+    fetchAssetRecord(ASSET.ethHedge),
+  ]);
+
+  const wethCycleId  = wethAsset?.fields?.[AF.cycleId]  ?? null;
+  const hedgeCycleId = hedgeAsset?.fields?.[AF.cycleId] ?? null;
+
+  console.log(`Cycle IDs — LP: ${wethCycleId ?? 'NOT FOUND'} | Hedge: ${hedgeCycleId ?? 'NOT FOUND'}`);
 
   const [wethRes, hedgeRes] = await Promise.allSettled([
     getWethPosition(wethAsset),
@@ -321,19 +313,20 @@ async function main() {
   if (weth) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
       [F.positionValue]: weth.positionValue,
-      [F.cycleId]:       weth.cycleId,
+      [F.cycleId]:       wethCycleId,
       ...(weth.feeValue > 0 ? { [F.feeValue]: weth.feeValue } : {}),
       [F.notes]: `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
     })]);
-    if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}, cycleId: ${weth.cycleId}`); }
+    if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)}, cycleId: ${wethCycleId}`); }
   }
 
   if (hedge?.positionValue != null) {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.ethHedge, true, {
       [F.positionValue]: hedge.positionValue,
+      [F.cycleId]:       hedgeCycleId,   // v3: now correctly read from Assets table
       [F.notes]:         hedge.notes,
     })]);
-    if (ok) { written++; console.log(`✓ ETH Hedge: $${hedge.positionValue.toFixed(2)} | ${hedge.notes}`); }
+    if (ok) { written++; console.log(`✓ ETH Hedge: $${hedge.positionValue.toFixed(2)} | ${hedge.notes} | cycleId: ${hedgeCycleId}`); }
   }
 
   console.log(`\n====== PSF Check Complete — ${written} records written ======`);
