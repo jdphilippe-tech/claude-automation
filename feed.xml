@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Wednesday, June 3, 2026</title>
+      <description><![CDATA[The delta neutral cycle ten closed this morning when Eth broke below the band lower, ending a seven-day run with two hundred and fifty-nine dollars in fees while all six equity positions hold in range with C-R-C-L-x leading at sixty-three percent annualized.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-03.mp3" length="2409996" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-03</guid>
+      <pubDate>Wed, 03 Jun 2026 14:36:53 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Tuesday, June 2, 2026</title>
       <description><![CDATA[Eth has slipped into Near Drift Lower Zone with only forty-five dollars of room above the Drift boundary, while C-R-C-L-x is leading the equity side with a fifty-four percent fee rate on its expanded position.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-02.mp3" length="2273324" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-03.mp3" length="1476693" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-03</guid>
       <pubDate>Sun, 03 May 2026 14:18:22 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, May 2, 2026</title>
-      <description><![CDATA[Eth is just nineteen dollars below the Near Drift Upper boundary at two thousand three hundred and seven dollars, making zone monitoring the top priority for the day despite the cycle sitting well within delta tolerance.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-02.mp3" length="1436569" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-02</guid>
-      <pubDate>Sat, 02 May 2026 14:17:26 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
