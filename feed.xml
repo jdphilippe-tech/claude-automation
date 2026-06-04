@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, June 4, 2026</title>
+      <description><![CDATA[The delta neutral cycle opened today and sits in Normal Zone with a delta balance barely outside tolerance, while C-R-C-L-x leads the equity side at sixty-eight percent annualized with nearly one hundred dollars in pending fees ready to claim.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-04.mp3" length="2199763" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-04</guid>
+      <pubDate>Thu, 04 Jun 2026 14:25:22 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, June 3, 2026</title>
       <description><![CDATA[The delta neutral cycle ten closed this morning when Eth broke below the band lower, ending a seven-day run with two hundred and fifty-nine dollars in fees while all six equity positions hold in range with C-R-C-L-x leading at sixty-three percent annualized.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-03.mp3" length="2409996" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-04.mp3" length="1483381" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-04</guid>
       <pubDate>Mon, 04 May 2026 14:18:59 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Sunday, May 3, 2026</title>
-      <description><![CDATA[The delta neutral strategy cycle enters day twenty-one with Eth sitting just eleven dollars below Near Drift Upper and the hedge slightly outside balance, though delta remains within Normal Zone tolerance.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-03.mp3" length="1476693" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-03</guid>
-      <pubDate>Sun, 03 May 2026 14:18:22 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
