@@ -1,15 +1,15 @@
-Good morning. It's Wednesday, June 3rd.
+Good morning. It's Thursday, June fourth.
 
-Eth is at one thousand eight hundred and forty-eight dollars — and that's the headline this morning. Eth broke below the cycle ten band lower of one thousand eight hundred and ninety-one dollars overnight, and the LP and hedge were both closed at around two twenty-seven UTC. There is no active delta neutral position right now. Cycle eleven has not yet opened.
+Eth is at one thousand seven hundred and eighty-six dollars, sitting in Normal Zone. You have about fifty-seven dollars of breathing room before Near Drift. No action needed.
 
-The cycle ten run was seven days. The LP finished down two thousand four hundred and fifty-eight dollars on price since open. The hedge recovered one thousand five hundred and forty-five dollars of that, leaving a net price delta at close of nine hundred and thirteen dollars. Total fees collected over the cycle were two hundred and fifty-nine dollars, averaging about thirty-six dollars a day — a fee rate of around thirty-eight percent annualized on total deployed capital.
+The current delta neutral strategy cycle is brand new — it opened earlier today, just under fourteen hours ago. The LP is down one hundred and sixty-three dollars on price since open, the hedge is up seventeen dollars. Delta balance is one hundred and forty-six dollars, which is just slightly outside tolerance for Normal Zone — the threshold sits at one hundred and forty-two dollars. The gap is less than four dollars, so this is a watch item rather than an action item right now. Total fees this cycle are one hundred dollars on thirty-four thousand dollars of total deployed capital. With the cycle this young, a daily fee rate isn't yet meaningful — check back tomorrow for a proper read.
 
-One thing to watch on the delta neutral side: with no active position and Eth sitting below the closed band at one thousand eight hundred and forty-eight, the key decision now is when and where to open cycle eleven. Eth needs to show signs of stabilizing before redeploying capital.
+One thing to watch on the delta neutral side: the cycle only opened about fourteen hours ago, so all metrics are still very early. The delta is barely over the Normal Zone tolerance line — monitor it through the day, but no hedge adjustment is warranted yet.
 
-On the crypto side — market sentiment is Fear at twenty-eight. Bitcoin is at sixty-seven thousand two hundred and fifty dollars. Volatility data was unavailable at brief time, but the cycle closure itself signals a meaningful Eth move — the band center for cycle eleven will need to be reset closer to current prices.
+On the crypto side — market sentiment is Extreme Fear at twenty-three. Bitcoin is at sixty-two thousand two hundred dollars. ETH thirty-day volatility is running under six percent — quite compressed — making the three-sixty point band comfortably wide for current conditions.
 
-Switching to the equity side. The six xStocks positions are averaging about nine and a half days into their current cycles. Total fees across all positions since last reset are one hundred and ninety-four dollars, averaging about twenty-six dollars a day — a blended fee rate of around thirty percent annualized on deployed capital. All six positions are currently in range — no rebalancing needed.
+Switching to the equity side. The six xStocks positions are averaging about ten and a half days into their current cycles. Total fees across all positions are two hundred and thirty-four dollars, averaging about twenty-eight dollars a day — a blended fee rate of around thirty-three percent annualized on deployed capital.
 
-One thing to watch on the equity side: C-R-C-L-x is the standout this week, running at sixty-three percent annualized on seven thousand one hundred and forty-six dollars of deployed capital — nearly double the blended rate. Keep an eye on it for any range drift given the outsized fee generation.
+One thing to watch on the equity side: C-R-C-L-x is running at sixty-eight percent annualized and has nearly one hundred dollars in pending fees sitting on seven thousand one hundred and forty-six dollars of deployed capital — the strongest performer in the book right now, and worth deciding today whether to claim or let it keep compounding.
 
-On the equity side — S-P-Y is at seven hundred and fifty-seven dollars, up on the day. The VIX is at sixteen, which is Normal — range boundaries are holding comfortably across all six positions. Have a good one.
+On the equity side — S-P-Y is at seven hundred and fifty-one dollars, down on the day. VIX data was unavailable at brief time. Have a good one.
