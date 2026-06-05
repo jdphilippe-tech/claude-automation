@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, June 5, 2026</title>
+      <description><![CDATA[Delta neutral cycle is one day old with a delta imbalance of six hundred and thirty-eight dollars — nearly five times Normal Zone tolerance — while Eth sits just fifteen dollars above the Near Drift boundary.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-05.mp3" length="2292550" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-05</guid>
+      <pubDate>Fri, 05 Jun 2026 14:22:43 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, June 4, 2026</title>
       <description><![CDATA[The delta neutral cycle opened today and sits in Normal Zone with a delta balance barely outside tolerance, while C-R-C-L-x leads the equity side at sixty-eight percent annualized with nearly one hundred dollars in pending fees ready to claim.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-04.mp3" length="2199763" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-05.mp3" length="1545657" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-05</guid>
       <pubDate>Tue, 05 May 2026 14:20:03 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Monday, May 4, 2026</title>
-      <description><![CDATA[The strategy enters day twenty-two of cycle nine in Near Drift Zone with Eth just fifteen dollars below the drift boundary and delta balance outside tolerance at one hundred and thirty-four dollars versus a sixty-four dollar threshold — a hedge adjustment may be warranted today.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-04.mp3" length="1483381" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-04</guid>
-      <pubDate>Mon, 04 May 2026 14:18:59 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
