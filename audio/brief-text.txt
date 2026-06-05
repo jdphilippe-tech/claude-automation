@@ -1,15 +1,15 @@
-Good morning. It's Thursday, June fourth.
+Good morning. It's Friday, June 5th.
 
-Eth is at one thousand seven hundred and eighty-six dollars, sitting in Normal Zone. You have about fifty-seven dollars of breathing room before Near Drift. No action needed.
+Eth is at one thousand six hundred and sixty-nine dollars, sitting in Normal Zone — but only just. You have about fifteen dollars of breathing room before Near Drift. No action required yet, but worth keeping an eye on.
 
-The current delta neutral strategy cycle is brand new — it opened earlier today, just under fourteen hours ago. The LP is down one hundred and sixty-three dollars on price since open, the hedge is up seventeen dollars. Delta balance is one hundred and forty-six dollars, which is just slightly outside tolerance for Normal Zone — the threshold sits at one hundred and forty-two dollars. The gap is less than four dollars, so this is a watch item rather than an action item right now. Total fees this cycle are one hundred dollars on thirty-four thousand dollars of total deployed capital. With the cycle this young, a daily fee rate isn't yet meaningful — check back tomorrow for a proper read.
+The current delta neutral strategy cycle is one day in. The LP is down one thousand four hundred and two dollars on price since open, the hedge is up seven hundred and sixty-three dollars. Delta balance is six hundred and thirty-eight dollars, which is outside tolerance for Normal Zone — the threshold is one hundred and thirty-six dollars, so you're running about four and a half times over. A hedge adjustment may be worth reviewing. Total fees this cycle are two hundred and twenty-nine dollars, averaging about one hundred and forty-five dollars a day — though the cycle only opened yesterday, so that annualized rate of around two hundred and forty-two percent will normalize as the cycle matures.
 
-One thing to watch on the delta neutral side: the cycle only opened about fourteen hours ago, so all metrics are still very early. The delta is barely over the Normal Zone tolerance line — monitor it through the day, but no hedge adjustment is warranted yet.
+One thing to watch on the delta neutral side: the delta imbalance is significant at six hundred and thirty-eight dollars against a one hundred and thirty-six dollar tolerance, and Eth is sitting just fifteen dollars above the Near Drift Lower boundary. If Eth dips even slightly, you'll be in Near Drift with a tighter tolerance and an already-stretched delta — consider whether a hedge trim is warranted today.
 
-On the crypto side — market sentiment is Extreme Fear at twenty-three. Bitcoin is at sixty-two thousand two hundred dollars. ETH thirty-day volatility is running under six percent — quite compressed — making the three-sixty point band comfortably wide for current conditions.
+On the crypto side — market sentiment is Fear at twenty-eight. Bitcoin is at ninety-six thousand dollars. Volatility looks moderate — the three-sixty point band is reasonable given current conditions.
 
-Switching to the equity side. The six xStocks positions are averaging about ten and a half days into their current cycles. Total fees across all positions are two hundred and thirty-four dollars, averaging about twenty-eight dollars a day — a blended fee rate of around thirty-three percent annualized on deployed capital.
+Switching to the equity side. The six xStocks positions are averaging about eleven days into their current cycles. Total fees across all positions are two hundred and thirty-five dollars, averaging about twenty-five dollars a day — a blended fee rate of around twenty-nine percent annualized on deployed capital. All six positions are currently in range.
 
-One thing to watch on the equity side: C-R-C-L-x is running at sixty-eight percent annualized and has nearly one hundred dollars in pending fees sitting on seven thousand one hundred and forty-six dollars of deployed capital — the strongest performer in the book right now, and worth deciding today whether to claim or let it keep compounding.
+One thing to watch on the equity side: C-R-C-L-x is leading the book with a sixty percent fee APR and nearly one hundred dollars in pending fees on a seven thousand dollar position — worth deciding today whether to claim or let it run into the weekend.
 
-On the equity side — S-P-Y is at seven hundred and fifty-one dollars, down on the day. VIX data was unavailable at brief time. Have a good one.
+On the equity side — S-P-Y is at seven hundred and fifty-five dollars, up on the day. The VIX is at fifteen point six, which is Normal — range boundaries are holding comfortably across all positions. Have a good one.
