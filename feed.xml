@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, June 6, 2026</title>
+      <description><![CDATA[The delta neutral strategy is between cycles after C-eleven closed Thursday while Friday's equity selloff — Nasdaq down four percent and VIX spiking to twenty-one — puts all six xStocks positions at elevated out-of-range risk heading into the weekend.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-06.mp3" length="2350646" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-06</guid>
+      <pubDate>Sat, 06 Jun 2026 14:23:52 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, June 5, 2026</title>
       <description><![CDATA[Delta neutral cycle is one day old with a delta imbalance of six hundred and thirty-eight dollars — nearly five times Normal Zone tolerance — while Eth sits just fifteen dollars above the Near Drift boundary.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-05.mp3" length="2292550" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-06.mp3" length="1399371" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-06</guid>
       <pubDate>Wed, 06 May 2026 14:19:36 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, May 5, 2026</title>
-      <description><![CDATA[Eth has crossed above the Drift Upper boundary into Drift Zone at two thousand three hundred and seventy-nine dollars, with delta outside tolerance at two hundred and fifty-two dollars — hedge review is likely needed today.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-05.mp3" length="1545657" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-05</guid>
-      <pubDate>Tue, 05 May 2026 14:20:03 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
