@@ -1,15 +1,13 @@
-Good morning. It's Saturday, June sixth.
+Good morning. It's Sunday, June seventh.
 
-Eth is at one thousand five hundred and sixty-six dollars. The delta neutral strategy has no active position right now — C-eleven closed on Thursday after Eth broke below Drift Lower. Both the LP and the standalone short have been exited, and the system is fully in stables awaiting a reentry signal.
+The delta neutral strategy does not have an active cycle right now. Both the LP and the hedge were closed on Thursday, June fifth, and the position is currently sitting in stables. No band levels, no fees, no delta to track — just waiting for the next cycle entry signal.
 
-There are no live P-and-L figures to report for the delta neutral side today. The cycle closed cleanly. No action needed.
+One thing to watch on the delta neutral side: this is a good window to review the entry criteria for the next cycle. Eth is at two thousand five hundred and sixteen dollars — if that level holds or consolidates, it could be a candidate range center for the next deployment.
 
-One thing to watch on the delta neutral side: Eth is sitting just below the C-eleven Band Lower of one thousand five hundred and seventy-six dollars. The price structure is still extended to the downside, so hold stables until the four-hour chart shows a confirmed higher low and higher high before redeploying.
+On the crypto side — market sentiment is Fear at twenty-eight. Bitcoin is at one hundred and five thousand two hundred dollars. Volatility looks elevated right now, which may argue for waiting for a calmer entry window before reopening the LP.
 
-On the crypto side — market sentiment is Extreme Fear at twelve. Bitcoin is at sixty-one thousand dollars. Eth's thirty-day volatility is running about seven percent — relatively contained. The three-sixty point band remains appropriate sizing for when the next cycle opens.
+Switching to the equity side. The five eligible xStocks positions are averaging about fourteen days into their current cycles. Total fees across all positions are two hundred and twenty-two dollars, averaging about nineteen dollars a day — a blended fee rate of around twenty-eight percent annualized on deployed capital. C-R-C-L-x reset less than a day ago under a new cycle — fee rate not yet meaningful there.
 
-Switching to the equity side. The six xStocks positions are averaging about twelve days into their current cycles. Total fees across all positions since their last resets are two hundred and sixty-eight dollars, averaging about twenty-six dollars a day — a blended fee rate of around thirty percent annualized on deployed capital. Apple-x missed its daily fee check today — last recorded Thursday — which may indicate it moved out of range on Friday and is worth a manual look.
+One thing to watch on the equity side: Apple-x is leading the pack at nearly forty-four percent annualized on a five thousand four hundred dollar position — worth keeping an eye on range status as it accounts for a meaningful share of daily fee output.
 
-One thing to watch on the equity side: Friday's session was rough — Nasdaq fell four percent, and the VIX spiked thirty-four percent in a single day. All six positions face elevated out-of-range risk heading into the weekend. C-R-C-L-x is the top earner at fifty-four percent annualized with one hundred dollars in pending fees, but the priority Monday is a full range status check across all positions before making any claims or rebalancing moves.
-
-On the equity side — S-P-Y closed Friday at seven hundred and thirty-seven dollars. The VIX is at twenty-one, which is Elevated — that Friday semiconductor selloff raises out-of-range risk across all positions, and a full range check first thing Monday is the move. Have a good one.
+On the equity side — S-P-Y closed Thursday at approximately seven hundred and thirty-eight dollars. The VIX is at twenty-one point five one, which is Elevated — elevated volatility increases out-of-range risk across all positions, so range boundaries across the equity book deserve a closer look this week. Have a good one.
