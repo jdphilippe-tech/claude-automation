@@ -75,12 +75,15 @@ const ASSET = {
   lighterLLP:   'recEFiaxgavObYWzL',
   lighterEdge:  'rectz3Zo3aDbe4GgL',
   lighterLIT:   'receiu02rkzc3quDW',
-  tslax:  { recordId: 'recYwaRC8FTZQaMJK', cycleId: 'TSLAx-C3',  nftMint: '58k7KQAYULuNygmxjuRyvbv9xFshVANGb61xMokn5UKw', poolId: 'HHQUnUbmWLrYzkscDY1C3deEFbGtiGBGoHjpANogmvum' },
-  nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', cycleId: 'NVDAx-C1',  nftMint: 'J7qm9jifiKg7CyWDbmdDUNokhgs7JvwZmy2jnJ7qmN5Z', poolId: '4KqQN6u1pFKroFE2jVEhoepAMRKPcuAzWVDCgm9zRBYN' },
-  aaplx:  { recordId: 'recGF59dwIOnE8fm2', cycleId: 'AAPLx-C2',  nftMint: 'ByFkf4R7cjXVG33Xo8fDmx86cmbAbketb8DCZfvwLidY', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
-  googlx: { recordId: 'recRxStry17D0ZGB5', cycleId: 'GOOGLx-C2', nftMint: 'FhE1nymLRWGnAGfsx2EdLFYqeSPfRsuEZVk2Zx7ridcU', poolId: 'B8YAwjGYk6qidWzGBXMAxP7nYfG8g74EZ3Y4gFSsobRw' },
-  crclx:  { recordId: 'recPq2Ee2MsoMa21S', cycleId: 'CRCLx-C3',  nftMint: 'C5ASQaMW9sUfNSFLds692y5AYhucbZo48hyxoc1tedD6', poolId: 'G39wywquKbHK8F2wZZZFX3fcsyG91VCCbbr6WEVp5axy' },
-  spyx:   { recordId: 'rechX4b2anmi82enx', cycleId: 'SPYx-C2',   nftMint: '9mPV6DTfnowWKtfW96hEfffpPruVs6YBiNsBUCAvHxo7', poolId: '6truu3rZuiB9rKQg4VYC3Dt3QwV7DgwGqXrYUcrvnDDE' },
+  // cycleId and nftMint are fetched from Airtable Assets table at runtime.
+  // Only recordId (permanent) and poolId (fixed per trading pair) stay hardcoded.
+  // On cycle rollover: update Airtable Assets only — no code change needed.
+  tslax:  { recordId: 'recYwaRC8FTZQaMJK', poolId: 'HHQUnUbmWLrYzkscDY1C3deEFbGtiGBGoHjpANogmvum' },
+  nvdax:  { recordId: 'recdQq6r8iDl3BGYZ', poolId: '4KqQN6u1pFKroFE2jVEhoepAMRKPcuAzWVDCgm9zRBYN' },
+  aaplx:  { recordId: 'recGF59dwIOnE8fm2', poolId: 'CKwJZwm7oj3nu4653N1EpDrqXbXAYXoPFiPeEnLouF8y' },
+  googlx: { recordId: 'recRxStry17D0ZGB5', poolId: 'B8YAwjGYk6qidWzGBXMAxP7nYfG8g74EZ3Y4gFSsobRw' },
+  crclx:  { recordId: 'recPq2Ee2MsoMa21S', poolId: 'G39wywquKbHK8F2wZZZFX3fcsyG91VCCbbr6WEVp5axy' },
+  spyx:   { recordId: 'rechX4b2anmi82enx', poolId: '6truu3rZuiB9rKQg4VYC3Dt3QwV7DgwGqXrYUcrvnDDE' },
 };
 
 // ---- Lending position record IDs ----
@@ -186,6 +189,36 @@ async function airtableFetchRecord(tableId, recordId) {
   );
   if (!res.ok) { console.error(`[Airtable fetch] ${tableId}/${recordId} — HTTP ${res.status}`); return null; }
   return await res.json();
+}
+
+// Fetch cycleId and nftMint for all 6 xStock positions from Airtable Assets table.
+// recordId and poolId remain hardcoded (never change). Only cycleId and nftMint
+// change on cycle rollover — update Airtable Assets, no code change needed.
+async function fetchXStockAssets() {
+  const xstockKeys = ['tslax', 'nvdax', 'aaplx', 'googlx', 'crclx', 'spyx'];
+  const results = {};
+
+  await Promise.all(xstockKeys.map(async (key) => {
+    const meta = ASSET[key];
+    if (!meta?.recordId) return;
+    const record = await airtableFetchRecord('tblrATIQI0ld9tz1y', meta.recordId);
+    const status  = record?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+    const cycleId = record?.fields?.['fld0T538WMoPQ5bgL'] ?? null;
+    const nftMint = record?.fields?.['fldpPTHyGfrSCQO0F'] ?? null;
+    if (status !== 'Active') {
+      console.log(`  [xStocks] ${key}: status=${status} — skipping (not Active)`);
+      results[key] = { ...meta, cycleId: null, nftMint: null };
+      return;
+    }
+    if (!cycleId || !nftMint) {
+      console.error(`  [xStocks] ${key}: Active but missing cycleId=${cycleId} or nftMint=${nftMint} in Airtable Assets`);
+    } else {
+      console.log(`  [xStocks] ${key}: status=Active, cycleId=${cycleId}, nftMint=${nftMint.slice(0, 12)}...`);
+    }
+    results[key] = { ...meta, cycleId, nftMint };
+  }));
+
+  return results;
 }
 
 function dailyRecord(assetRecordId, inRange, extra = {}) {
@@ -617,15 +650,20 @@ function parsePoolAccount(data) {
   };
 }
 
-async function getRaydiumPositions() {
+async function getRaydiumPositions(xstockAssets) {
   console.log(`\n--- Raydium xStocks CLMM ${RAYDIUM_DRY_RUN ? '[DRY RUN]' : '[LIVE]'} ---`);
   const results = [];
 
-  const xstockPositions = Object.entries(ASSET)
-    .filter(([, v]) => typeof v === 'object' && v.nftMint)
+  // Use Airtable-driven asset data (cycleId + nftMint from Assets table at runtime)
+  const xstockPositions = Object.entries(xstockAssets)
+    .filter(([, v]) => v.nftMint && v.cycleId)
     .map(([key, v]) => ({ key, ...v }));
 
-  console.log(`Processing ${xstockPositions.length} hardcoded xStock positions`);
+  const skipped = Object.entries(xstockAssets).filter(([, v]) => !v.nftMint || !v.cycleId);
+  if (skipped.length > 0) {
+    console.warn(`  Skipping ${skipped.length} position(s) with missing Airtable data: ${skipped.map(([k]) => k).join(', ')}`);
+  }
+  console.log(`Processing ${xstockPositions.length} xStock positions (from Airtable Assets)`);
 
   for (const posConfig of xstockPositions) {
     const { key, nftMint, poolId } = posConfig;
@@ -910,13 +948,23 @@ async function main() {
   console.log(`\n====== Daily Portfolio Check v39 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
+  // Fetch xStock asset metadata (cycleId + nftMint) from Airtable before running modules
+  console.log('\n--- Fetching xStock asset metadata from Airtable ---');
+  const xstockAssets = await fetchXStockAssets();
+
+  // Status-gated module execution — skip API calls for inactive/closed assets
+  const wethActive  = wethAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] === 'Active';
+  const hedgeActive = hedgeAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] === 'Active';
+  if (!wethActive)  console.log('WETH/USDC position is not Active — skipping LP check');
+  if (!hedgeActive) console.log('ETH Hedge position is not Active — skipping Hyperliquid check');
+
   const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes] = await Promise.allSettled([
-    getWethPosition(),
+    wethActive  ? getWethPosition() : Promise.resolve(null),
     getMoonwellData(),
     getSuilendData(),
-    getRaydiumPositions(),
+    getRaydiumPositions(xstockAssets),
     getLighterPositions(),
-    getEthHedge(),
+    hedgeActive ? getEthHedge()     : Promise.resolve(null),
   ]);
 
   const weth     = wethRes.status     === 'fulfilled' ? wethRes.value     : null;
@@ -927,8 +975,8 @@ async function main() {
   const hedge    = hedgeRes.status    === 'fulfilled' ? hedgeRes.value    : null;
 
   console.log('\n--- Fetching dynamic cycle IDs from Asset table ---');
-  let wethCycleId  = 'WETH-PRIMARY-C10'; // fallback
-  let hedgeCycleId = 'HEDGE-C10';        // fallback
+  let wethCycleId  = null; // loaded from Airtable Assets — no hardcoded fallback
+  let hedgeCycleId = null; // loaded from Airtable Assets — no hardcoded fallback
   try {
     const [wethAssetRes, hedgeAssetRes] = await Promise.all([
       airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.wethPrimary),
@@ -940,9 +988,11 @@ async function main() {
     if (hedgeAssetRes?.fields?.['fld0T538WMoPQ5bgL']) {
       hedgeCycleId = hedgeAssetRes.fields['fld0T538WMoPQ5bgL'];
     }
-    console.log(`✓ Cycle IDs — LP: ${wethCycleId} | Hedge: ${hedgeCycleId}`);
+    const wethStatus  = wethAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+    const hedgeStatus = hedgeAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+    console.log(`✓ Cycle IDs — LP: ${wethCycleId} (${wethStatus}) | Hedge: ${hedgeCycleId} (${hedgeStatus})`);
   } catch (e) {
-    console.error(`Cycle ID fetch failed: ${e.message} — using fallbacks (${wethCycleId} / ${hedgeCycleId})`);
+    console.error(`Cycle ID fetch failed: ${e.message} — cycle IDs will be null, records may be skipped`);
   }
 
   console.log('\n--- Writing to Airtable ---');
@@ -950,6 +1000,9 @@ async function main() {
 
   // WETH/USDC Primary
   if (weth) {
+    if (!wethCycleId) {
+      console.error('Skipping WETH/USDC write — cycle ID unavailable (update Airtable Assets)');
+    } else {
     const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.wethPrimary, weth.inRange, {
       [F.positionValue]: weth.positionValue,
       [F.cycleId]:       wethCycleId,
@@ -957,16 +1010,21 @@ async function main() {
       [F.notes]: `ETH: $${weth.ethPrice?.toFixed(0)} | Tick: ${weth.currentTick} | Range: [${weth.tickLower}, ${weth.tickUpper}]`,
     })]);
     if (ok) { written++; console.log(`✓ WETH/USDC: $${weth.positionValue?.toFixed(2)}, fees: $${weth.feeValue?.toFixed(2)} | Cycle: ${wethCycleId}`); }
+    } // end cycleId guard
   }
 
   // ETH Short Hedge (Hyperliquid)
   if (hedge?.positionValue != null) {
-    const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.ethHedge, true, {
-      [F.positionValue]: hedge.positionValue,
-      [F.cycleId]:       hedgeCycleId,
-      [F.notes]:         hedge.notes,
-    })]);
-    if (ok) { written++; console.log(`✓ ETH Hedge: $${hedge.positionValue.toFixed(2)} | ${hedge.notes} | Cycle: ${hedgeCycleId}`); }
+    if (!hedgeCycleId) {
+      console.error('Skipping ETH Hedge write — cycle ID unavailable (update Airtable Assets)');
+    } else {
+      const ok = await airtableCreate(DAILY_TABLE, [dailyRecord(ASSET.ethHedge, true, {
+        [F.positionValue]: hedge.positionValue,
+        [F.cycleId]:       hedgeCycleId,
+        [F.notes]:         hedge.notes,
+      })]);
+      if (ok) { written++; console.log(`✓ ETH Hedge: $${hedge.positionValue.toFixed(2)} | ${hedge.notes} | Cycle: ${hedgeCycleId}`); }
+    }
   }
 
   // Moonwell
