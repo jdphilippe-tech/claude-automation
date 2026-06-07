@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Sunday, June 7, 2026</title>
+      <description><![CDATA[The delta neutral strategy is in stables with no active cycle after closing on June fifth, while the five eligible equity positions are averaging twenty-eight percent annualized fees and C-R-C-L-x has just reopened today under a fresh cycle.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-07.mp3" length="1834048" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-07</guid>
+      <pubDate>Sun, 07 Jun 2026 14:20:26 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, June 6, 2026</title>
       <description><![CDATA[The delta neutral strategy is between cycles after C-eleven closed Thursday while Friday's equity selloff — Nasdaq down four percent and VIX spiking to twenty-one — puts all six xStocks positions at elevated out-of-range risk heading into the weekend.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-06.mp3" length="2350646" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-07.mp3" length="1264370" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-07</guid>
       <pubDate>Thu, 07 May 2026 14:18:58 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, May 6, 2026</title>
-      <description><![CDATA[Delta neutral cycle is twenty-four days in with Eth pressing into Near Drift Zone just six dollars from the Drift boundary, and delta outside tolerance — a hedge adjustment may be needed today.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-06.mp3" length="1399371" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-06</guid>
-      <pubDate>Wed, 06 May 2026 14:19:36 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
