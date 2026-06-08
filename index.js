@@ -1031,21 +1031,21 @@ async function getKaminoPositions() {
 
     const kaminoPositionIds = new Set(Object.values(KAMINO_POSITIONS));
 
-    // Fetch Lending Actions with token amounts for Kamino positions only.
-    // Filter using the linked position's display name — all Kamino positions are named
-    // "Kamino XXXx Supply", so FIND('Kamino', {Position}) reliably isolates them.
-    // ARRAYJOIN with record IDs returns HTTP 422 — display name search is the correct pattern.
+    // Fetch Lending Actions with token amounts.
+    // Use returnFieldsByFieldId=true so response keys match our LF field ID constants.
+    // Filter only by token amount presence (formula uses display names — position field
+    // name is unknown so we filter by position ID in JavaScript after fetch).
     let lendingActionsRaw = [];
     try {
       const { default: fetch } = await import('node-fetch');
       const params = new URLSearchParams();
       [LF.position, LF.tokenAmt, LF.date].forEach(f => params.append('fields[]', f));
-      params.append('filterByFormula', `AND(FIND('Kamino', {Position}), {Token Amount} > 0)`);
-      params.append('sort[0][field]', 'Date');
+      params.append('filterByFormula', '{Token Amount} > 0');
+      params.append('sort[0][field]', LF.date);
       params.append('sort[0][direction]', 'desc');
-      params.append('pageSize', '50');
+      params.append('pageSize', '100');
       const res = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${params}`,
+        `https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${params}&returnFieldsByFieldId=true`,
         { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
       );
       if (res.ok) {
