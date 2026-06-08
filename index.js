@@ -1087,13 +1087,34 @@ async function main() {
   console.log(`\n====== Daily Portfolio Check v39 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
+  // Fetch WETH + Hedge asset records first — needed for both status gate and cycle IDs.
+  // Must be hoisted outside try/catch so variables are in scope for the status gate below.
+  console.log('\n--- Fetching asset records from Airtable ---');
+  let wethAssetRes  = null;
+  let hedgeAssetRes = null;
+  try {
+    [wethAssetRes, hedgeAssetRes] = await Promise.all([
+      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.wethPrimary),
+      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.ethHedge),
+    ]);
+  } catch (e) {
+    console.error(`Asset record fetch failed: ${e.message}`);
+  }
+
+  // Cycle IDs (read from already-fetched asset records)
+  const wethCycleId  = wethAssetRes?.fields?.['fld0T538WMoPQ5bgL'] ?? null;
+  const hedgeCycleId = hedgeAssetRes?.fields?.['fld0T538WMoPQ5bgL'] ?? null;
+  const wethStatus   = wethAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+  const hedgeStatus  = hedgeAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+  console.log(`✓ Cycle IDs — LP: ${wethCycleId} (${wethStatus}) | Hedge: ${hedgeCycleId} (${hedgeStatus})`);
+
   // Fetch xStock asset metadata (cycleId + nftMint) from Airtable before running modules
   console.log('\n--- Fetching xStock asset metadata from Airtable ---');
   const xstockAssets = await fetchXStockAssets();
 
   // Status-gated module execution — skip API calls for inactive/closed assets
-  const wethActive  = wethAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] === 'Active';
-  const hedgeActive = hedgeAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] === 'Active';
+  const wethActive  = wethStatus === 'Active';
+  const hedgeActive = hedgeStatus === 'Active';
   if (!wethActive)  console.log('WETH/USDC position is not Active — skipping LP check');
   if (!hedgeActive) console.log('ETH Hedge position is not Active — skipping Hyperliquid check');
 
@@ -1114,27 +1135,6 @@ async function main() {
   const lighter  = lighterRes.status  === 'fulfilled' ? lighterRes.value  : {};
   const hedge    = hedgeRes.status    === 'fulfilled' ? hedgeRes.value    : null;
   const kamino   = kaminoRes.status   === 'fulfilled' ? kaminoRes.value   : {};
-
-  console.log('\n--- Fetching dynamic cycle IDs from Asset table ---');
-  let wethCycleId  = null; // loaded from Airtable Assets — no hardcoded fallback
-  let hedgeCycleId = null; // loaded from Airtable Assets — no hardcoded fallback
-  try {
-    const [wethAssetRes, hedgeAssetRes] = await Promise.all([
-      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.wethPrimary),
-      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.ethHedge),
-    ]);
-    if (wethAssetRes?.fields?.['fld0T538WMoPQ5bgL']) {
-      wethCycleId = wethAssetRes.fields['fld0T538WMoPQ5bgL'];
-    }
-    if (hedgeAssetRes?.fields?.['fld0T538WMoPQ5bgL']) {
-      hedgeCycleId = hedgeAssetRes.fields['fld0T538WMoPQ5bgL'];
-    }
-    const wethStatus  = wethAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
-    const hedgeStatus = hedgeAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
-    console.log(`✓ Cycle IDs — LP: ${wethCycleId} (${wethStatus}) | Hedge: ${hedgeCycleId} (${hedgeStatus})`);
-  } catch (e) {
-    console.error(`Cycle ID fetch failed: ${e.message} — cycle IDs will be null, records may be skipped`);
-  }
 
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
