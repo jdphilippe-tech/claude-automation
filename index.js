@@ -1027,22 +1027,40 @@ async function getKaminoPositions() {
     const KAMINO_OBLIGATION = process.env.KAMINO_XSTOCKS_OBLIGATION ?? '7CBqV8bcyYDwtdJYnbbd1EfT5JaQJhbuHntbr5w5CQn9';
 
     let obligation = null;
+
+    // Try every plausible Kamino API pattern for user obligation data.
+    // Log each attempt so we can see which path the API actually uses.
     const obligationEndpoints = [
+      // Obligation PDA address patterns
       `${KAMINO_API}/kamino-market/${marketAddress}/obligations/${KAMINO_OBLIGATION}`,
-      `${KAMINO_API}/v2/kamino-market/${marketAddress}/obligations/${KAMINO_OBLIGATION}`,
       `${KAMINO_API}/kamino-market/${marketAddress}/obligation/${KAMINO_OBLIGATION}`,
+      // Wallet-based user portfolio patterns
+      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/positions`,
+      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/lend`,
+      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/portfolio`,
+      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/lend-positions`,
+      `${KAMINO_API}/kamino-market/${marketAddress}/users/${WALLET_KAMINO_LENDING}`,
+      `${KAMINO_API}/kamino-market/${marketAddress}/user-obligation/${WALLET_KAMINO_LENDING}`,
+      `${KAMINO_API}/kamino-market/${marketAddress}/depositors/${WALLET_KAMINO_LENDING}`,
     ];
 
     for (const endpoint of obligationEndpoints) {
+      const shortUrl = endpoint.replace(WALLET_KAMINO_LENDING, '5yiT..').replace(marketAddress, '5wJe..').replace(KAMINO_OBLIGATION, '7CBq..');
       const res = await fetchWithTimeout(endpoint);
+      if (res === null) { console.log(`  [skip] ${shortUrl}`); continue; }
       if (res && !res.error) {
         obligation = res;
-        console.log(`  Obligation fetched via: ...obligations/${KAMINO_OBLIGATION.slice(0, 8)}...`);
+        console.log(`  ✓ Obligation fetched via: ${shortUrl}`);
         break;
       }
+      console.log(`  [err] ${shortUrl}: ${JSON.stringify(res)?.slice(0, 60)}`);
     }
 
-    if (!obligation) throw new Error('Could not fetch Kamino obligation — all endpoints failed');
+    if (!obligation) {
+      // Log all raw response codes for debugging
+      console.error('Kamino obligation: all endpoints failed — check logs above for working path');
+      throw new Error('Could not fetch Kamino obligation');
+    }
 
     // Step 4: Parse deposits from obligation
     // Kamino API may return deposits at different keys depending on version
