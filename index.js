@@ -98,6 +98,21 @@ const LPOS = {
   suilendBorrow:  'rec7fEjrou7kLZ29U',
 };
 
+// ---- Kamino xStocks Lending (Solana) ----
+const KAMINO_API             = 'https://api.kamino.finance';
+const WALLET_KAMINO_LENDING  = '5yiTWdskR7yd5RXvs7MJLqWsn6n7geM8SzvYjUpRHrTX';
+
+// Airtable Lending Position record IDs for 6 Kamino xStocks collateral positions.
+// These are permanent record IDs — never change. Status/APY data is fetched live.
+const KAMINO_POSITIONS = {
+  SPYx:   'recAAa654hqvJapSU',
+  TSLAx:  'recBpvLXaP5Bz7zUk',
+  QQQx:   'rec8BTB46urdsYJtx',
+  GOOGLx: 'recvriddPuQUNYsWL',
+  NVDAx:  'recr9BpTygVxkeyCU',
+  AAPLx:  'rectkbR1l6gvcx3nl',
+};
+
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
 const MARKETS = [
@@ -941,6 +956,130 @@ async function getEthHedge() {
 }
 
 // ============================================================
+// MODULE: Kamino xStocks Lending (Solana)
+// ============================================================
+
+async function getKaminoPositions() {
+  console.log('\n--- Kamino xStocks Lending ---');
+  const results = {};
+
+  try {
+    // Step 1: Discover xStocks market address dynamically
+    const markets = await fetchWithTimeout(`${KAMINO_API}/kamino-market/configs`);
+    if (!Array.isArray(markets)) throw new Error(`Unexpected markets response: ${JSON.stringify(markets)?.slice(0, 80)}`);
+
+    const xstocksMarket = markets.find(m =>
+      m.name?.toLowerCase().includes('xstock') ||
+      m.description?.toLowerCase().includes('xstock')
+    );
+    if (!xstocksMarket) {
+      console.error(`xStocks market not found. Available: ${markets.map(m => m.name).join(', ')}`);
+      throw new Error('xStocks market not found in Kamino configs');
+    }
+
+    const marketAddress = xstocksMarket.lendingMarket;
+    console.log(`  Market: ${xstocksMarket.name} (${marketAddress})`);
+
+    // Step 2: Fetch reserve metrics (APY per token)
+    const reserveMetrics = await fetchWithTimeout(
+      `${KAMINO_API}/kamino-market/${marketAddress}/reserves/metrics`
+    );
+
+    const apyBySymbol = {};
+    const metricsArr = Array.isArray(reserveMetrics) ? reserveMetrics : (reserveMetrics?.reserves ?? []);
+    for (const r of metricsArr) {
+      const sym = (r.liquidityToken ?? r.symbol ?? '').toUpperCase();
+      if (sym) apyBySymbol[sym] = parseFloat(r.supplyApy ?? 0);
+    }
+    console.log(`  Reserve APYs loaded: ${Object.keys(apyBySymbol).join(', ')}`);
+
+    // Step 3: Fetch user obligation for the xStocks market
+    // Try multiple endpoint patterns — Kamino API versions vary
+    let obligation = null;
+    const obligationEndpoints = [
+      `${KAMINO_API}/kamino-market/${marketAddress}/obligations/${WALLET_KAMINO_LENDING}`,
+      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/obligations?market=${marketAddress}`,
+      `${KAMINO_API}/lending/v2/${marketAddress}/users/${WALLET_KAMINO_LENDING}`,
+    ];
+
+    for (const endpoint of obligationEndpoints) {
+      const res = await fetchWithTimeout(endpoint);
+      if (res && !res.error) {
+        obligation = res;
+        console.log(`  Obligation fetched via: ${endpoint.replace(WALLET_KAMINO_LENDING, '5yiT...')}`);
+        break;
+      }
+    }
+
+    if (!obligation) throw new Error('Could not fetch Kamino obligation — all endpoints failed');
+
+    // Step 4: Parse deposits from obligation
+    // Kamino API may return deposits at different keys depending on version
+    const deposits = (
+      obligation.deposits ??
+      obligation.collateral ??
+      obligation.data?.deposits ??
+      (Array.isArray(obligation) ? obligation : null) ??
+      []
+    );
+
+    if (!deposits.length) {
+      console.log('  No deposits found in obligation response');
+      console.log('  Raw obligation keys:', Object.keys(obligation).join(', '));
+    }
+
+    for (const deposit of deposits) {
+      // Token symbol may be at different fields depending on API version
+      const symbol = (
+        deposit.token ??
+        deposit.symbol ??
+        deposit.mintSymbol ??
+        deposit.liquidityToken ??
+        ''
+      ).toUpperCase().replace('X', 'x'); // normalize e.g. "SPYX" → "SPYx"
+
+      // Find matching key in KAMINO_POSITIONS (case-insensitive)
+      const tokenKey = Object.keys(KAMINO_POSITIONS).find(
+        k => k.toLowerCase() === symbol.toLowerCase()
+      );
+      if (!tokenKey) {
+        if (symbol) console.log(`  Skipping untracked deposit: ${symbol}`);
+        continue;
+      }
+
+      // USD value — try multiple field names
+      const supplyUSD = parseFloat(
+        deposit.amountUsd ??
+        deposit.marketValueUsd ??
+        deposit.depositedAmountUsd ??
+        deposit.supplyUsd ??
+        deposit.value ??
+        0
+      );
+
+      // Token amount — raw token units (already decoded) or scaled fraction
+      const tokenAmt = parseFloat(
+        deposit.amount ??
+        deposit.depositedAmount ??
+        deposit.tokenAmount ??
+        deposit.balance ??
+        0
+      );
+
+      const supplyAPY = apyBySymbol[tokenKey.toUpperCase()] ?? apyBySymbol[symbol.toUpperCase()] ?? null;
+
+      console.log(`  ${tokenKey}: $${supplyUSD.toFixed(2)}, ${tokenAmt.toFixed(4)} tokens, APY: ${supplyAPY != null ? (supplyAPY * 100).toFixed(3) + '%' : 'n/a'}`);
+      results[tokenKey] = { supplyUSD, tokenAmt, supplyAPY };
+    }
+
+  } catch (e) {
+    console.error(`Kamino fatal: ${e.message}`);
+  }
+
+  return results;
+}
+
+// ============================================================
 // MAIN
 // ============================================================
 
@@ -958,13 +1097,14 @@ async function main() {
   if (!wethActive)  console.log('WETH/USDC position is not Active — skipping LP check');
   if (!hedgeActive) console.log('ETH Hedge position is not Active — skipping Hyperliquid check');
 
-  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes] = await Promise.allSettled([
+  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes, kaminoRes] = await Promise.allSettled([
     wethActive  ? getWethPosition() : Promise.resolve(null),
     getMoonwellData(),
     getSuilendData(),
     getRaydiumPositions(xstockAssets),
     getLighterPositions(),
     hedgeActive ? getEthHedge()     : Promise.resolve(null),
+    getKaminoPositions(),
   ]);
 
   const weth     = wethRes.status     === 'fulfilled' ? wethRes.value     : null;
@@ -973,6 +1113,7 @@ async function main() {
   const raydium  = raydiumRes.status  === 'fulfilled' ? raydiumRes.value  : [];
   const lighter  = lighterRes.status  === 'fulfilled' ? lighterRes.value  : {};
   const hedge    = hedgeRes.status    === 'fulfilled' ? hedgeRes.value    : null;
+  const kamino   = kaminoRes.status   === 'fulfilled' ? kaminoRes.value   : {};
 
   console.log('\n--- Fetching dynamic cycle IDs from Asset table ---');
   let wethCycleId  = null; // loaded from Airtable Assets — no hardcoded fallback
@@ -1133,6 +1274,25 @@ async function main() {
     if (batch.length > 0) {
       const ok = await airtableCreate(DAILY_TABLE, batch);
       if (ok) { written += batch.length; console.log(`✓ Lighter: ${batch.length} records written`); }
+    }
+  }
+
+  // Kamino xStocks Lending
+  if (kamino && Object.keys(kamino).length > 0) {
+    const batch = [];
+    for (const [tokenKey, data] of Object.entries(kamino)) {
+      const posId = KAMINO_POSITIONS[tokenKey];
+      if (!posId) continue;
+      const fields = {};
+      if (data.supplyUSD > 0)   fields[LF.supplyUSD] = data.supplyUSD;
+      if (data.tokenAmt  > 0)   fields[LF.tokenAmt]  = data.tokenAmt;
+      if (data.supplyAPY != null) fields[LF.supplyAPY] = data.supplyAPY * 100; // store as % not decimal
+      batch.push(lendingRecord(posId, fields));
+      console.log(`  Queued ${tokenKey}: $${data.supplyUSD.toFixed(2)}, ${data.tokenAmt.toFixed(4)} tokens, APY ${data.supplyAPY != null ? (data.supplyAPY * 100).toFixed(3) + '%' : 'n/a'}`);
+    }
+    if (batch.length > 0) {
+      const ok = await airtableCreate(LENDING_TABLE, batch);
+      if (ok) { written += batch.length; console.log(`✓ Kamino: ${batch.length} records written`); }
     }
   }
 
