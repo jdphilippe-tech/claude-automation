@@ -967,7 +967,7 @@ async function getKaminoPositions() {
     // Step 1: Discover xStocks market address
     // Try several Kamino API endpoint patterns — the configs endpoint path varies by API version.
     // XSTOCKS_MARKET_ADDRESS can be hardcoded once confirmed from the Kamino UI URL.
-    const XSTOCKS_MARKET_ADDRESS = process.env.KAMINO_XSTOCKS_MARKET ?? null;
+    const XSTOCKS_MARKET_ADDRESS = process.env.KAMINO_XSTOCKS_MARKET ?? '5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua';
 
     let marketAddress = XSTOCKS_MARKET_ADDRESS;
 
