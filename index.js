@@ -1032,15 +1032,15 @@ async function getKaminoPositions() {
     const kaminoPositionIds = new Set(Object.values(KAMINO_POSITIONS));
 
     // Fetch Lending Actions with token amounts for Kamino positions only.
-    // Filter by ARRAYJOIN to match specific Kamino position record IDs.
+    // Filter using the linked position's display name — all Kamino positions are named
+    // "Kamino XXXx Supply", so FIND('Kamino', {Position}) reliably isolates them.
+    // ARRAYJOIN with record IDs returns HTTP 422 — display name search is the correct pattern.
     let lendingActionsRaw = [];
     try {
       const { default: fetch } = await import('node-fetch');
-      const kaminoIds = Object.values(KAMINO_POSITIONS);
-      const posFilter = kaminoIds.map(id => `FIND('${id}', ARRAYJOIN({Position}))`).join(', ');
       const params = new URLSearchParams();
       [LF.position, LF.tokenAmt, LF.date].forEach(f => params.append('fields[]', f));
-      params.append('filterByFormula', `AND(OR(${posFilter}), {Token Amount} > 0)`);
+      params.append('filterByFormula', `AND(FIND('Kamino', {Position}), {Token Amount} > 0)`);
       params.append('sort[0][field]', 'Date');
       params.append('sort[0][direction]', 'desc');
       params.append('pageSize', '50');
