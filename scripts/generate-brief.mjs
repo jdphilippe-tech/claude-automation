@@ -1,110 +1,27 @@
 /**
  * scripts/generate-brief.mjs
  *
- * Calls the Claude API with tool definitions so Claude autonomously fetches
- * all data it needs — Airtable (with full pagination), Notion band params,
- * and live market prices — then writes the morning audio brief.
+ * Collateral Engine morning brief — agentic Claude loop.
+ * Claude fetches all data via tools and generates spoken audio brief text.
+ * Output: audio/brief-text.txt (consumed by morning-brief-audio.mjs)
  *
- * Output: writes brief text to audio/brief-text.txt for the next step
- * (morning-brief-audio.mjs) to consume.
+ * Cadence:
+ *   Mon–Fri  → Skinny daily  (~40 sec / ~55 words)
+ *   Saturday → Full weekly   (~2.5 min / ~430 words)
+ *   Sunday   → Skip entirely (no API call, empty output)
  *
- * Architecture: Claude tool use (agentic loop)
- * Claude fetches its own data — nothing is pre-fetched and passed to it.
- * This eliminates the pagination bug where Reopen Position records were
- * missed because they live on page 2+ of Airtable results.
- *
- * Fixes applied 2026-04-12:
- *   Fix 1 — System prompt hardened with single-output rule to prevent
- *            Claude rewriting the brief multiple times in one response.
- *   Fix 2 — Extraction uses lastIndexOf('Good morning') + lastIndexOf
- *            ('Have a good one.') so only the final clean version is
- *            captured even if Claude does produce multiple drafts.
- *
- * Fixes applied 2026-04-14:
- *   Fix 3 — 429 rate limit retry with 60s backoff instead of Fatal crash.
- *   Fix 4 — max_tokens reduced from 4096 to 2048 to slow context growth.
- *            (Reversed by Fix 10 — 2048 was insufficient for expanded brief.)
- *   Fix 5 — System prompt band values removed — Claude now fetches current
- *            cycle band values from Notion at runtime instead of using
- *            hardcoded C8 values that go stale every cycle.
- *
- * Fixes applied 2026-05-19:
- *   Fix 6 — Removed duplicate net price delta dollar amount from P&L sentence.
- *            Delta balance sentence now carries the number — not both.
- *   Fix 7 — Removed net return (fees + delta) as primary performance metric.
- *            Replaced with Fee APR = total fees / total deployed × annualized.
- *            total deployed = LP open + hedge open (full capital normalization).
- *            Net price delta reported separately as health indicator only.
- *
- * Fixes applied 2026-05-19 (2):
- *   Fix 8 — Removed Notion dependency for band values. Band levels now derived
- *            from cycle open ETH price already in Airtable Reopen Position Notes.
- *            Formula: Center = open ETH price, Band ±180, Drift ±144, Near Drift ±87.
- *            notion_fetch tool and NOTION_API_KEY no longer needed for band values.
- *
- * Fixes applied 2026-05-27:
- *   Fix 9 — Added xStocks block to brief. xStocks data fetched from Airtable
- *            using Cycle IDs containing ticker suffixes (TSLAx, SPYx, NVDAx,
- *            CRCLx, AAPLx, GOOGLx). Block mirrors PSF block structure:
- *            weighted blended fee APR, avg daily fees, avg cycle age, OOR
- *            detection with 2-consecutive-weekday escalation, one thing to
- *            watch, and market close with SPY + VIX instead of BTC + ETH vol.
- *            Brief flow: Date → ETH/PSF zone → PSF P&L → PSF watch →
- *            PSF market close → xStocks P&L → xStocks watch → xStocks market.
- *
- * Fixes applied 2026-05-27 (2):
- *   Fix 10 — max_tokens raised from 2048 → 4096. Expanded brief (PSF + xStocks)
- *            was hitting the token ceiling mid-sentence during final generation,
- *            causing multiple max_tokens continuations, context fragmentation,
- *            and loss of the "Good morning"/"Have a good one." markers.
- *   Fix 11 — xStocks weighted blended APR now computed as capital-weighted
- *            average of per-position APRs, not aggregate-fees/aggregate-capital
- *            annualized by avg days. Each position's APR = (fees / open value)
- *            × (365 / own days). Blend = Σ(APR × open value) / Σ(open value).
- *            This correctly handles mixed-age positions (e.g. day-1 positions
- *            alongside day-30 positions) without annualization distortion.
- *   Fix 12 — Positions with 0 elapsed days (opened same day, no full day yet)
- *            are excluded from the blended APR and flagged in spoken text as
- *            "too new to rate" so they don't distort the blended figure.
- *   Fix 13 — Brief extraction now scans ALL assistant text blocks across the
- *            full message history, not just the final response block. Prevents
- *            marker loss when Claude resumes mid-brief after a max_tokens split.
- *
- * Fixes applied 2026-05-29:
- *   Fix 14 — Context pruning added to runClaude(). After each tool result has
- *            been consumed (i.e. once Claude has replied to it), the raw payload
- *            is replaced with a short stub in the message history. This prevents
- *            accumulated Airtable 100-record payloads from blowing past the
- *            30,000 input tokens/minute org rate limit by iterations 4+.
- *            Stub format: "[tool_result pruned — N chars — already processed]"
- *
- * Fixes applied 2026-05-31:
- *   Fix 16 — System prompt: hard cap of 2 search attempts per market data point.
- *            After 2 failures, declare unavailable and continue — never retry a 3rd
- *            time. Root cause of the 30-iteration fatal on May 31: Claude spun on
- *            VIX for 15+ iterations because it had no retry limit and no weekend
- *            awareness. Weekend rule added: on Sat/Sun equity markets are closed —
- *            use last Friday close from first search result, say "as of Friday's
- *            close". Fear & Greed backup query (milkroad.com) added after alt.me.
- *   Fix 17 — runAirtableQuery: handle Airtable 422 LIST_RECORDS_ITERATOR_NOT_AVAILABLE
- *            by stripping the expired offset token and restarting from page 1.
- *            Offset tokens expire after ~5 min; long sessions (caused by Fix 16's
- *            spinning) triggered this. Now recovers gracefully instead of returning
- *            an error that causes Claude to re-query without context.
- *   Fix 18 — MAX_ITERS raised from 30 → 40 as additional safety headroom.
- *
- *   Fix 15 — xStocks APR formula overhauled:
- *            (a) Net cycle capital = Σ deposits − Σ withdrawals for whole cycle,
- *                not just open value. Handles mid-cycle Deposit New Money / Supply More.
- *            (b) Reset window = most recent of Open/Reopen/Deposit New Money/
- *                Deposit Old Money/Supply More. Fees and time measured from there.
- *            (c) Exact elapsed hours used for annualization (no floor). Eliminates
- *                APR overstatement on young positions (e.g. 35h floored to 1 day
- *                inflated CRCLx from 80% to 119%).
- *            (d) Eligibility threshold changed from days≥1 to hours≥24 to match
- *                exact-hours logic.
- *            (e) Deposit Amount (fldWLVUqSCRJ4NtnQ) and Withdrawal Amount
- *                (fldJc61ql8kILUfJU) added to Airtable field fetch list.
+ * Fix history:
+ *   Fix 1–13  — PSF/xStocks era (archived — see git history)
+ *   Fix 14    — Context pruning to avoid 30k input token/min org rate limit
+ *   Fix 15    — xStocks APR formula (archived with engine)
+ *   Fix 16    — Search discipline: 2-attempt cap + weekend equity handling
+ *   Fix 17    — Airtable 422 handler: strip expired offset, restart page 1
+ *   Fix 18    — MAX_ITERS raised 30→40
+ *   Fix 19    — Full rewrite for Collateral Engine (2026-06-08):
+ *               PSF + xStocks LP removed. New brief covers Kamino lending,
+ *               Stability Engine (Lighter), market pulse (BTC/F&G/SPY/QQQ/VIX),
+ *               and spotlight (TSLA/NVDA/GOOGL/AAPL). Sunday skip added.
+ *               Brief extraction updated for "Have a good weekend." marker.
  */
 
 import fs from 'fs';
@@ -114,79 +31,43 @@ const CLAUDE_API_KEY   = process.env.CLAUDE_API_KEY;
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 
 const AIRTABLE_BASE_ID       = 'appWojaxYR99bXC1f';
-const AIRTABLE_DAILY_TABLE   = 'tblKsk0QnkOoKNLuk';
 const AIRTABLE_LENDING_TABLE = 'tblFw52kzeTRvxTSM';
 
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const OUTPUT_PATH  = 'audio/brief-text.txt';
 const DESC_PATH    = process.env.DESCRIPTION_FILE || '/tmp/description.txt';
 
-// ── Tool Definitions ────────────────────────────────────────────────────────
+// ── Tool Definitions ─────────────────────────────────────────────────────────
 
 const TOOLS = [
   {
     name: 'airtable_query',
-    description: `Query the Airtable REST API directly.
-
-DAILY ACTIONS TABLE: ${AIRTABLE_DAILY_TABLE}
-Field IDs:
-  fldUkwrxtS4AEr52W = Action Type  (Fee Check | Reopen Position | Close Position | Claim | Open Position)
-  fldHG3MCcyhkXknyH = Date         (ISO timestamp — sort ascending to get oldest first)
-  fldWElDtJZRYTaZtD = Position Value
-  fld6QnTv9CKHvglcX = Fee Value    (pending fees, only on Fee Check records)
-  fldE5uO0nwZmgLQtF = Fees Claimed (only on Claim records)
-  fldFFts5ByR1EeYBk = Cycle ID     (e.g. WETH-PRIMARY-C9, HEDGE-C9, TSLAx-C2, SPYx-C1)
-  fldxWdSuQ09uhadFo = Notes        (HEDGE Fee Check records contain "PnL: $XX.XX | Entry: $XXXX | Size: -X.X ETH")
-  fldQxXuK9uTwRQsX8 = In Range     (1 = in range, 0 = out of range — present on Fee Check records)
+    description: `Query the Airtable Lending Actions table for Collateral Engine position data.
 
 LENDING ACTIONS TABLE: ${AIRTABLE_LENDING_TABLE}
+Field IDs (use in fields[] array):
+  fldFi5nwRXNC5n0pU = Position     (linked record — returns display name, e.g. "Kamino SPYx Supply")
+  fld5UpfU63qiYEZtp = Action Type  (Rate Check | Supply | Borrow | Adjust | Claim)
+  fldUksu7BXYunAADh = Date         (ISO timestamp)
+  fldJ7T452iqgQNiWb = Supply Value (USD)
+  fldrWm55G12S1qQjY = Token Amount
+  fldJLDy5yOHq8S6RS = Supply APY % (as a percentage, e.g. 0.17 means 0.17%)
+  fldTSqf1Yrxg7O0tr = Borrow Value (USD)
+  fldWHlp8HCuMYGc9e = Borrow APY %
 
-PAGINATION IS REQUIRED. Always pass the offset from each response into the
-next call until has_more = false. The Reopen Position records that
-define opening deposit values are the OLDEST records in the cycle — they
-will NOT appear on the first page when sorted descending. You MUST paginate
-through all pages sorted ascending to find them.
-
-For PSF data use filterByFormula:
-  OR(FIND('WETH-PRIMARY-C',{Cycle ID}),FIND('HEDGE-C',{Cycle ID}))
-Sort ascending by fldHG3MCcyhkXknyH so Reopen Position records come first.
-
-For xStocks data use filterByFormula:
-  OR(FIND('TSLAx',{Cycle ID}),FIND('SPYx',{Cycle ID}),FIND('NVDAx',{Cycle ID}),FIND('CRCLx',{Cycle ID}),FIND('AAPLx',{Cycle ID}),FIND('GOOGLx',{Cycle ID}))
-Sort ascending by fldHG3MCcyhkXknyH. Always paginate fully.`,
+Sort by fldUksu7BXYunAADh descending to get most recent records first.
+Paginate until has_more = false. Offset tokens expire after ~5 min — if 422,
+strip offset and restart from page 1.`,
     input_schema: {
       type: 'object',
       properties: {
-        table_id: {
-          type: 'string',
-          description: `Airtable table ID. Use '${AIRTABLE_DAILY_TABLE}' for PSF/xStock data, '${AIRTABLE_LENDING_TABLE}' for lending rates.`
-        },
-        filter_formula: {
-          type: 'string',
-          description: 'Airtable filterByFormula string (URL-encoded automatically by the tool)'
-        },
-        sort_field: {
-          type: 'string',
-          description: 'Field ID to sort by'
-        },
-        sort_direction: {
-          type: 'string',
-          enum: ['asc', 'desc'],
-          description: 'asc = oldest first (use this to find Reopen/Open Position records). desc = newest first.'
-        },
-        fields: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Array of field IDs to return. Always include fldFFts5ByR1EeYBk (Cycle ID), fldUkwrxtS4AEr52W (Action Type), and fldxWdSuQ09uhadFo (Notes). For xStocks also include fldQxXuK9uTwRQsX8 (In Range). Request ONLY the fields you need.'
-        },
-        page_size: {
-          type: 'number',
-          description: 'Records per page. Max 100. Use 100 to minimize API calls.'
-        },
-        offset: {
-          type: 'string',
-          description: 'Pagination offset token from previous response. Omit for first page. MUST be passed to get all records including Reopen/Open Position.'
-        }
+        table_id:       { type: 'string', description: `Use '${AIRTABLE_LENDING_TABLE}'` },
+        filter_formula: { type: 'string', description: 'Airtable filterByFormula string' },
+        sort_field:     { type: 'string', description: 'Field ID to sort by' },
+        sort_direction: { type: 'string', enum: ['asc', 'desc'] },
+        fields:         { type: 'array', items: { type: 'string' }, description: 'Array of field IDs to return' },
+        page_size:      { type: 'number', description: 'Max 100' },
+        offset:         { type: 'string', description: 'Pagination offset from previous response' }
       },
       required: ['table_id']
     }
@@ -194,13 +75,14 @@ Sort ascending by fldHG3MCcyhkXknyH. Always paginate fully.`,
   {
     name: 'web_search',
     description: `Search the web for current market data.
-Use short, specific queries:
-- ETH price: "ETH USD price today"
-- BTC price: "BTC USD price today"
-- Fear & Greed: "alternative.me fear greed index"
-- SPY price: "SPY ETF price today"
-- VIX: "VIX volatility index today"
-- ETH volatility: "ETH 30 day volatility"
+Use short, specific queries (1-6 words). Max 2 attempts per data point.
+Common queries:
+  BTC price:      "BTC USD price today"
+  Fear & Greed:   "alternative.me fear greed index"  (backup: "milkroad.com fear greed index today")
+  SPY:            "SPY ETF price today"
+  QQQ:            "QQQ ETF price today"
+  VIX:            "VIX volatility index today"
+  Stock price:    "TSLA stock price today"  (same pattern for NVDA, GOOGL, AAPL)
 Returns a summary of top results.`,
     input_schema: {
       type: 'object',
@@ -212,100 +94,67 @@ Returns a summary of top results.`,
   }
 ];
 
-// ── Tool Execution ──────────────────────────────────────────────────────────
+// ── Tool Execution ────────────────────────────────────────────────────────────
 
 async function runAirtableQuery(input) {
   const { table_id, filter_formula, sort_field, sort_direction, fields, page_size, offset } = input;
-
   const params = new URLSearchParams();
   if (filter_formula)  params.append('filterByFormula', filter_formula);
   if (sort_field) {
-    params.append('sort[0][field]', sort_field);
-    params.append('sort[0][direction]', sort_direction || 'asc');
+    params.append('sort[0][field]',     sort_field);
+    params.append('sort[0][direction]', sort_direction || 'desc');
   }
   if (fields?.length)  fields.forEach(f => params.append('fields[]', f));
   if (page_size)       params.append('pageSize', String(Math.min(page_size, 100)));
   if (offset)          params.append('offset', offset);
 
   const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table_id}?${params}`;
-  const res  = await fetch(url, {
-    headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` }
-  });
+  const res  = await fetch(url, { headers: { Authorization: `Bearer ${AIRTABLE_API_KEY}` } });
 
-  // Fix 17: 422 LIST_RECORDS_ITERATOR_NOT_AVAILABLE means the pagination offset
-  // token expired (Airtable tokens expire after ~5 min of inactivity). Strip the
-  // offset and restart from page 1 so a long-running session can recover.
+  // Fix 17: expired offset token — restart from page 1
   if (res.status === 422 && offset) {
     console.warn('  [422] Airtable pagination token expired — restarting from page 1');
     return runAirtableQuery({ ...input, offset: undefined });
   }
-
   if (!res.ok) {
     const err = await res.text();
     return { error: `Airtable ${res.status}: ${err}` };
   }
-
   const data = await res.json();
-  return {
-    records:        data.records,
-    offset:         data.offset || null,
-    total_returned: data.records?.length ?? 0,
-    has_more:       !!data.offset
-  };
+  return { records: data.records, has_more: !!data.offset, offset: data.offset };
 }
 
 async function runWebSearch(input) {
   const { query } = input;
-  const BRAVE_API_KEY = process.env.BRAVE_SEARCH_API_KEY;
-
-  if (!BRAVE_API_KEY) {
-    return { error: 'BRAVE_SEARCH_API_KEY not set — web search unavailable' };
-  }
-
-  try {
-    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3&text_decorations=false&search_lang=en`;
-    const res  = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip',
-        'X-Subscription-Token': BRAVE_API_KEY
-      }
-    });
-    if (!res.ok) {
-      return { error: `Brave Search ${res.status}: ${await res.text()}` };
-    }
-    const data = await res.json();
-    const results = (data.web?.results || []).slice(0, 3).map(r => ({
-      title:       r.title       || '',
-      description: r.description || '',
-      url:         r.url         || ''
-    }));
-    return { results };
-  } catch (e) {
-    return { error: e.message };
-  }
+  const params = new URLSearchParams({ q: query, format: 'json' });
+  const res = await fetch(`https://search.tbxzt.com/search?${params}`, {
+    headers: { 'User-Agent': 'Mozilla/5.0 PortfolioOS/1.0' }
+  });
+  if (!res.ok) return { error: `Search failed: ${res.status}` };
+  const data = await res.json();
+  const results = (data.results || []).slice(0, 5).map(r => ({
+    title:   r.title,
+    snippet: r.content || r.snippet || '',
+    url:     r.url
+  }));
+  return { results };
 }
 
 async function executeTool(name, input) {
-  console.log(`  [tool] ${name} — ${JSON.stringify(input).substring(0, 100)}`);
+  console.log(`  [tool] ${name} — ${JSON.stringify(input).slice(0, 80)}`);
   let result;
-  switch (name) {
-    case 'airtable_query': result = await runAirtableQuery(input); break;
-    case 'web_search':     result = await runWebSearch(input);     break;
-    default:               result = { error: `Unknown tool: ${name}` };
-  }
-  const preview = JSON.stringify(result).substring(0, 120);
-  console.log(`  [result] ${preview}${preview.length >= 120 ? '…' : ''}`);
+  if (name === 'airtable_query') result = await runAirtableQuery(input);
+  else if (name === 'web_search') result = await runWebSearch(input);
+  else result = { error: `Unknown tool: ${name}` };
+  console.log(`  [result] ${JSON.stringify(result).slice(0, 120)}…`);
   return result;
 }
 
-// ── Claude API call with 429 retry ──────────────────────────────────────────
+// ── Claude API Call ───────────────────────────────────────────────────────────
 
 async function callClaude(messages, systemPrompt) {
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY_MS = 60000; // 60 seconds
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  const MAX_RETRIES = 2;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -324,43 +173,35 @@ async function callClaude(messages, systemPrompt) {
 
     if (res.status === 429) {
       if (attempt < MAX_RETRIES) {
-        console.warn(`  [429] Rate limit hit — waiting 60s before retry ${attempt}/${MAX_RETRIES - 1}...`);
-        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+        console.warn(`  [429] Rate limit hit — waiting 60s before retry ${attempt + 1}/${MAX_RETRIES}...`);
+        await new Promise(r => setTimeout(r, 60000));
         continue;
       } else {
         const err = await res.text();
         throw new Error(`Claude API 429 after ${MAX_RETRIES} retries: ${err}`);
       }
     }
-
     if (!res.ok) {
       const err = await res.text();
       throw new Error(`Claude API ${res.status}: ${err}`);
     }
-
     return await res.json();
   }
 }
 
-// ── Claude Agentic Loop ─────────────────────────────────────────────────────
+// ── Claude Agentic Loop ───────────────────────────────────────────────────────
 
 async function runClaude(systemPrompt, userPrompt) {
   const messages = [{ role: 'user', content: userPrompt }];
-  const MAX_ITERS = 40; // Fix 18: raised from 30 — weekend search loops need more headroom
+  const MAX_ITERS = 40; // Fix 18
 
   for (let i = 0; i < MAX_ITERS; i++) {
     console.log(`\n[claude] iteration ${i + 1}`);
-
     const response = await callClaude(messages, systemPrompt);
     console.log(`  stop_reason: ${response.stop_reason}`);
-
     messages.push({ role: 'assistant', content: response.content });
 
     if (response.stop_reason === 'end_turn') {
-      // Fix 13: Scan ALL assistant text blocks across the entire message history.
-      // When Claude hits max_tokens mid-brief and resumes via "Continue.", the
-      // "Good morning" marker may be in an earlier assistant block while "Have a
-      // good one." is in a later one. Concatenating all blocks recovers the full brief.
       const allAssistantText = messages
         .filter(m => m.role === 'assistant')
         .flatMap(m => (Array.isArray(m.content) ? m.content : [m.content]))
@@ -370,48 +211,49 @@ async function runClaude(systemPrompt, userPrompt) {
 
       const raw = allAssistantText.trim();
 
-      // Extract DESCRIPTION line if present and save to DESC_PATH
+      // Handle Sunday skip signal
+      if (raw.trim() === 'SUNDAY_SKIP') return 'SUNDAY_SKIP';
+
+      // Extract DESCRIPTION meta line
       const descMatch = raw.match(/^DESCRIPTION:\s*(.+)$/m);
       if (descMatch) {
-        const description = descMatch[1].trim();
-        fs.writeFileSync(DESC_PATH, description, 'utf8');
-        console.log(`Description saved: "${description}"`);
+        fs.writeFileSync(DESC_PATH, descMatch[1].trim(), 'utf8');
+        console.log(`Description saved: "${descMatch[1].trim()}"`);
       } else {
         console.warn('Warning: no DESCRIPTION line found — RSS will use fallback');
       }
 
-      // Fix 2: Use lastIndexOf to extract only the final clean brief,
-      // discarding any earlier drafts or self-revision Claude may have output.
+      // Find brief start
       const lastStart = raw.lastIndexOf('Good morning');
-      const lastEnd   = raw.lastIndexOf('Have a good one.');
-
-      if (lastStart === -1 || lastEnd === -1) {
-        console.warn('Warning: could not find brief markers — using full text');
+      if (lastStart === -1) {
+        console.warn('Warning: could not find "Good morning" — using full text');
         return raw;
       }
 
-      return raw.slice(lastStart, lastEnd + 'Have a good one.'.length).trim();
+      // Fix: handle both "Have a good one." (skinny) and "Have a good weekend." (full weekly)
+      const goodOneIdx     = raw.lastIndexOf('Have a good one.');
+      const goodWeekendIdx = raw.lastIndexOf('Have a good weekend.');
+      const endPhrase      = goodWeekendIdx > goodOneIdx ? 'Have a good weekend.' : 'Have a good one.';
+      const lastEnd        = goodWeekendIdx > goodOneIdx ? goodWeekendIdx : goodOneIdx;
+
+      if (lastEnd === -1) {
+        console.warn('Warning: could not find closing phrase — using full text from "Good morning"');
+        return raw.slice(lastStart).trim();
+      }
+
+      return raw.slice(lastStart, lastEnd + endPhrase.length).trim();
     }
 
     if (response.stop_reason === 'tool_use') {
-      const toolCalls = response.content.filter(b => b.type === 'tool_use');
+      const toolCalls   = response.content.filter(b => b.type === 'tool_use');
       const toolResults = [];
       for (const call of toolCalls) {
         const result = await executeTool(call.name, call.input);
-        toolResults.push({
-          type:        'tool_result',
-          tool_use_id: call.id,
-          content:     JSON.stringify(result)
-        });
+        toolResults.push({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(result) });
       }
       messages.push({ role: 'user', content: toolResults });
 
-      // Fix 14: Context pruning — once Claude has replied to a tool result,
-      // that raw payload is no longer needed in full. Replace older tool_result
-      // messages (anything before the last two user turns) with a short stub
-      // to keep input token count below the 30k/min org rate limit.
-      // We keep the last two user turns intact so Claude always has the
-      // most recent tool results available for reasoning.
+      // Fix 14: Context pruning — replace old tool results with stubs to limit input tokens
       const userTurnIndices = messages
         .map((m, idx) => (m.role === 'user' ? idx : -1))
         .filter(idx => idx !== -1);
@@ -423,22 +265,17 @@ async function runClaude(systemPrompt, userPrompt) {
           if (msg.role === 'user' && Array.isArray(msg.content)) {
             msg.content = msg.content.map(block => {
               if (block.type === 'tool_result' && typeof block.content === 'string' && block.content.length > 200) {
-                const originalLen = block.content.length;
-                return {
-                  ...block,
-                  content: `[tool_result pruned — ${originalLen} chars — already processed]`
-                };
+                const len = block.content.length;
+                return { ...block, content: `[tool_result pruned — ${len} chars — already processed]` };
               }
               return block;
             });
           }
         }
       }
-
       continue;
     }
 
-    // max_tokens during reasoning — continue so Claude can finish
     if (response.stop_reason === 'max_tokens') {
       console.warn('  Warning: hit max_tokens mid-response — continuing loop');
       messages.push({ role: 'user', content: [{ type: 'text', text: 'Continue.' }] });
@@ -451,334 +288,211 @@ async function runClaude(systemPrompt, userPrompt) {
   throw new Error(`Exceeded ${MAX_ITERS} Claude iterations`);
 }
 
-// ── System Prompt ───────────────────────────────────────────────────────────
+// ── System Prompt ─────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are the morning brief generator for JD's Portfolio OS — a personal DeFi portfolio management system with two parallel cashflow engines: PSF (delta-neutral ETH LP) and xStocks (tokenized equity LP on Raydium).
+const SYSTEM_PROMPT = `You are the Portfolio OS morning brief generator for JD's Collateral Engine.
 
-Your job: fetch all required data using your tools, compute everything yourself, and return the spoken audio brief text. Nothing else — no JSON wrapper, no markdown, no preamble, no explanation. Your ENTIRE response must start with "Good morning." and end with "Have a good one." Any text before "Good morning" or after "Have a good one." will be stripped and discarded.
+Fetch all required data using your tools, then output the spoken audio brief text.
+
+OUTPUT RULES — STRICTLY ENFORCED:
+  • If today is Sunday: output "SUNDAY_SKIP" and NOTHING ELSE.
+  • Otherwise: begin with "DESCRIPTION: [one sentence]" then "Good morning."
+  • End with "Have a good one." (skinny daily) or "Have a good weekend." (full weekly)
+  • No markdown, no preamble, no explanation outside these bounds.
 
 ═══════════════════════════════════════
-SECTION 1 — PSF (DELTA-NEUTRAL ETH LP)
+STEP 0 — DAY CHECK
 ═══════════════════════════════════════
+Extract the day of week from the date in the user message.
+  • Sunday   → output "SUNDAY_SKIP" immediately. Stop. Do not fetch data.
+  • Saturday → FULL WEEKLY brief
+  • Mon–Fri  → SKINNY DAILY brief
 
-STEP 1 — Band Values (derived from Airtable cycle open price)
-Do NOT fetch Notion for band values. Instead, derive them from the cycle open ETH price
-you will read from Airtable in Step 2.
-
-The cycle open ETH price is in the Notes field of the earliest Reopen Position record
-for WETH-PRIMARY-C[n]. The Notes field looks like:
-  "ETH: $2226 | Tick: -XXXXX | Range: [-XXXXXX, -XXXXXX]"
-Extract the ETH price after "ETH: $".
-
-Then compute all band levels using the fixed 360-point band formula:
-  • Center            = cycle open ETH price (rounded to nearest dollar)
-  • Band Upper        = Center + 180
-  • Band Lower        = Center − 180
-  • Drift Upper       = Center + 144
-  • Drift Lower       = Center − 144
-  • Near Drift Upper  = Center + 87
-  • Near Drift Lower  = Center − 87
-
-STEP 2 — PSF Cycle Data (Airtable Daily Actions)
-Query table ${AIRTABLE_DAILY_TABLE} with:
-  filterByFormula: OR(FIND('WETH-PRIMARY-C',{Cycle ID}),FIND('HEDGE-C',{Cycle ID}))
-  sort: fldHG3MCcyhkXknyH ascending (oldest first)
-  fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk, fldxWdSuQ09uhadFo
+═══════════════════════════════════════
+STEP 1 — COLLATERAL ENGINE DATA (Airtable)
+═══════════════════════════════════════
+Query the Lending Actions table (${AIRTABLE_LENDING_TABLE}):
+  sort: fldUksu7BXYunAADh descending (newest first)
   page_size: 100
+  Paginate until has_more = false.
 
-⚠️  PAGINATION IS MANDATORY. Keep calling airtable_query with the offset from
-each response until has_more = false.
+The Position field (fldFi5nwRXNC5n0pU) returns the linked position's display name.
+Identify records by position name:
+  • Kamino collateral supply: name contains "Kamino" (6 positions: AAPLx QQQx GOOGLx NVDAx SPYx TSLAx)
+  • Moonwell supply: name contains "Moonwell" and not "Borrow"
+  • Moonwell borrow: name contains "Moonwell" and "Borrow"
+  • Suilend supply/borrow: same pattern with "Suilend"
+  • Lighter: name contains "LLP" or "Edge" or "LIT"
 
-From the complete record set, determine:
-  • Current cycle number = highest number in Cycle ID (e.g. C9 from WETH-PRIMARY-C9)
-  • LP open value       = Position Value on earliest Reopen Position for WETH-PRIMARY-C[n]
-  • Hedge open value    = Position Value on earliest Reopen Position for HEDGE-C[n]
-  • Total deployed      = LP open + hedge open
-  • LP current value    = Position Value on latest Fee Check for WETH-PRIMARY-C[n]
-  • Hedge current value = Position Value on latest Fee Check for HEDGE-C[n]
-  • Pending fees        = Fee Value on latest Fee Check for WETH-PRIMARY-C[n]
-  • Total claimed       = sum of all Fees Claimed on all Claim records for WETH-PRIMARY-C[n]
-  • Total fees          = total claimed + pending fees
-  • LP PnL              = LP current − LP open
-  • Hedge PnL           = READ from Notes field on latest HEDGE-C[n] Fee Check.
-                          The Notes field contains "PnL: $48.95 | Entry: $2078.1 | Size: -5.5 ETH".
-                          Extract the dollar amount after "PnL: $". Can be negative.
-                          NEVER compute hedge PnL from position value delta.
-  • Net price delta     = LP PnL + Hedge PnL
-  • Delta balance       = |Net price delta|
-  • Delta tolerance     = Normal Zone: 0.5% of LP current value | Near Drift Zone: 0.25%
-  • Cycle open date     = Date on earliest Reopen Position for WETH-PRIMARY-C[n]
-  • Elapsed hours       = hours from cycle open date to now
-  • Days in cycle       = floor(elapsed hours / 24) — whole number only
-  • Avg daily fee       = (total fees / elapsed hours) × 24
-  • Fee APR             = (total fees / total deployed) × (365 / days in cycle) × 100
-                          NEVER use LP current value alone as denominator.
-                          NEVER add net price delta to fees.
+For Kamino positions:
+  • Most recent Supply Value (USD) per position — fldJ7T452iqgQNiWb
+  • Supply APY % per position — fldJLDy5yOHq8S6RS
+  • Total collateral = sum of 6 supply USD values
+  • Blended supply yield = capital-weighted average of 6 supply APYs
+  • Growth vs deposited base: total collateral − $60,153 (the deposited base)
 
-STEP 3 — PSF Market Data (web search)
-⚠️  SEARCH DISCIPLINE — STRICTLY ENFORCED:
-    • Maximum 2 search attempts per data point. If both fail to return a specific number,
-      declare it unavailable and move on immediately. NEVER attempt a 3rd search for the
-      same data point. Spinning on unavailable data is the primary cause of brief failures.
-    • Today is ${new Date().toLocaleDateString('en-US', {weekday:'long'})}. If it is
-      Saturday or Sunday, equity markets (SPY, VIX) are CLOSED. Use the most recent
-      Friday closing price from the first search result. Say "as of Friday's close" in
-      the brief. Do not search more than ONCE for weekend equity data.
+For borrow records (Moonwell + Suilend borrows):
+  • Most recent Borrow Value (USD) per borrow position — fldTSqf1Yrxg7O0tr
+  • Borrow APY % — fldWHlp8HCuMYGc9e
+  • Total borrows = sum of all borrow values
+  • Blended borrow APY = capital-weighted average
 
-  • ETH current price — 1 search. Use whatever number appears in the snippet.
-  • BTC current price — 1 search. Use whatever number appears in the snippet.
-  • Crypto Fear & Greed index — search "alternative.me fear greed index" first. If the
-    snippet does not contain a specific number (0–100), try ONE backup search for
-    "milkroad.com fear greed index today". If still no number after 2 total attempts,
-    say "Market sentiment data was unavailable at brief time." Do NOT guess or retry further.
-  • ETH 30-day volatility or ATR — 1 search. If no clear data, say "volatility data
-    unavailable" and use neutral band verdict.
+Computed metrics:
+  • Blended LTV = total borrows / total collateral (0 if no borrows)
+  • Net carry = blended borrow APY − blended supply yield (positive = cost, negative = earning)
+    Currently 0 until first July draw.
 
-STEP 4 — PSF Zone Determination
-Zone rules:
-  • Between Near Drift Lower and Near Drift Upper → Normal Zone
-  • Between Drift Lower and Near Drift Lower OR between Near Drift Upper and Drift Upper → Near Drift Zone
-  • Below Drift Lower OR above Drift Upper → Drift Zone (flag clearly, action required)
+For Lighter (Stability Engine):
+  • Most recent Supply Value (USD) for LLP, Edge & Hedge, LIT Staking
+  • Total Stability value = sum
 
 ═══════════════════════════════════════
-SECTION 2 — xSTOCKS (TOKENIZED EQUITY LP)
+STEP 2 — CHEAT SHEET (hardcoded — update only at May/Nov checkpoints)
+Source of truth: Notion page 37912a7e-409e-818e-a487-f291507e28f9
 ═══════════════════════════════════════
+Use these values directly — do NOT search for them:
 
-STEP 5 — xStocks Cycle Data (Airtable Daily Actions)
-Query table ${AIRTABLE_DAILY_TABLE} with:
-  filterByFormula: OR(FIND('TSLAx',{Cycle ID}),FIND('SPYx',{Cycle ID}),FIND('NVDAx',{Cycle ID}),FIND('CRCLx',{Cycle ID}),FIND('AAPLx',{Cycle ID}),FIND('GOOGLx',{Cycle ID}))
-  sort: fldHG3MCcyhkXknyH ascending (oldest first)
-  fields: fldUkwrxtS4AEr52W, fldHG3MCcyhkXknyH, fldWElDtJZRYTaZtD, fld6QnTv9CKHvglcX, fldE5uO0nwZmgLQtF, fldFFts5ByR1EeYBk, fldxWdSuQ09uhadFo, fldQxXuK9uTwRQsX8, fldWLVUqSCRJ4NtnQ, fldJc61ql8kILUfJU
-  page_size: 100
+  Deposited base C      = $60,153
+  Operating LTV cap     = 40%  (watch at >35%; act at >40%)
+  Liquidation line      ≈ 65% (blended across basket)
+  Standing draw         = $3,750/month (Target, Jul–Oct 2026 window)
+  Target D_max          = $15,038 (= 0.25 × C)
+  Ceiling D_max         = $18,046 (= 0.30 × C)
+  Window                = Jul–Oct 2026 (4 months)
+  Next deposit          = November 2026
+  Current debt          = $0 (no draw yet)
 
-⚠️  PAGINATION IS MANDATORY. Keep calling with offset until has_more = false.
-    fldWLVUqSCRJ4NtnQ = Deposit Amount (on Open/Reopen/Deposit/Supply More records)
-    fldJc61ql8kILUfJU = Withdrawal Amount (on Close Position records)
-
-The 6 active positions are: TSLAx, SPYx, NVDAx, CRCLx, AAPLx, GOOGLx.
-Each has its own Cycle ID (e.g. TSLAx-C2, SPYx-C1, NVDAx-C3, etc.)
-The current cycle for each ticker = the highest cycle number seen in the records for that ticker.
-
-RESET EVENT ACTION TYPES (trigger a new measurement window):
-  Open Position | Reopen Position | Deposit New Money | Deposit Old Money | Supply More
-The MOST RECENT reset event in the current cycle defines the active measurement window.
-
-For EACH position, determine:
-
-  ── NET CYCLE CAPITAL (denominator) ──
-  • Net cycle capital = Σ(Deposit Amount on all reset event records in current cycle)
-                      − Σ(Withdrawal Amount on all Close Position records in current cycle)
-                      This covers the full cycle lifetime regardless of which reset event
-                      is most recent. It represents total capital ever committed to this cycle.
-  Example: CRCLx-C3 has Reopen ($1,589) + Deposit New Money ($5,557.07) − no withdrawals = $7,146.07
-
-  ── RESET WINDOW (time + fees) ──
-  • Last reset date  = Date on the most recent reset event record in the current cycle
-                       (Open Position, Reopen Position, Deposit New Money, Deposit Old Money,
-                       or Supply More — whichever is most recent)
-  • Elapsed hours    = exact hours from last reset date to now (do NOT floor — use decimal)
-  • Exact days       = elapsed hours / 24 (decimal, e.g. 1.46 days — NOT floored)
-  • Eligible         = elapsed hours ≥ 24. If < 24h since last reset, exclude from blended APR
-                       and flag in speech: "[Ticker] reset less than a day ago — APR not yet meaningful."
-  • Fees since reset = sum of all Fees Claimed records AFTER last reset date
-                     + Fee Value on latest Fee Check (this represents current pending fees,
-                       which accumulate since the last claim — if last claim was before the
-                       last reset, all pending fees are post-reset)
-  • Avg daily fee    = fees since reset / exact days
-
-  ── PER-POSITION APR ──
-  • Fee APR = (fees since reset / net cycle capital) × (365 / exact days) × 100
-              Uses exact days (decimal) — never floored. This avoids overstating APR
-              for young positions (e.g. 35 hours floors to 1 day inflating by 40%+).
-              Uses net cycle capital as denominator — total committed capital for the cycle.
-
-  ── OOR STATUS ──
-  • OOR status      = In Range field (fldQxXuK9uTwRQsX8) on the latest Fee Check:
-                      1 = in range, 0 = out of range
-  • OOR consecutive = Count consecutive most-recent Fee Check records where In Range = 0
-                      with no in-range record between them. Weekends span through —
-                      OOR going into weekend + OOR coming out = consecutive streak.
-
-Then compute AGGREGATE xStocks metrics:
-  • Eligible positions       = positions where elapsed hours since last reset ≥ 24
-  • Too-new positions        = positions where elapsed hours since last reset < 24
-  • Total net capital        = sum of net cycle capital across ALL 6 positions
-  • Total fees since reset   = sum of fees since reset across ALL 6 positions
-  • Total avg daily fee      = sum of avg daily fees across ALL 6 positions
-  • Avg exact days           = average of exact days across eligible positions only
-  • Weighted blended fee APR = capital-weighted average of per-position Fee APRs
-                               for ELIGIBLE positions only (hours ≥ 24).
-
-                               Formula:
-                                 Weighted Blended APR = Σ(position_APR × net_cycle_capital)
-                                                      / Σ(net_cycle_capital)
-                                 where sums are over eligible positions only.
-
-                               Example with deposit-reset logic:
-                                 CRCLx: APR=80.5%, net capital=$7,146 → 80.5 × 7146 = 575,253
-                                 NVDAx: APR=21.4%, net capital=$1,758 → 21.4 × 1758 = 37,621
-                                 SPYx:  APR=8.4%,  net capital=$1,162 → 8.4  × 1162 = 9,761
-                                 TSLAx: APR=28.1%, net capital=$8,764 → 28.1 × 8764 = 246,268
-                                 AAPLx: APR=14.1%, net capital=$5,406 → 14.1 × 5406 = 76,225
-                                 GOOGLx: APR=13.9%, net capital=$2,476 → 13.9 × 2476 = 34,416
-                                 Blended = (575253+37621+9761+246268+76225+34416) / (7146+1758+1162+8764+5406+2476)
-                                         = 979,544 / 26,712 = 36.7%
-
-                               If no eligible positions exist, skip APR entirely.
-  • OOR positions            = list of tickers where latest Fee Check In Range = 0
-  • Action-needed OOR        = list of tickers with consecutive OOR streak ≥ 2 weekday
-                               Fee Check records — these require rebalancing per playbook
-
-STEP 6 — xStocks Market Data (web search)
-⚠️  SAME SEARCH DISCIPLINE APPLIES — max 2 attempts per data point, then declare unavailable.
-    On weekends (Saturday/Sunday) equity markets are CLOSED:
-      • Use the most recent available Friday closing price for SPY and VIX.
-      • Say "as of Friday's close" when referencing these values in the brief.
-      • Do not search more than ONCE for weekend equity data — Friday close will be in
-        the first result's snippet or historical table.
-
-  • SPY ETF price — 1 search on weekdays, 1 search on weekends (use Friday close).
-    Direction (up/down) only needed on weekdays when markets are open.
-    On weekends say "S-P-Y closed Friday at [price]" instead of up/down framing.
-  • VIX current level — 1 search. Classify as: Low (<15), Normal (15–20), Elevated (20–30),
-    High (>30). On weekends use Friday close. If unavailable after 2 attempts, say
-    "VIX data was unavailable" and skip the range verdict sentence.
+⚠️ PRE-DRAW PLACEHOLDER: Until the first July 2026 borrow lands in Airtable,
+all debt-related blocks use this language:
+  Collateral health: "No debt yet — draw begins July."
+  Borrowing pace:    "Nothing drawn yet. First draw July — three thousand seven hundred fifty dollars."
+  Net carry:         "No borrow cost yet. Supply yield is [X%] — small but ticking."
 
 ═══════════════════════════════════════
-BRIEF FORMAT (follow exactly, in order)
+STEP 3 — STATUS LINE LOGIC
 ═══════════════════════════════════════
+Evaluate three conditions in order:
+  1. LTV vs cap: LTV > 35% → Watch; LTV > 40% → Act (currently always clear — no debt)
+  2. Peg deviation > 0.5% on any token → Watch (Saturday only — see peg watch)
+  3. Net carry turns positive AND > 1% → Watch (currently always clear — no debt)
 
-──────────────────────
-BLOCK 1: Date
-──────────────────────
-"Good morning. It's [Weekday], [Month] [Day]."
-
-──────────────────────
-BLOCK 2: ETH + PSF Zone
-──────────────────────
-Normal Zone:
-  "Eth is at [price], sitting in Normal Zone. You have about [distance] dollars of breathing room before Near Drift. No action needed."
-Near Drift Zone:
-  "Eth is at [price], in Near Drift Zone — [distance] dollars from the Drift boundary. Monitor closely."
-Drift Zone:
-  "Eth is at [price] and has crossed into Drift Zone. Action may be required — review the position."
-
-──────────────────────
-BLOCK 3: PSF P&L
-──────────────────────
-"The current delta neutral strategy cycle is [X] days in. The LP is [up/down] [amount] on price since open, the hedge is [up/down] [amount]. Delta balance is [amount], which is [within/outside] tolerance for [Normal/Near Drift] Zone. [If outside tolerance: hedge adjustment may be needed.] Total fees this cycle are [amount], averaging about [amount] a day — a fee rate of around [fee APR]% annualized on total deployed capital."
-
-KEY RULES:
-- Do NOT repeat net price delta dollar amount before the delta balance sentence.
-- Fee APR is fees-only. Never mix delta into APR.
-- State fee APR as whole number or one decimal spoken as words.
-
-──────────────────────
-BLOCK 4: PSF One Thing to Watch
-──────────────────────
-"One thing to watch on the delta neutral side: [single most notable item — two sentences max. Examples: delta outside tolerance, position approaching Drift, unclaimed fees building on LP, cooldown period status.]"
-
-──────────────────────
-BLOCK 5: PSF Market Close
-──────────────────────
-"On the crypto side — market sentiment is [label] at [number]. Bitcoin is at [price]. [Band width verdict — one sentence: is 360-point band still appropriate given current ETH volatility?]"
-
-──────────────────────
-BLOCK 6: xStocks P&L
-──────────────────────
-"Switching to the equity side. The six xStocks positions are averaging [X] days into their current cycles. Total fees across all positions are [amount], averaging about [amount] a day — a blended fee rate of around [blended APR]% annualized on deployed capital. [If any position has days = 0: "[Ticker] opened today — APR not yet meaningful."] [If any position OOR but streak < 2: "[Ticker] is currently out of range — watching it."] [If any position with streak ≥ 2: "[Ticker] has been out of range for [N] consecutive sessions — rebalancing required per playbook."]"
-
-NOTE: The blended APR is the capital-weighted average of eligible positions only (days ≥ 1).
-If ALL positions are too new (all days = 0), omit the APR sentence entirely and say
-"All positions opened today — fee rate not yet meaningful."
-
-──────────────────────
-BLOCK 7: xStocks One Thing to Watch
-──────────────────────
-"One thing to watch on the equity side: [single most notable item — two sentences max. Examples: specific position with high unclaimed fees, a position with unusually high or low APR, a position approaching its range boundary, a rebalancing action due.]"
-
-──────────────────────
-BLOCK 8: xStocks Market Close
-──────────────────────
-"On the equity side — S-P-Y is at [price], [up/down] on the day. The VIX is at [level], which is [Low/Normal/Elevated/High] — [one sentence: what this means for xStocks range management, e.g. 'range boundaries are holding comfortably' or 'elevated volatility increases out-of-range risk across all positions' or 'compressed volatility is keeping positions well-centered']. Have a good one."
+If none flag: "All clear. No action needed today." (skinny) / "All clear." (weekly)
+If watch: "Watch — [one clause naming what.]"
+If act: "Act — [state the action.]"
 
 ═══════════════════════════════════════
-SPEAKING RULES — CRITICAL
+STEP 4 — MARKET DATA (web search)
+═══════════════════════════════════════
+⚠️ SEARCH DISCIPLINE — STRICTLY ENFORCED:
+  • Maximum 2 search attempts per data point. After 2 failures, declare unavailable.
+  • Saturday/Sunday: equity markets closed — use Friday close, say "as of Friday's close."
+  • Max 1 search for weekend equity data.
+
+Fetch (1 search each unless noted):
+  • BTC price
+  • Fear & Greed — alternative.me first, milkroad.com as backup (2 max total)
+  • SPY price + direction
+  • QQQ price + direction (the Nasdaq 100 ETF — say "Nasdaq one hundred" in the brief)
+  • VIX level — classify: Low (<15) / Normal (15–20) / Elevated (20–30) / High (>30)
+
+Spotlight (both brief types):
+  • Prices + % moves for TSLA, NVDA, GOOGL, AAPL — 2 searches maximum total
+  • Pick the SINGLE standout for the day/week — merit-based, not round-robin
+  • Frame as MARKET PERFORMANCE only: price, % move, notable level, earnings-on-deck flag
+  • DO NOT mention Kamino thresholds, LTV weights, or strategy role here
+
+═══════════════════════════════════════
+STEP 5 — PEG WATCH (SATURDAY FULL WEEKLY ONLY)
+═══════════════════════════════════════
+For each of the 6 xStocks tokens, compute deviation vs underlying:
+  token_price = Airtable Supply Value (USD) / Token Amount
+  Underlying mapping: SPYx→SPY, QQQx→QQQ, TSLAx→TSLA, NVDAx→NVDA, GOOGLx→GOOGL, AAPLx→AAPL
+  Deviation % = (token_price − underlying_price) / underlying_price × 100
+  Flag if |deviation| > 0.5%
+
+You already have SPY, QQQ from market data. TSLA/NVDA/GOOGL/AAPL from spotlight — reuse those.
+
+═══════════════════════════════════════
+STEP 6 — GENERATE BRIEF
 ═══════════════════════════════════════
 
-ElevenLabs will read this text aloud. Numbers must be written as words:
-  ✓ "two thousand and fifty-eight dollars"    ✗ "$2,058"
-  ✓ "one hundred and forty-six dollars"       ✗ "$146"
-  ✓ "sixty-four percent"                      ✗ "64%"
-  ✓ "thirty thousand dollars"                 ✗ "$30,000"
-  ✓ "sixteen days"                            ✗ "16 days" or "sixteen point one days"
-  ✓ "S-P-Y"  (hyphenated so ElevenLabs spells it) ✗ "SPY"
-  ✓ "VIX" is fine as-is — ElevenLabs reads it correctly
-  ✓ "LP" is fine as-is
+SPEAKING RULES (ElevenLabs TTS — critical):
+  Numbers as words: "three thousand seven hundred fifty dollars" not "$3,750"
+  Percentages:      "four point two percent" not "4.2%"
+  Tickers phonetic:
+    BTC → "Bitcoin"     SPY → "S-P-Y"      QQQ → "Q-Q-Q"      VIX → "V-I-X"
+    TSLA → "Tesla"      NVDA → "Nvidia"    GOOGL → "Google"    AAPL → "Apple"
+    TSLAx → "Tesla-x"   NVDAx → "Nvidia-x" GOOGLx → "Google-x" AAPLx → "Apple-x"
+    SPYx → "S-P-Y-x"    QQQx → "Q-Q-Q-x"   LLP → "L-L-P"
 
-Tickers must be phonetic:
-  ETH → "Eth"   BTC → "Bitcoin"   USDC → "U-S-D-C"
-  TSLAx → "Tesla-x"   SPYx → "S-P-Y-x"   NVDAx → "Nvidia-x"
-  CRCLx → "C-R-C-L-x"   AAPLx → "Apple-x"   GOOGLx → "Google-x"
+BLOCK COMPRESSION RULE: every block collapses to ONE LINE when calm.
+Do not pad to hit a target length. Calm weeks stay short.
 
-Never use raw ticker symbols. Never explain band structure or hedge mechanics.
-Target length: 90–120 seconds at 1.2× speed (~200–260 words).
+─────────────────────────────────────
+SKINNY DAILY (Monday–Friday, ~55 words):
+─────────────────────────────────────
+1. "Good morning. It's [Weekday], [Month] [Day]."
+2. Status line (one sentence — verdict only).
+3. "On the crypto side — Bitcoin is at [price], sentiment is [label] at [number]."
+4. "On the equity side — S-P-Y is at [price], the Nasdaq one hundred is [up/flat/down about X percent], and V-I-X is at [level] — [one brief characterization]."
+5. Spotlight + close: "[Name] is the standout today — [price action in one phrase]. [One optional context note.] Have a good one."
+
+OMIT entirely: collateral health, LTV detail, draw pace, net carry, growth, peg watch.
+
+─────────────────────────────────────
+FULL WEEKLY (Saturday, ~430 words calm):
+─────────────────────────────────────
+1. "Good morning. It's Saturday, [Month] [Day] — here's how the week landed."
+
+2. Status: "[verdict]. [One-clause watch if applicable — else omit watch clause.]"
+
+3. COLLATERAL HEALTH:
+   Pre-draw: "No debt yet — draw begins July. Collateral is sitting at [total USD], and the first draw puts opening LTV well under the forty percent cap."
+   Post-draw: "Blended LTV is [X] percent, against the forty percent operating cap and the sixty-five percent liquidation line. [Collateral could fall X% before the cap — one sentence.]"
+
+4. BORROWING PACE:
+   Pre-draw: "Nothing drawn yet. First draw July — three thousand seven hundred fifty dollars at Target, under the ceiling of four thousand five hundred. No tracking needed until then."
+   Post-draw: MTD drawn vs Target · cumulative vs Target D_max ($15,038) and Ceiling D_max ($18,046) · months to November.
+
+5. NET CARRY:
+   Pre-draw: "No borrow cost yet. Supply yield is averaging [X%] across the basket — small but ticking."
+   Post-draw: "Borrow rate is [X%], supply yield covering [Y%] [plus incentive of Z% if active] — real cost of debt is [net]% [. Note if incentive is promotional.]"
+
+6. GROWTH:
+   "Collateral is [up/down] [amount or X%] from the deposited base of sixty thousand one hundred fifty-three dollars. [ALWAYS TAG]: that is cushion, not borrowing room — the draw is sized off the deposited base, not market value."
+
+7. PEG WATCH:
+   All clean: "All six tokens tracked their underlying shares tightly this week — no de-peg pressure."
+   Flag: "[Token-x] is showing [X] basis points of gap vs [underlying] — [one context sentence]."
+
+8. MARKET PULSE:
+   "Bitcoin [finished/is] at [price], sentiment [label] at [number]. On equities, S-P-Y [closed at/is at] [price], the Nasdaq one hundred [up/down X percent on the week], and V-I-X at [level] — [characterization]."
+
+9. SPOTLIGHT + CLOSE:
+   "The week's standout was [Name] — [move + context]. [One additional sentence if the move warrants it.] Have a good weekend."
 
 ═══════════════════════════════════════
-OUTPUT RULES — CRITICAL
+OUTPUT FORMAT
 ═══════════════════════════════════════
-
-Output the brief EXACTLY ONCE, preceded by a single description line.
-
-FORMAT YOUR ENTIRE RESPONSE LIKE THIS:
-DESCRIPTION: [one sentence — the single most notable thing across BOTH strategies today, plain prose, no symbols]
+DESCRIPTION: [one sentence — most notable thing today/this week, plain prose, numbers spelled out, no symbols]
 Good morning. It's [day]...
-[rest of brief]
-...Have a good one.
+[brief body]
+...Have a good one.  [or: ...Have a good weekend.]
 
-DESCRIPTION line rules:
-- Must be the very first line of your response
-- One sentence only, ending with a period
-- Plain prose — spell out numbers, no dollar signs, percent signs, or ticker symbols
-- Capture the most actionable or notable thing today across either strategy
-- Examples:
-  "Delta neutral cycle sits in Normal Zone with fees averaging fifty dollars a day while all six equity positions remain in range."
-  "Near Drift alert on the crypto side while Tesla-x has been out of range for two consecutive sessions requiring rebalancing."
-  "Strong fee momentum across both strategies with a blended equity rate above forty percent and the delta neutral cycle on pace."
+DESCRIPTION examples:
+  "All clear across the collateral engine with Bitcoin holding above one hundred thousand dollars and Tesla the week's standout on a four percent move."
+  "Status all clear with the collateral sitting five percent above the deposited base and Nvidia pushing a new high ahead of earnings."
 
-- If you catch an error or inconsistency while writing, correct it silently and continue.
-- Do not restart. Do not show multiple drafts. Do not explain your reasoning.
-- Do not include anything after "Have a good one." — not a note, not a correction, nothing.
+Only one brief. No drafts. No self-correction notes. No text after the closing phrase.`;
 
-═══════════════════════════════════════
-EXAMPLE OUTPUT — MATCH THIS STYLE EXACTLY
-═══════════════════════════════════════
-
-DESCRIPTION: Delta neutral cycle holds in Normal Zone while the equity side shows strong blended fee momentum with all six positions in range.
-
-Good morning. It's Friday, April 4th.
-
-Eth is at two thousand and fifty-eight dollars, sitting in Normal Zone. You have about one hundred and twenty dollars of breathing room before Near Drift. No action needed.
-
-The current delta neutral strategy cycle is thirteen days in. The LP is down one hundred and forty-six dollars on price since open, the hedge is up one hundred and seventy-eight dollars. Delta balance is thirty-two dollars, within tolerance for Normal Zone. Total fees this cycle are six hundred and fifteen dollars, averaging about fifty-one dollars a day — a fee rate of around forty-one percent annualized on total deployed capital.
-
-One thing to watch on the delta neutral side: pending fees on the LP are approaching three hundred dollars — worth deciding today whether to claim or let them compound into the weekend.
-
-On the crypto side — market sentiment is Extreme Fear at nine. Bitcoin is at sixty-six thousand eight hundred dollars. Volatility looks normal — the three-sixty point band remains appropriate.
-
-Switching to the equity side. The six xStocks positions are averaging eleven days into their current cycles. Total fees across all positions are four hundred and twenty dollars, averaging about thirty-eight dollars a day — a blended fee rate of around thirty-four percent annualized on total deployed capital. C-R-C-L-x is currently out of range — watching it.
-
-One thing to watch on the equity side: C-R-C-L-x has three hundred and twenty-two dollars in unclaimed fees on a fifteen hundred dollar position — worth deciding today whether to claim or wait for rebalancing.
-
-On the equity side — S-P-Y is at five hundred and twelve dollars, down on the day. The VIX is at eighteen, which is Normal — range boundaries are holding comfortably across all positions. Have a good one.`;
-
-// ── Main ────────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
   if (!CLAUDE_API_KEY)   throw new Error('CLAUDE_API_KEY not set');
   if (!AIRTABLE_API_KEY) throw new Error('AIRTABLE_API_KEY not set');
 
   const now     = new Date();
+  const dayOfWeek = now.getDay(); // 0 = Sunday
   const dateStr = now.toLocaleDateString('en-US', {
     timeZone: 'America/Los_Angeles',
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
@@ -786,17 +500,37 @@ async function main() {
 
   console.log(`\n=== Generating morning brief for ${dateStr} ===\n`);
 
+  // Sunday skip — no brief, no API call
+  if (dayOfWeek === 0) {
+    console.log('=== Sunday — no brief scheduled. Exiting. ===');
+    const outputDir = path.dirname(OUTPUT_PATH);
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+    fs.writeFileSync(OUTPUT_PATH, '', 'utf8');
+    console.log(`✓ Sunday skip — empty file written to ${OUTPUT_PATH}`);
+    return;
+  }
+
+  const briefType = dayOfWeek === 6 ? 'FULL WEEKLY (Saturday)' : 'SKINNY DAILY (weekday)';
+  console.log(`Brief type: ${briefType}`);
+
   const userPrompt = `Today is ${dateStr} (${now.toISOString()}). Please fetch all required data and generate my morning brief now.`;
 
   const briefText = await runClaude(SYSTEM_PROMPT, userPrompt);
 
-  // Deduplicate — if Claude returns the brief twice in one response, strip the repeat
+  // Handle Sunday skip signal from Claude (belt-and-suspenders)
+  if (briefText === 'SUNDAY_SKIP') {
+    console.log('=== Sunday skip (detected by Claude) ===');
+    const outputDir = path.dirname(OUTPUT_PATH);
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+    fs.writeFileSync(OUTPUT_PATH, '', 'utf8');
+    return;
+  }
+
+  // Deduplicate — strip repeated brief if Claude outputted it twice
   const half = Math.floor(briefText.length / 2);
   const firstHalf  = briefText.slice(0, half).trim();
   const secondHalf = briefText.slice(half).trim();
-  const cleanBrief = (secondHalf.length > 50 && firstHalf === secondHalf)
-    ? firstHalf
-    : briefText;
+  const cleanBrief = (secondHalf.length > 50 && firstHalf === secondHalf) ? firstHalf : briefText;
 
   console.log('\n=== BRIEF TEXT ===');
   console.log(cleanBrief);
@@ -805,7 +539,6 @@ async function main() {
   const outputDir = path.dirname(OUTPUT_PATH);
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, cleanBrief, 'utf8');
-
   console.log(`✓ Brief written to ${OUTPUT_PATH}`);
 }
 
