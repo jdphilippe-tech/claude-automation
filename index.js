@@ -1031,14 +1031,16 @@ async function getKaminoPositions() {
 
     const kaminoPositionIds = new Set(Object.values(KAMINO_POSITIONS));
 
-    // Fetch all Lending Actions records that have a Token Amount populated,
-    // sorted by date descending so the most recent appears first per position.
+    // Fetch Lending Actions with token amounts for Kamino positions only.
+    // Filter by ARRAYJOIN to match specific Kamino position record IDs.
     let lendingActionsRaw = [];
     try {
       const { default: fetch } = await import('node-fetch');
+      const kaminoIds = Object.values(KAMINO_POSITIONS);
+      const posFilter = kaminoIds.map(id => `FIND('${id}', ARRAYJOIN({Position}))`).join(', ');
       const params = new URLSearchParams();
       [LF.position, LF.tokenAmt, LF.date].forEach(f => params.append('fields[]', f));
-      params.append('filterByFormula', '{Token Amount} > 0');
+      params.append('filterByFormula', `AND(OR(${posFilter}), {Token Amount} > 0)`);
       params.append('sort[0][field]', 'Date');
       params.append('sort[0][direction]', 'desc');
       params.append('pageSize', '50');
@@ -1057,15 +1059,17 @@ async function getKaminoPositions() {
       console.error(`  Token amount Airtable fetch error: ${e.message}`);
     }
 
-    // Build most-recent token amount per Kamino position
+    // Build most-recent token amount per Kamino position.
+    // Airtable returns linked record fields as [{id, name}] objects — extract .id
     const kaminoTokenAmounts = {};
     for (const record of lendingActionsRaw) {
       const posLinks = record.fields?.[LF.position];
-      const posId = Array.isArray(posLinks) ? posLinks[0] : posLinks;
+      const rawLink  = Array.isArray(posLinks) ? posLinks[0] : posLinks;
+      const posId    = (typeof rawLink === 'object' && rawLink !== null) ? rawLink.id : rawLink;
       if (!posId || !kaminoPositionIds.has(posId)) continue;
 
       const tokenKey = Object.keys(KAMINO_POSITIONS).find(k => KAMINO_POSITIONS[k] === posId);
-      if (!tokenKey || kaminoTokenAmounts[tokenKey] !== undefined) continue; // already have most recent
+      if (!tokenKey || kaminoTokenAmounts[tokenKey] !== undefined) continue;
 
       const tokenAmt = parseFloat(record.fields?.[LF.tokenAmt] ?? 0);
       if (tokenAmt > 0) kaminoTokenAmounts[tokenKey] = tokenAmt;
