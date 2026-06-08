@@ -1019,20 +1019,25 @@ async function getKaminoPositions() {
     }
     console.log(`  Reserve APYs loaded: ${Object.keys(apyBySymbol).join(', ')}`);
 
-    // Step 3: Fetch user obligation for the xStocks market
-    // Try multiple endpoint patterns — Kamino API versions vary
+    // Step 3: Fetch user obligation for the xStocks market.
+    // Kamino obligation endpoints use the obligation PDA address, not the wallet address.
+    // Obligation PDA = findProgramAddressSync(["obligation", obligationType, market, wallet], programId)
+    // For this wallet+market, the obligation address is hardcoded from Solscan tx verification.
+    // It is a deterministic PDA — stable unless the obligation is fully closed and recreated.
+    const KAMINO_OBLIGATION = process.env.KAMINO_XSTOCKS_OBLIGATION ?? '7CBqV8bcyYDwtdJYnbbd1EfT5JaQJhbuHntbr5w5CQn9';
+
     let obligation = null;
     const obligationEndpoints = [
-      `${KAMINO_API}/kamino-market/${marketAddress}/obligations/${WALLET_KAMINO_LENDING}`,
-      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/obligations?market=${marketAddress}`,
-      `${KAMINO_API}/lending/v2/${marketAddress}/users/${WALLET_KAMINO_LENDING}`,
+      `${KAMINO_API}/kamino-market/${marketAddress}/obligations/${KAMINO_OBLIGATION}`,
+      `${KAMINO_API}/v2/kamino-market/${marketAddress}/obligations/${KAMINO_OBLIGATION}`,
+      `${KAMINO_API}/kamino-market/${marketAddress}/obligation/${KAMINO_OBLIGATION}`,
     ];
 
     for (const endpoint of obligationEndpoints) {
       const res = await fetchWithTimeout(endpoint);
       if (res && !res.error) {
         obligation = res;
-        console.log(`  Obligation fetched via: ${endpoint.replace(WALLET_KAMINO_LENDING, '5yiT...')}`);
+        console.log(`  Obligation fetched via: ...obligations/${KAMINO_OBLIGATION.slice(0, 8)}...`);
         break;
       }
     }
