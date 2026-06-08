@@ -199,7 +199,7 @@ async function airtableCreate(tableId, records) {
 async function airtableFetchRecord(tableId, recordId) {
   const { default: fetch } = await import('node-fetch');
   const res = await fetch(
-    `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}/${recordId}`,
+    `https://api.airtable.com/v0/${AIRTABLE_BASE}/${tableId}/${recordId}?returnFieldsByFieldId=true`,
     { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
   );
   if (!res.ok) { console.error(`[Airtable fetch] ${tableId}/${recordId} — HTTP ${res.status}`); return null; }
@@ -217,7 +217,7 @@ async function fetchXStockAssets() {
     const meta = ASSET[key];
     if (!meta?.recordId) return;
     const record = await airtableFetchRecord('tblrATIQI0ld9tz1y', meta.recordId);
-    const status  = record?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+    const status  = record?.fields?.['fldDRyGqgXJTuHTpx']?.name ?? record?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
     const cycleId = record?.fields?.['fld0T538WMoPQ5bgL'] ?? null;
     const nftMint = record?.fields?.['fldpPTHyGfrSCQO0F'] ?? null;
     if (status !== 'Active') {
@@ -1104,8 +1104,8 @@ async function main() {
   // Cycle IDs (read from already-fetched asset records)
   const wethCycleId  = wethAssetRes?.fields?.['fld0T538WMoPQ5bgL'] ?? null;
   const hedgeCycleId = hedgeAssetRes?.fields?.['fld0T538WMoPQ5bgL'] ?? null;
-  const wethStatus   = wethAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
-  const hedgeStatus  = hedgeAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+  const wethStatus   = wethAssetRes?.fields?.['fldDRyGqgXJTuHTpx']?.name ?? wethAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+  const hedgeStatus  = hedgeAssetRes?.fields?.['fldDRyGqgXJTuHTpx']?.name ?? hedgeAssetRes?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
   console.log(`✓ Cycle IDs — LP: ${wethCycleId} (${wethStatus}) | Hedge: ${hedgeCycleId} (${hedgeStatus})`);
 
   // Fetch xStock asset metadata (cycleId + nftMint) from Airtable before running modules
