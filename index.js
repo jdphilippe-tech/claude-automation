@@ -1019,124 +1019,79 @@ async function getKaminoPositions() {
     }
     console.log(`  Reserve APYs loaded: ${Object.keys(apyBySymbol).join(', ')}`);
 
-    // Step 3: Fetch user kToken (Kamino Reserve Collateral) balances from Solana RPC.
+    // Step 3: Read token amounts from Airtable Lending Actions.
     //
-    // The Kamino REST API does not expose obligation data at any discoverable endpoint.
-    // Alternative: when a user deposits into Kamino, they receive kTokens in their wallet.
-    // kToken balance × (totalSupplyUsd / totalSupply) = user's current supply USD.
-    // This approach uses Solana RPC + reserve metrics (already fetched above).
+    // kTokens are held in Kamino's obligation program account, not the user's wallet.
+    // The Kamino REST API does not expose obligation data at any public endpoint.
     //
-    // Step 3a: Get all SPL token accounts for the wallet via Solana RPC.
-    // Step 3b: Fetch reserve details to map reserve address → kToken mint.
-    // Step 3c: Cross-reference to compute user deposit USD per position.
+    // Solution: read the most recent token amount per position from Airtable.
+    // The initial deposit records (entered at position open) have token amounts.
+    // Current supply USD = token_amount × (totalSupplyUsd / totalSupply) from reserve metrics.
+    // This gives an accurate mark-to-market USD value without any blockchain RPC calls.
 
-    const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
+    const kaminoPositionIds = new Set(Object.values(KAMINO_POSITIONS));
 
-    async function solanaRpc(method, params) {
+    // Fetch all Lending Actions records that have a Token Amount populated,
+    // sorted by date descending so the most recent appears first per position.
+    let lendingActionsRaw = [];
+    try {
       const { default: fetch } = await import('node-fetch');
-      try {
-        const res = await fetch(SOLANA_RPC, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-          signal: AbortSignal.timeout(10000),
-        });
-        if (!res.ok) return null;
+      const params = new URLSearchParams();
+      [LF.position, LF.tokenAmt, LF.date].forEach(f => params.append('fields[]', f));
+      params.append('filterByFormula', '{Token Amount} > 0');
+      params.append('sort[0][field]', 'Date');
+      params.append('sort[0][direction]', 'desc');
+      params.append('pageSize', '50');
+      const res = await fetch(
+        `https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${params}`,
+        { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
+      );
+      if (res.ok) {
         const json = await res.json();
-        return json.result ?? null;
-      } catch (e) { return null; }
+        lendingActionsRaw = json.records ?? [];
+        console.log(`  Airtable token amount records: ${lendingActionsRaw.length} found`);
+      } else {
+        console.error(`  [Airtable] Token amount fetch failed: HTTP ${res.status}`);
+      }
+    } catch (e) {
+      console.error(`  Token amount Airtable fetch error: ${e.message}`);
     }
 
-    // Get all token accounts for the Kamino wallet (classic SPL — kTokens use Token Program)
-    const tokenAccountsResult = await solanaRpc('getTokenAccountsByOwner', [
-      WALLET_KAMINO_LENDING,
-      { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
-      { encoding: 'jsonParsed' },
-    ]);
+    // Build most-recent token amount per Kamino position
+    const kaminoTokenAmounts = {};
+    for (const record of lendingActionsRaw) {
+      const posLinks = record.fields?.[LF.position];
+      const posId = Array.isArray(posLinks) ? posLinks[0] : posLinks;
+      if (!posId || !kaminoPositionIds.has(posId)) continue;
 
-    // Build mint → balance map from wallet token accounts
-    const walletMintBalances = {};
-    if (tokenAccountsResult?.value) {
-      for (const ta of tokenAccountsResult.value) {
-        const info = ta.account?.data?.parsed?.info;
-        if (!info) continue;
-        const mint = info.mint;
-        const amount = parseFloat(info.tokenAmount?.uiAmount ?? 0);
-        if (amount > 0) walletMintBalances[mint] = amount;
-      }
-      console.log(`  Wallet token accounts: ${Object.keys(walletMintBalances).length} with balance`);
-    } else {
-      console.log('  Solana RPC unavailable — deposit values will be null');
+      const tokenKey = Object.keys(KAMINO_POSITIONS).find(k => KAMINO_POSITIONS[k] === posId);
+      if (!tokenKey || kaminoTokenAmounts[tokenKey] !== undefined) continue; // already have most recent
+
+      const tokenAmt = parseFloat(record.fields?.[LF.tokenAmt] ?? 0);
+      if (tokenAmt > 0) kaminoTokenAmounts[tokenKey] = tokenAmt;
     }
+    console.log(`  Token amounts resolved: ${Object.keys(kaminoTokenAmounts).join(', ') || 'none'}`);
 
-    // Fetch reserve detail accounts to get kToken (collateral) mint per reserve
-    // Kamino API endpoint: /kamino-market/{market}/reserves (without /metrics)
-    const reservesDetail = await fetchWithTimeout(
-      `${KAMINO_API}/kamino-market/${marketAddress}/reserves`
-    );
-
-    // Build reserve → kToken mint map from reserve detail response
-    const reserveToKTokenMint = {};
-    if (Array.isArray(reservesDetail)) {
-      for (const r of reservesDetail) {
-        const reservePubkey = r.address ?? r.reserve ?? r.pubkey;
-        const kTokenMint = r.collateralMint ?? r.collateral?.mint ?? r.kTokenMint ?? r.collateralMintAddress;
-        if (reservePubkey && kTokenMint) {
-          reserveToKTokenMint[reservePubkey] = kTokenMint;
-        }
-      }
-      console.log(`  Reserve→kToken mappings: ${Object.keys(reserveToKTokenMint).length}`);
-    } else if (reservesDetail) {
-      // Try to extract from different response shapes
-      const inner = reservesDetail.reserves ?? reservesDetail.data ?? [];
-      for (const r of inner) {
-        const reservePubkey = r.address ?? r.pubkey ?? r.reserve;
-        const kTokenMint = r.collateralMint ?? r.collateral?.mint ?? r.kTokenMint;
-        if (reservePubkey && kTokenMint) reserveToKTokenMint[reservePubkey] = kTokenMint;
-      }
-    }
-
-    // Map token symbol → { supplyUSD, tokenAmt } using kToken balance + exchange rate
-    const userDeposits = {};
+    // Step 4: For each tracked reserve, compute current supply USD and merge with APY
     for (const r of metricsArr) {
       const sym = (r.liquidityToken ?? r.symbol ?? '').toUpperCase();
       const tokenKey = Object.keys(KAMINO_POSITIONS).find(k => k.toUpperCase() === sym);
       if (!tokenKey) continue;
 
-      const reservePubkey = r.reserve;
-      const kTokenMint = reserveToKTokenMint[reservePubkey];
-      const kTokenBalance = kTokenMint ? (walletMintBalances[kTokenMint] ?? null) : null;
-
+      const supplyAPY = parseFloat(r.supplyApy ?? 0);
       const totalSupplyTokens = parseFloat(r.totalSupply ?? 0);
-      const totalSupplyUsd = parseFloat(r.totalSupplyUsd ?? 0);
+      const totalSupplyUsd    = parseFloat(r.totalSupplyUsd ?? 0);
+      const tokenAmt = kaminoTokenAmounts[tokenKey] ?? null;
 
       let supplyUSD = null;
-      let tokenAmt  = null;
-
-      if (kTokenBalance !== null && totalSupplyTokens > 0) {
-        // kToken represents a proportional share of the reserve
-        // We need total kToken supply to compute user share — use on-chain data if available
-        // Simplified: since kToken:token exchange rate ≈ 1:1 for fresh deposits,
-        // use kToken balance as proxy for token amount when exact rate unavailable
-        tokenAmt  = kTokenBalance; // approximate: actual amount ≈ kToken balance × exchange rate
-        supplyUSD = tokenAmt * (totalSupplyUsd / totalSupplyTokens);
-        console.log(`  ${tokenKey}: kToken=${kTokenBalance.toFixed(4)}, ~$${supplyUSD.toFixed(2)}`);
-      } else if (kTokenBalance !== null) {
-        tokenAmt  = kTokenBalance;
-        console.log(`  ${tokenKey}: kToken=${kTokenBalance.toFixed(4)}, USD=unknown (no supply data)`);
+      if (tokenAmt != null && totalSupplyTokens > 0) {
+        const pricePerToken = totalSupplyUsd / totalSupplyTokens;
+        supplyUSD = tokenAmt * pricePerToken;
+        console.log(`  ${tokenKey}: ${tokenAmt.toFixed(4)} tokens × $${pricePerToken.toFixed(4)} = $${supplyUSD.toFixed(2)}, APY: ${(supplyAPY * 100).toFixed(3)}%`);
       } else {
-        console.log(`  ${tokenKey}: kToken balance unavailable (${kTokenMint ? 'mint=' + kTokenMint.slice(0, 8) + '..' : 'no mint mapping'})`);
+        console.log(`  ${tokenKey}: no prior token amount in Airtable — APY only: ${(supplyAPY * 100).toFixed(3)}%`);
       }
 
-      userDeposits[tokenKey] = { supplyUSD, tokenAmt };
-    }
-
-    // Merge with APY data already in apyBySymbol
-    const obligation = userDeposits; // re-use the obligation variable name for compatibility
-
-    // Step 4: Merge kToken deposit data with APY data
-    for (const [tokenKey, depositData] of Object.entries(obligation)) {
-      const supplyAPY = apyBySymbol[tokenKey.toUpperCase()] ?? null;
-      const { supplyUSD, tokenAmt } = depositData;
       results[tokenKey] = { supplyUSD, tokenAmt, supplyAPY };
     }
 
