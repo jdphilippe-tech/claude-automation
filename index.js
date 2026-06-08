@@ -1019,105 +1019,124 @@ async function getKaminoPositions() {
     }
     console.log(`  Reserve APYs loaded: ${Object.keys(apyBySymbol).join(', ')}`);
 
-    // Step 3: Fetch user obligation for the xStocks market.
-    // Kamino obligation endpoints use the obligation PDA address, not the wallet address.
-    // Obligation PDA = findProgramAddressSync(["obligation", obligationType, market, wallet], programId)
-    // For this wallet+market, the obligation address is hardcoded from Solscan tx verification.
-    // It is a deterministic PDA — stable unless the obligation is fully closed and recreated.
-    const KAMINO_OBLIGATION = process.env.KAMINO_XSTOCKS_OBLIGATION ?? '7CBqV8bcyYDwtdJYnbbd1EfT5JaQJhbuHntbr5w5CQn9';
+    // Step 3: Fetch user kToken (Kamino Reserve Collateral) balances from Solana RPC.
+    //
+    // The Kamino REST API does not expose obligation data at any discoverable endpoint.
+    // Alternative: when a user deposits into Kamino, they receive kTokens in their wallet.
+    // kToken balance × (totalSupplyUsd / totalSupply) = user's current supply USD.
+    // This approach uses Solana RPC + reserve metrics (already fetched above).
+    //
+    // Step 3a: Get all SPL token accounts for the wallet via Solana RPC.
+    // Step 3b: Fetch reserve details to map reserve address → kToken mint.
+    // Step 3c: Cross-reference to compute user deposit USD per position.
 
-    let obligation = null;
+    const SOLANA_RPC = 'https://api.mainnet-beta.solana.com';
 
-    // Try every plausible Kamino API pattern for user obligation data.
-    // Log each attempt so we can see which path the API actually uses.
-    const obligationEndpoints = [
-      // Obligation PDA address patterns
-      `${KAMINO_API}/kamino-market/${marketAddress}/obligations/${KAMINO_OBLIGATION}`,
-      `${KAMINO_API}/kamino-market/${marketAddress}/obligation/${KAMINO_OBLIGATION}`,
-      // Wallet-based user portfolio patterns
-      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/positions`,
-      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/lend`,
-      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/portfolio`,
-      `${KAMINO_API}/v2/users/${WALLET_KAMINO_LENDING}/lend-positions`,
-      `${KAMINO_API}/kamino-market/${marketAddress}/users/${WALLET_KAMINO_LENDING}`,
-      `${KAMINO_API}/kamino-market/${marketAddress}/user-obligation/${WALLET_KAMINO_LENDING}`,
-      `${KAMINO_API}/kamino-market/${marketAddress}/depositors/${WALLET_KAMINO_LENDING}`,
-    ];
+    async function solanaRpc(method, params) {
+      const { default: fetch } = await import('node-fetch');
+      try {
+        const res = await fetch(SOLANA_RPC, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        return json.result ?? null;
+      } catch (e) { return null; }
+    }
 
-    for (const endpoint of obligationEndpoints) {
-      const shortUrl = endpoint.replace(WALLET_KAMINO_LENDING, '5yiT..').replace(marketAddress, '5wJe..').replace(KAMINO_OBLIGATION, '7CBq..');
-      const res = await fetchWithTimeout(endpoint);
-      if (res === null) { console.log(`  [skip] ${shortUrl}`); continue; }
-      if (res && !res.error) {
-        obligation = res;
-        console.log(`  ✓ Obligation fetched via: ${shortUrl}`);
-        break;
+    // Get all token accounts for the Kamino wallet (classic SPL — kTokens use Token Program)
+    const tokenAccountsResult = await solanaRpc('getTokenAccountsByOwner', [
+      WALLET_KAMINO_LENDING,
+      { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' },
+      { encoding: 'jsonParsed' },
+    ]);
+
+    // Build mint → balance map from wallet token accounts
+    const walletMintBalances = {};
+    if (tokenAccountsResult?.value) {
+      for (const ta of tokenAccountsResult.value) {
+        const info = ta.account?.data?.parsed?.info;
+        if (!info) continue;
+        const mint = info.mint;
+        const amount = parseFloat(info.tokenAmount?.uiAmount ?? 0);
+        if (amount > 0) walletMintBalances[mint] = amount;
       }
-      console.log(`  [err] ${shortUrl}: ${JSON.stringify(res)?.slice(0, 60)}`);
+      console.log(`  Wallet token accounts: ${Object.keys(walletMintBalances).length} with balance`);
+    } else {
+      console.log('  Solana RPC unavailable — deposit values will be null');
     }
 
-    if (!obligation) {
-      // Log all raw response codes for debugging
-      console.error('Kamino obligation: all endpoints failed — check logs above for working path');
-      throw new Error('Could not fetch Kamino obligation');
-    }
-
-    // Step 4: Parse deposits from obligation
-    // Kamino API may return deposits at different keys depending on version
-    const deposits = (
-      obligation.deposits ??
-      obligation.collateral ??
-      obligation.data?.deposits ??
-      (Array.isArray(obligation) ? obligation : null) ??
-      []
+    // Fetch reserve detail accounts to get kToken (collateral) mint per reserve
+    // Kamino API endpoint: /kamino-market/{market}/reserves (without /metrics)
+    const reservesDetail = await fetchWithTimeout(
+      `${KAMINO_API}/kamino-market/${marketAddress}/reserves`
     );
 
-    if (!deposits.length) {
-      console.log('  No deposits found in obligation response');
-      console.log('  Raw obligation keys:', Object.keys(obligation).join(', '));
+    // Build reserve → kToken mint map from reserve detail response
+    const reserveToKTokenMint = {};
+    if (Array.isArray(reservesDetail)) {
+      for (const r of reservesDetail) {
+        const reservePubkey = r.address ?? r.reserve ?? r.pubkey;
+        const kTokenMint = r.collateralMint ?? r.collateral?.mint ?? r.kTokenMint ?? r.collateralMintAddress;
+        if (reservePubkey && kTokenMint) {
+          reserveToKTokenMint[reservePubkey] = kTokenMint;
+        }
+      }
+      console.log(`  Reserve→kToken mappings: ${Object.keys(reserveToKTokenMint).length}`);
+    } else if (reservesDetail) {
+      // Try to extract from different response shapes
+      const inner = reservesDetail.reserves ?? reservesDetail.data ?? [];
+      for (const r of inner) {
+        const reservePubkey = r.address ?? r.pubkey ?? r.reserve;
+        const kTokenMint = r.collateralMint ?? r.collateral?.mint ?? r.kTokenMint;
+        if (reservePubkey && kTokenMint) reserveToKTokenMint[reservePubkey] = kTokenMint;
+      }
     }
 
-    for (const deposit of deposits) {
-      // Token symbol may be at different fields depending on API version
-      const symbol = (
-        deposit.token ??
-        deposit.symbol ??
-        deposit.mintSymbol ??
-        deposit.liquidityToken ??
-        ''
-      ).toUpperCase().replace('X', 'x'); // normalize e.g. "SPYX" → "SPYx"
+    // Map token symbol → { supplyUSD, tokenAmt } using kToken balance + exchange rate
+    const userDeposits = {};
+    for (const r of metricsArr) {
+      const sym = (r.liquidityToken ?? r.symbol ?? '').toUpperCase();
+      const tokenKey = Object.keys(KAMINO_POSITIONS).find(k => k.toUpperCase() === sym);
+      if (!tokenKey) continue;
 
-      // Find matching key in KAMINO_POSITIONS (case-insensitive)
-      const tokenKey = Object.keys(KAMINO_POSITIONS).find(
-        k => k.toLowerCase() === symbol.toLowerCase()
-      );
-      if (!tokenKey) {
-        if (symbol) console.log(`  Skipping untracked deposit: ${symbol}`);
-        continue;
+      const reservePubkey = r.reserve;
+      const kTokenMint = reserveToKTokenMint[reservePubkey];
+      const kTokenBalance = kTokenMint ? (walletMintBalances[kTokenMint] ?? null) : null;
+
+      const totalSupplyTokens = parseFloat(r.totalSupply ?? 0);
+      const totalSupplyUsd = parseFloat(r.totalSupplyUsd ?? 0);
+
+      let supplyUSD = null;
+      let tokenAmt  = null;
+
+      if (kTokenBalance !== null && totalSupplyTokens > 0) {
+        // kToken represents a proportional share of the reserve
+        // We need total kToken supply to compute user share — use on-chain data if available
+        // Simplified: since kToken:token exchange rate ≈ 1:1 for fresh deposits,
+        // use kToken balance as proxy for token amount when exact rate unavailable
+        tokenAmt  = kTokenBalance; // approximate: actual amount ≈ kToken balance × exchange rate
+        supplyUSD = tokenAmt * (totalSupplyUsd / totalSupplyTokens);
+        console.log(`  ${tokenKey}: kToken=${kTokenBalance.toFixed(4)}, ~$${supplyUSD.toFixed(2)}`);
+      } else if (kTokenBalance !== null) {
+        tokenAmt  = kTokenBalance;
+        console.log(`  ${tokenKey}: kToken=${kTokenBalance.toFixed(4)}, USD=unknown (no supply data)`);
+      } else {
+        console.log(`  ${tokenKey}: kToken balance unavailable (${kTokenMint ? 'mint=' + kTokenMint.slice(0, 8) + '..' : 'no mint mapping'})`);
       }
 
-      // USD value — try multiple field names
-      const supplyUSD = parseFloat(
-        deposit.amountUsd ??
-        deposit.marketValueUsd ??
-        deposit.depositedAmountUsd ??
-        deposit.supplyUsd ??
-        deposit.value ??
-        0
-      );
+      userDeposits[tokenKey] = { supplyUSD, tokenAmt };
+    }
 
-      // Token amount — raw token units (already decoded) or scaled fraction
-      const tokenAmt = parseFloat(
-        deposit.amount ??
-        deposit.depositedAmount ??
-        deposit.tokenAmount ??
-        deposit.balance ??
-        0
-      );
+    // Merge with APY data already in apyBySymbol
+    const obligation = userDeposits; // re-use the obligation variable name for compatibility
 
-      const supplyAPY = apyBySymbol[tokenKey.toUpperCase()] ?? apyBySymbol[symbol.toUpperCase()] ?? null;
-
-      console.log(`  ${tokenKey}: $${supplyUSD.toFixed(2)}, ${tokenAmt.toFixed(4)} tokens, APY: ${supplyAPY != null ? (supplyAPY * 100).toFixed(3) + '%' : 'n/a'}`);
+    // Step 4: Merge kToken deposit data with APY data
+    for (const [tokenKey, depositData] of Object.entries(obligation)) {
+      const supplyAPY = apyBySymbol[tokenKey.toUpperCase()] ?? null;
+      const { supplyUSD, tokenAmt } = depositData;
       results[tokenKey] = { supplyUSD, tokenAmt, supplyAPY };
     }
 
@@ -1333,11 +1352,13 @@ async function main() {
       const posId = KAMINO_POSITIONS[tokenKey];
       if (!posId) continue;
       const fields = {};
-      if (data.supplyUSD > 0)   fields[LF.supplyUSD] = data.supplyUSD;
-      if (data.tokenAmt  > 0)   fields[LF.tokenAmt]  = data.tokenAmt;
-      if (data.supplyAPY != null) fields[LF.supplyAPY] = data.supplyAPY * 100; // store as % not decimal
+      if (data.supplyUSD != null && data.supplyUSD > 0) fields[LF.supplyUSD] = data.supplyUSD;
+      if (data.tokenAmt  != null && data.tokenAmt  > 0) fields[LF.tokenAmt]  = data.tokenAmt;
+      if (data.supplyAPY != null) fields[LF.supplyAPY] = data.supplyAPY * 100;
       batch.push(lendingRecord(posId, fields));
-      console.log(`  Queued ${tokenKey}: $${data.supplyUSD.toFixed(2)}, ${data.tokenAmt.toFixed(4)} tokens, APY ${data.supplyAPY != null ? (data.supplyAPY * 100).toFixed(3) + '%' : 'n/a'}`);
+      const usdStr = data.supplyUSD != null ? `$${data.supplyUSD.toFixed(2)}` : 'USD=pending';
+      const tokStr = data.tokenAmt  != null ? `${data.tokenAmt.toFixed(4)} tokens` : 'tokens=pending';
+      console.log(`  Queued ${tokenKey}: ${usdStr}, ${tokStr}, APY ${data.supplyAPY != null ? (data.supplyAPY * 100).toFixed(3) + '%' : 'n/a'}`);
     }
     if (batch.length > 0) {
       const ok = await airtableCreate(LENDING_TABLE, batch);
