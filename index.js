@@ -964,21 +964,47 @@ async function getKaminoPositions() {
   const results = {};
 
   try {
-    // Step 1: Discover xStocks market address dynamically
-    const markets = await fetchWithTimeout(`${KAMINO_API}/kamino-market/configs`);
-    if (!Array.isArray(markets)) throw new Error(`Unexpected markets response: ${JSON.stringify(markets)?.slice(0, 80)}`);
+    // Step 1: Discover xStocks market address
+    // Try several Kamino API endpoint patterns — the configs endpoint path varies by API version.
+    // XSTOCKS_MARKET_ADDRESS can be hardcoded once confirmed from the Kamino UI URL.
+    const XSTOCKS_MARKET_ADDRESS = process.env.KAMINO_XSTOCKS_MARKET ?? null;
 
-    const xstocksMarket = markets.find(m =>
-      m.name?.toLowerCase().includes('xstock') ||
-      m.description?.toLowerCase().includes('xstock')
-    );
-    if (!xstocksMarket) {
-      console.error(`xStocks market not found. Available: ${markets.map(m => m.name).join(', ')}`);
-      throw new Error('xStocks market not found in Kamino configs');
+    let marketAddress = XSTOCKS_MARKET_ADDRESS;
+
+    if (!marketAddress) {
+      const configEndpoints = [
+        `${KAMINO_API}/v2/lending/markets`,
+        `${KAMINO_API}/lending/v2/markets`,
+        `${KAMINO_API}/kamino-market/configs`,
+        `${KAMINO_API}/v2/markets`,
+      ];
+
+      for (const endpoint of configEndpoints) {
+        const res = await fetchWithTimeout(endpoint);
+        if (!res) continue;
+        const arr = Array.isArray(res) ? res : (res.markets ?? res.data ?? []);
+        if (!Array.isArray(arr) || arr.length === 0) continue;
+        const found = arr.find(m =>
+          m.name?.toLowerCase().includes('xstock') ||
+          m.description?.toLowerCase().includes('xstock')
+        );
+        if (found) {
+          marketAddress = found.lendingMarket ?? found.market ?? found.address;
+          console.log(`  Market found via ${endpoint}: ${found.name} (${marketAddress})`);
+          break;
+        }
+      }
     }
 
-    const marketAddress = xstocksMarket.lendingMarket;
-    console.log(`  Market: ${xstocksMarket.name} (${marketAddress})`);
+    if (!marketAddress) {
+      throw new Error(
+        'xStocks market address not found. ' +
+        'Set KAMINO_XSTOCKS_MARKET env variable in GitHub repo variables ' +
+        'with the market address from app.kamino.finance/lending/{address}'
+      );
+    }
+
+    console.log(`  Using xStocks market: ${marketAddress}`);
 
     // Step 2: Fetch reserve metrics (APY per token)
     const reserveMetrics = await fetchWithTimeout(
