@@ -1,22 +1,24 @@
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
-
 const VOICE_ID = 'ewxUvnyvvOehYjKjUVKC'; // Mike
 const MODEL_ID = 'eleven_turbo_v2_5';
 const API_KEY  = process.env.ELEVENLABS_API_KEY;
-
 if (!API_KEY) { console.error('Missing ELEVENLABS_API_KEY'); process.exit(1); }
-
 // Match the output path from generate-brief.mjs
 const BRIEF_FILE = process.env.BRIEF_TEXT_FILE || 'audio/brief-text.txt';
-
 if (!fs.existsSync(BRIEF_FILE)) {
   console.error(`Brief file not found: ${BRIEF_FILE}`);
   process.exit(1);
 }
-
 const BRIEF_TEXT = fs.readFileSync(BRIEF_FILE, 'utf8').trim();
+
+// Sunday skip — generate-brief.mjs writes an empty file on Sundays.
+// Sending empty text to ElevenLabs causes a 400 error, so exit cleanly.
+if (!BRIEF_TEXT) {
+  console.log('Brief file is empty — Sunday skip. No audio generated.');
+  process.exit(0);
+}
 
 const payload = JSON.stringify({
   text: BRIEF_TEXT,
@@ -29,7 +31,6 @@ const payload = JSON.stringify({
     speed: 1.2
   }
 });
-
 const options = {
   hostname: 'api.elevenlabs.io',
   path: `/v1/text-to-speech/${VOICE_ID}`,
@@ -40,14 +41,11 @@ const options = {
     'Content-Length': Buffer.byteLength(payload)
   }
 };
-
 const date      = new Date().toISOString().split('T')[0];
 const outputDir = 'audio';
 if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 const outputFile = path.join(outputDir, `brief-${date}.mp3`);
-
 console.log(`Generating audio for ${date} at 1.2x speed...`);
-
 const req = https.request(options, (res) => {
   if (res.statusCode !== 200) {
     let body = '';
@@ -69,7 +67,6 @@ const req = https.request(options, (res) => {
     );
   });
 });
-
 req.on('error', (e) => { console.error(e); process.exit(1); });
 req.write(payload);
 req.end();
