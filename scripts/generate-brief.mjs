@@ -126,18 +126,32 @@ async function runAirtableQuery(input) {
 
 async function runWebSearch(input) {
   const { query } = input;
-  const params = new URLSearchParams({ q: query, format: 'json' });
-  const res = await fetch(`https://search.tbxzt.com/search?${params}`, {
-    headers: { 'User-Agent': 'Mozilla/5.0 PortfolioOS/1.0' }
-  });
-  if (!res.ok) return { error: `Search failed: ${res.status}` };
-  const data = await res.json();
-  const results = (data.results || []).slice(0, 5).map(r => ({
-    title:   r.title,
-    snippet: r.content || r.snippet || '',
-    url:     r.url
-  }));
-  return { results };
+  const BRAVE_API_KEY = process.env.BRAVE_SEARCH_API_KEY;
+
+  if (!BRAVE_API_KEY) {
+    return { error: 'BRAVE_SEARCH_API_KEY not set — web search unavailable' };
+  }
+
+  try {
+    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3&text_decorations=false&search_lang=en`;
+    const res = await fetch(url, {
+      headers: {
+        'Accept':              'application/json',
+        'Accept-Encoding':     'gzip',
+        'X-Subscription-Token': BRAVE_API_KEY
+      }
+    });
+    if (!res.ok) return { error: `Brave Search ${res.status}: ${await res.text()}` };
+    const data = await res.json();
+    const results = (data.web?.results || []).slice(0, 3).map(r => ({
+      title:       r.title       || '',
+      description: r.description || '',
+      url:         r.url         || ''
+    }));
+    return { results };
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
 async function executeTool(name, input) {
