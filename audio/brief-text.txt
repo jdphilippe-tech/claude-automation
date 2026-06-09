@@ -1,13 +1,9 @@
-Good morning. It's Sunday, June seventh.
+Good morning. It's Tuesday, June ninth.
 
-The delta neutral strategy does not have an active cycle right now. Both the LP and the hedge were closed on Thursday, June fifth, and the position is currently sitting in stables. No band levels, no fees, no delta to track — just waiting for the next cycle entry signal.
+All clear. No action needed today.
 
-One thing to watch on the delta neutral side: this is a good window to review the entry criteria for the next cycle. Eth is at two thousand five hundred and sixteen dollars — if that level holds or consolidates, it could be a candidate range center for the next deployment.
+On the crypto side — Bitcoin is at around sixty-three thousand four hundred dollars, sentiment is Fear at twenty-eight.
 
-On the crypto side — market sentiment is Fear at twenty-eight. Bitcoin is at one hundred and five thousand two hundred dollars. Volatility looks elevated right now, which may argue for waiting for a calmer entry window before reopening the LP.
+On the equity side — S-P-Y is trading in the seven forties, the Nasdaq one hundred is up about one and a half percent on the day, and V-I-X is at twenty point four five — elevated, worth watching but not signaling stress.
 
-Switching to the equity side. The five eligible xStocks positions are averaging about fourteen days into their current cycles. Total fees across all positions are two hundred and twenty-two dollars, averaging about nineteen dollars a day — a blended fee rate of around twenty-eight percent annualized on deployed capital. C-R-C-L-x reset less than a day ago under a new cycle — fee rate not yet meaningful there.
-
-One thing to watch on the equity side: Apple-x is leading the pack at nearly forty-four percent annualized on a five thousand four hundred dollar position — worth keeping an eye on range status as it accounts for a meaningful share of daily fee output.
-
-On the equity side — S-P-Y closed Thursday at approximately seven hundred and thirty-eight dollars. The VIX is at twenty-one point five one, which is Elevated — elevated volatility increases out-of-range risk across all positions, so range boundaries across the equity book deserve a closer look this week. Have a good one.
+Tesla is the standout today — up nearly five percent on the robotaxi launch, pushing back toward the four hundred dollar range. That move matters for the basket — Tesla-x is one of the six collateral positions, so a sustained rally adds cushion going into July's first draw. Have a good one.
