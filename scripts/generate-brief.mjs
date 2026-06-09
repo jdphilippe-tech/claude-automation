@@ -157,10 +157,17 @@ async function runWebSearch(input) {
 async function executeTool(name, input) {
   console.log(`  [tool] ${name} — ${JSON.stringify(input).slice(0, 80)}`);
   let result;
-  if (name === 'airtable_query') result = await runAirtableQuery(input);
-  else if (name === 'web_search') result = await runWebSearch(input);
-  else result = { error: `Unknown tool: ${name}` };
-  console.log(`  [result] ${JSON.stringify(result).slice(0, 120)}…`);
+  try {
+    if (name === 'airtable_query') result = await runAirtableQuery(input);
+    else if (name === 'web_search') result = await runWebSearch(input);
+    else result = { error: `Unknown tool: ${name}` };
+  } catch (e) {
+    // Belt-and-suspenders: any uncaught tool exception returns an error object
+    // instead of crashing the whole brief loop.
+    console.error(`  [tool crash] ${name}: ${e.message}`);
+    result = { error: `${name} crashed: ${e.message}` };
+  }
+  console.log(`  [result] ${JSON.stringify(result)?.slice(0, 120)}…`);
   return result;
 }
 
