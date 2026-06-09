@@ -121,7 +121,9 @@ async function runAirtableQuery(input) {
     return { error: `Airtable ${res.status}: ${err}` };
   }
   const data = await res.json();
-  return { records: data.records, has_more: !!data.offset, offset: data.offset };
+  // Cap at 50 records to prevent oversized Claude API payloads on the next iteration.
+  const records = (data.records ?? []).slice(0, 50);
+  return { records, has_more: !!data.offset, offset: data.offset };
 }
 
 async function runWebSearch(input) {
@@ -176,21 +178,32 @@ async function executeTool(name, input) {
 async function callClaude(messages, systemPrompt) {
   const MAX_RETRIES = 2;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         CLAUDE_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model:      CLAUDE_MODEL,
-        max_tokens: 4096,
-        system:     systemPrompt,
-        tools:      TOOLS,
-        messages
-      })
-    });
+    let res;
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type':      'application/json',
+          'x-api-key':         CLAUDE_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model:      CLAUDE_MODEL,
+          max_tokens: 4096,
+          system:     systemPrompt,
+          tools:      TOOLS,
+          messages
+        }),
+        signal: AbortSignal.timeout(120000) // 2 min timeout
+      });
+    } catch (fetchErr) {
+      if (attempt < MAX_RETRIES) {
+        console.warn(`  [fetch error] ${fetchErr.message} — retrying in 10s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise(r => setTimeout(r, 10000));
+        continue;
+      }
+      throw new Error(`Claude API fetch failed after ${MAX_RETRIES} retries: ${fetchErr.message}`);
+    }
 
     if (res.status === 429) {
       if (attempt < MAX_RETRIES) {
