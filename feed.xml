@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, June 9, 2026</title>
+      <description><![CDATA[All clear across the collateral engine with no debt yet ahead of July's first draw, and Tesla the standout today on a robotaxi launch driving nearly a five percent gain.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-09.mp3" length="756132" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-09</guid>
+      <pubDate>Tue, 09 Jun 2026 15:41:51 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Sunday, June 7, 2026</title>
       <description><![CDATA[The delta neutral strategy is in stables with no active cycle after closing on June fifth, while the five eligible equity positions are averaging twenty-eight percent annualized fees and C-R-C-L-x has just reopened today under a fresh cycle.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-07.mp3" length="1834048" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-08.mp3" length="1363844" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-08</guid>
       <pubDate>Fri, 08 May 2026 14:26:18 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, May 7, 2026</title>
-      <description><![CDATA[Eth has drifted into Near Drift Zone and sits just thirty-three dollars below the Drift Upper boundary, with delta currently within tolerance but worth watching closely today.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-07.mp3" length="1264370" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-07</guid>
-      <pubDate>Thu, 07 May 2026 14:18:58 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
