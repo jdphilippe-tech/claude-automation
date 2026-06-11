@@ -75,21 +75,46 @@ strip offset and restart from page 1.`,
   {
     name: 'web_search',
     description: `Search the web for current market data.
-Use short, specific queries (1-6 words). Max 2 attempts per data point.
+Use short, specific queries (1-6 words). HARD LIMIT: max 2 attempts per data item, then use web_fetch.
+After 2 searches with no price in snippet, switch to web_fetch on a direct URL.
 Common queries:
   BTC price:      "BTC USD price today"
-  Fear & Greed:   "alternative.me fear greed index"  (backup: "milkroad.com fear greed index today")
+  Fear & Greed:   "alternative.me fear greed index"
   SPY:            "SPY ETF price today"
   QQQ:            "QQQ ETF price today"
   VIX:            "VIX volatility index today"
-  Stock price:    "TSLA stock price today"  (same pattern for NVDA, GOOGL, AAPL)
-Returns a summary of top results.`,
+  Stock price:    "TSLA stock price today"
+Returns snippets only — if no price in snippet, use web_fetch.`,
     input_schema: {
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Search query' }
       },
       required: ['query']
+    }
+  },
+  {
+    name: 'web_fetch',
+    description: `Fetch live structured market data from reliable endpoints.
+USE THIS when search snippets don't contain actual price numbers.
+
+Reliable endpoints (no auth required):
+  BTC price:    https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd
+                returns JSON: {"bitcoin":{"usd":105000}}
+  Fear & Greed: https://api.alternative.me/fng/?limit=1
+                returns JSON: {"data":[{"value":"72","value_classification":"Greed"}]}
+  Stock/ETF:    https://query1.finance.yahoo.com/v8/finance/chart/SYMBOL?interval=1d&range=1d
+                replace SYMBOL with: NVDA AAPL TSLA GOOGL SPY QQQ %5EVIX
+                returns JSON with regularMarketPrice in the meta object
+
+RECOMMENDED FLOW: use web_fetch for BTC and Fear/Greed always (faster than search).
+For stocks: try one search, then web_fetch if no price found.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Full URL to fetch' }
+      },
+      required: ['url']
     }
   }
 ];
@@ -156,12 +181,51 @@ async function runWebSearch(input) {
   }
 }
 
-async function executeTool(name, input) {
+
+async function runWebFetch(input) {
+  const { url } = input;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; PortfolioOS/1.0)',
+        'Accept': 'application/json, text/html'
+      },
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!res.ok) return { error: `HTTP ${res.status}` };
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('json')) {
+      const data = await res.json();
+      return { data };
+    }
+    const html = await res.text();
+    const text = html.replace(/<script[\s\S]*?<\/script>/gi, '')
+                     .replace(/<style[\s\S]*?<\/style>/gi, '')
+                     .replace(/<[^>]*>/g, ' ')
+                     .replace(/\s+/g, ' ')
+                     .trim()
+                     .slice(0, 1500);
+    return { text };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+async function executeTool(name, input, ctx = {}) {
   console.log(`  [tool] ${name} — ${JSON.stringify(input).slice(0, 80)}`);
+  // Enforce hard search cap — if exceeded, return stop signal instead of searching
+  if (name === 'web_search') {
+    ctx.searches = (ctx.searches || 0) + 1;
+    if (ctx.searches > (ctx.maxSearches || 14)) {
+      console.warn(`  [search cap] ${ctx.searches} searches hit — returning stop signal`);
+      return { error: 'SEARCH_CAP_REACHED: Stop searching. Write the brief now using available data. Mark any missing prices as unavailable.' };
+    }
+  }
   let result;
   try {
     if (name === 'airtable_query') result = await runAirtableQuery(input);
     else if (name === 'web_search') result = await runWebSearch(input);
+    else if (name === 'web_fetch')  result = await runWebFetch(input);
     else result = { error: `Unknown tool: ${name}` };
   } catch (e) {
     // Belt-and-suspenders: any uncaught tool exception returns an error object
@@ -228,6 +292,9 @@ async function callClaude(messages, systemPrompt) {
 async function runClaude(systemPrompt, userPrompt) {
   const messages = [{ role: 'user', content: userPrompt }];
   const MAX_ITERS = 40; // Fix 18
+
+  let searchCount = 0;
+  const MAX_SEARCHES = 14; // hard cap — prevents runaway search loops
 
   for (let i = 0; i < MAX_ITERS; i++) {
     console.log(`\n[claude] iteration ${i + 1}`);
@@ -422,12 +489,19 @@ STEP 4 — MARKET DATA (web search)
   • Saturday/Sunday: equity markets closed — use Friday close, say "as of Friday's close."
   • Max 1 search for weekend equity data.
 
-Fetch (1 search each unless noted):
-  • BTC price
-  • Fear & Greed — alternative.me first, milkroad.com as backup (2 max total)
-  • SPY price + direction
-  • QQQ price + direction (the Nasdaq 100 ETF — say "Nasdaq one hundred" in the brief)
-  • VIX level — classify: Low (<15) / Normal (15–20) / Elevated (20–30) / High (>30)
+Fetch using the RECOMMENDED FLOW (fastest, most reliable):
+
+  BTC price:    web_fetch → https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd
+  Fear & Greed: web_fetch → https://api.alternative.me/fng/?limit=1
+  SPY:          web_search "SPY ETF price today" → if no price in snippet, web_fetch Yahoo Finance chart endpoint
+  QQQ:          web_search "QQQ ETF price today" → fallback to web_fetch (the Nasdaq 100 ETF)
+  VIX:          web_search "VIX index today" → classify: Low (<15) / Normal (15–20) / Elevated (20–30) / High (>30)
+
+HARD SEARCH RULES (enforced by code — will return SEARCH_CAP_REACHED if violated):
+  • Max 2 web_search calls per data item — then switch to web_fetch or declare unavailable
+  • Max 14 web_search calls total across the entire brief generation
+  • When SEARCH_CAP_REACHED is returned: STOP ALL SEARCHES, write the brief immediately with whatever data you have
+  • Missing prices → say "market data unavailable" for that item. Do NOT keep searching.
 
 Spotlight (both brief types):
   • Prices + % moves for TSLA, NVDA, GOOGL, AAPL — 2 searches maximum total
