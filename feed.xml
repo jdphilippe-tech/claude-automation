@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, June 12, 2026</title>
+      <description><![CDATA[All clear across the collateral engine with the basket sitting just below the deposited base and Google the day's standout, up over one percent.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-12.mp3" length="605248" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-12</guid>
+      <pubDate>Fri, 12 Jun 2026 14:18:20 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, June 11, 2026</title>
       <description><![CDATA[All clear on the collateral engine with Bitcoin sitting at sixty-two thousand dollars amid extreme fear sentiment, and Google the day's standout sliding over two percent as V-I-X climbs to elevated territory.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-11.mp3" length="626564" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-10.mp3" length="1483381" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-10</guid>
       <pubDate>Sun, 10 May 2026 14:21:29 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, May 9, 2026</title>
-      <description><![CDATA[The delta neutral strategy cycle sits in Normal Zone but Eth is just twelve dollars below the Near Drift upper boundary, putting the position one small move away from a zone change.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-09.mp3" length="1268550" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-09</guid>
-      <pubDate>Sat, 09 May 2026 14:19:49 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
