@@ -54,10 +54,14 @@ jobs:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
         run: node scripts/morning-brief-audio.mjs
       - name: Update RSS feed
+        # Skip on Sunday — morning-brief-audio.mjs exits early without setting AUDIO_FILE
+        if: env.AUDIO_FILE != ''
         env:
           REPO_URL: https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main
         run: node scripts/update-rss.mjs
       - name: Commit and push audio + RSS
+        # Skip on Sunday — nothing to commit if no audio was generated
+        if: env.AUDIO_FILE != ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
