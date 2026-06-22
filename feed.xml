@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, June 22, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw, while Google is the standout today falling nearly five percent and dragging sentiment to extreme fear at twenty.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-22.mp3" length="695110" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-22</guid>
+      <pubDate>Mon, 22 Jun 2026 14:17:41 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, June 20, 2026</title>
       <description><![CDATA[All clear across the collateral engine with the six Kamino positions sitting right at the deposited base and Nvidia the week's standout, up nearly three percent as tech led equity markets higher.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-20.mp3" length="2013771" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-18.mp3" length="1830287" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-18</guid>
       <pubDate>Mon, 18 May 2026 14:21:22 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Sunday, May 17, 2026</title>
-      <description><![CDATA[Delta neutral cycle at day thirty-five sits in Normal Zone with fees crossing one thousand dollars, though Eth is drifting close to the lower Near Drift boundary and worth monitoring today.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-17.mp3" length="1415671" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-17</guid>
-      <pubDate>Sun, 17 May 2026 14:21:02 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
