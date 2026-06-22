@@ -1,17 +1,9 @@
-Good morning. It's Saturday, June 20 — here's how the week landed.
+Good morning. It's Monday, June twenty-second.
 
-All clear. No action needed.
+All clear. No action needed today.
 
-No debt yet — draw begins July. Collateral is sitting at sixty thousand one hundred fifty-three dollars, essentially flat from the deposited base. The first draw puts opening L-T-V well under the forty percent cap.
+On the crypto side — Bitcoin is at sixty-five thousand two hundred thirty-seven dollars, sentiment is Extreme Fear at twenty.
 
-Nothing drawn yet. First draw July — three thousand seven hundred fifty dollars at Target, under the ceiling of four thousand five hundred twelve dollars. No tracking needed until then.
+On the equity side — S-P-Y is at seven hundred forty-eight dollars and eighty-six cents, the Nasdaq one hundred is lower on the day with Google weighing heavily, and V-I-X is elevated — markets are on edge this morning.
 
-No borrow cost yet. Supply yield is averaging a small but positive rate across the basket — ticking quietly in the background.
-
-Collateral is up just under a dollar from the deposited base of sixty thousand one hundred fifty-three dollars. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
-
-On peg watch: the six Kamino positions were initiated June eighth and no subsequent Rate Check records have landed in Airtable yet for the basket. Token prices can't be confirmed against this week's closes. Worth noting for the first Rate Check cycle — once those land, peg deviation will be trackable week over week.
-
-Bitcoin finished the week at sixty-three thousand one hundred eighty-seven dollars, with sentiment at twenty-three — Extreme Fear. On equities, S-P-Y closed at seven hundred forty-six dollars and seventy-four cents, the Nasdaq one hundred was up about two point seven percent on the week, and V-I-X closed at sixteen point four — normal territory, though it briefly spiked to eighteen point four on Wednesday before settling back down.
-
-The week's standout was Nvidia — up two point seven percent on the week, closing Friday at two hundred ten dollars and sixty-nine cents. Tech was the clear theme this week, with Q-Q-Q matching Nvidia's move almost dollar for dollar. Tesla was the only name in the basket to close red, down about one and a half percent. Have a good weekend.
+Google is the standout today — down four point seven percent from Friday, now at three hundred fifty dollars and eighty cents. That's a sharp move for a large-cap, and the biggest single-day drag in the basket. Have a good one.
