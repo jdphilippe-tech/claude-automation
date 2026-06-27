@@ -1,9 +1,17 @@
-Good morning. It's Friday, June twenty-sixth.
+Good morning. It's Saturday, June twenty-seventh — here's how the week landed.
 
-All clear. No action needed today.
+All clear. No debt on the books, L-T-V at zero, no action needed.
 
-On the crypto side — Bitcoin is at fifty-nine thousand nine hundred fifteen dollars, sentiment is extreme fear at thirteen.
+No debt yet — draw begins July. Collateral is sitting at approximately sixty thousand two hundred thirty-four dollars, and the first draw puts opening L-T-V well under the forty percent cap.
 
-On the equity side — S-P-Y is at seven hundred thirty-three dollars, the Nasdaq one hundred is down about half a percent on the day, and V-I-X is at nineteen point five two — upper end of the normal band.
+Nothing drawn yet. First draw July — three thousand seven hundred fifty dollars at Target, under the ceiling of four thousand five hundred. No tracking needed until then.
 
-Bitcoin is the standout today — dipping below sixty thousand dollars with the fear and greed index deep in extreme fear at thirteen. That kind of sentiment reading often marks short-term floor territory, but it warrants watching into the weekend. Have a good one.
+No borrow cost yet. Supply yield is averaging just under one tenth of one percent across the Kamino basket — small but ticking.
+
+Collateral is up about eighty-one dollars from the deposited base of sixty thousand one hundred fifty-three dollars — essentially flat. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
+
+Peg watch: the most recent confirmed on-chain token prices are from June thirteenth. Comparing those to Friday's closes would reflect two weeks of equity movement rather than actual de-peg pressure — no flags raised.
+
+Bitcoin finished at sixty thousand five hundred sixty-four dollars, sentiment extreme fear at fifteen. S-P-Y closed at seven hundred twenty-eight dollars and ninety-nine cents as of Friday's close, the Nasdaq one hundred down about four point three percent on the week, and V-I-X at eighteen point four one — normal range, though the overall mood is defensive.
+
+The week's standout was Nvidia — down nearly eight percent, closing at one hundred ninety-two dollars and fifty-three cents, breaking back below two hundred dollars. The selloff was broad: Apple off four and a half percent, Tesla down roughly six, and Google down three and a half. A full basket flush heading into the weekend. Have a good weekend.
