@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, June 27, 2026</title>
+      <description><![CDATA[A rough week closes with Bitcoin at sixty thousand dollars, extreme fear at fifteen, and Nvidia down nearly eight percent as markets broadly retreated — the collateral engine sits debt-free with the basket roughly flat versus its deposited base.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-27.mp3" length="1951495" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-06-27</guid>
+      <pubDate>Sat, 27 Jun 2026 14:19:26 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, June 26, 2026</title>
       <description><![CDATA[All clear on the collateral engine heading into the weekend, with Bitcoin slipping below sixty thousand dollars and sentiment in extreme fear at thirteen.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-26.mp3" length="745683" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-22.mp3" length="1255175" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-22</guid>
       <pubDate>Fri, 22 May 2026 14:23:36 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, May 21, 2026</title>
-      <description><![CDATA[Cycle nine sits in Near Drift Zone on the lower side with delta outside tolerance and Eth trading just thirty-nine dollars above the Drift lower boundary.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-21.mp3" length="1479619" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-21</guid>
-      <pubDate>Thu, 21 May 2026 14:20:35 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
