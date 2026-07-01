@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Wednesday, July 1, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with no debt drawn yet and Bitcoin sliding under sixty thousand dollars against a backdrop of extreme fear in crypto sentiment with Nvidia the day's standout on a two percent pullback.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-01.mp3" length="695110" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-01</guid>
+      <pubDate>Wed, 01 Jul 2026 14:17:01 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Tuesday, June 30, 2026</title>
       <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw window, Bitcoin sitting at fifty-eight thousand nine hundred sixteen dollars in extreme fear territory, and Apple the day's standout up one point five percent.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-30.mp3" length="636177" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-25.mp3" length="1592050" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-25</guid>
       <pubDate>Mon, 25 May 2026 14:19:00 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Sunday, May 24, 2026</title>
-      <description><![CDATA[Cycle nine closed yesterday after Eth broke below the Drift Lower boundary, locking in eleven hundred and seventy-four dollars in fees over forty-one days — no new cycle is open yet and the strategy is currently sitting in cash.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-24.mp3" length="1357157" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-24</guid>
-      <pubDate>Sun, 24 May 2026 14:19:17 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
