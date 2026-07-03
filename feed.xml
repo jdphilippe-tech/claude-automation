@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, July 3, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw window, while Tesla tumbles nearly eight percent today on heavy volume amid broad market softness.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-03.mp3" length="749444" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-03</guid>
+      <pubDate>Fri, 03 Jul 2026 14:17:07 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, July 1, 2026</title>
       <description><![CDATA[All clear on the collateral engine with no debt drawn yet and Bitcoin sliding under sixty thousand dollars against a backdrop of extreme fear in crypto sentiment with Nvidia the day's standout on a two percent pullback.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-01.mp3" length="695110" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-26.mp3" length="1454542" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-26</guid>
       <pubDate>Tue, 26 May 2026 14:21:02 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Monday, May 25, 2026</title>
-      <description><![CDATA[Cycle nine closed two days ago after Eth broke below Drift Lower, and the strategy is currently between cycles with total fees of eleven hundred and seventy-three dollars over forty-one days — a strong run at around thirty-four percent annualized, now waiting for reentry conditions near two thousand one hundred dollars.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-25.mp3" length="1592050" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-25</guid>
-      <pubDate>Mon, 25 May 2026 14:19:00 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
