@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, July 6, 2026</title>
+      <description><![CDATA[All clear on the collateral engine as the July draw window opens, with Tesla leading the basket today up nearly three percent and Bitcoin holding near sixty-two thousand dollars amid extreme fear sentiment.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-06.mp3" length="599397" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-06</guid>
+      <pubDate>Mon, 06 Jul 2026 14:17:23 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, July 3, 2026</title>
       <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw window, while Tesla tumbles nearly eight percent today on heavy volume amid broad market softness.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-03.mp3" length="749444" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-27.mp3" length="1425284" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-27</guid>
       <pubDate>Wed, 27 May 2026 14:28:23 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, May 26, 2026</title>
-      <description><![CDATA[Cycle nine closed on May twenty-third after Eth broke below Drift Lower for five consecutive candles, and no new cycle has been opened yet — the strategy is sitting in cash waiting for re-entry.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-26.mp3" length="1454542" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-26</guid>
-      <pubDate>Tue, 26 May 2026 14:21:02 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
