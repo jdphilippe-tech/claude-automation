@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, July 7, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with Bitcoin at sixty-three thousand dollars and Google the standout today, up about one point three percent against a broadly down tape.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-07.mp3" length="674212" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-07</guid>
+      <pubDate>Tue, 07 Jul 2026 14:17:25 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, July 6, 2026</title>
       <description><![CDATA[All clear on the collateral engine as the July draw window opens, with Tesla leading the basket today up nearly three percent and Bitcoin holding near sixty-two thousand dollars amid extreme fear sentiment.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-06.mp3" length="599397" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-29.mp3" length="2118679" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-05-29</guid>
       <pubDate>Fri, 29 May 2026 14:37:51 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, May 27, 2026</title>
-      <description><![CDATA[Daily portfolio and market intelligence brief.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-27.mp3" length="1425284" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-27</guid>
-      <pubDate>Wed, 27 May 2026 14:28:23 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
