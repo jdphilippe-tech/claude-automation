@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, July 9, 2026</title>
+      <description><![CDATA[The collateral engine's first July draw landed at three thousand seven hundred fifty dollars, putting opening L-T-V at a clean six point two percent — and Google is the day's standout, sliding four percent on the session.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-09.mp3" length="808795" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-09</guid>
+      <pubDate>Thu, 09 Jul 2026 14:19:56 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, July 8, 2026</title>
       <description><![CDATA[All clear on the collateral engine with no draw yet and Bitcoin sitting at sixty-two thousand dollars amid extreme fear in crypto sentiment, with Tesla the standout equity mover down over two percent today.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-08.mp3" length="656239" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-01.mp3" length="1941882" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-01</guid>
       <pubDate>Mon, 01 Jun 2026 14:30:03 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, May 30, 2026</title>
-      <description><![CDATA[Delta neutral cycle sits comfortably in Normal Zone though delta balance is nearly at its tolerance ceiling, while the equity side shows a blended fee rate of thirty-eight percent with all six positions in range.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-05-30.mp3" length="2248664" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-05-30</guid>
-      <pubDate>Sat, 30 May 2026 14:27:34 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
