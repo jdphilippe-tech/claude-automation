@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, July 11, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of July's first draw, Nvidia surging nearly eight percent on the week as the standout, and Bitcoin sitting at sixty-four thousand dollars with sentiment in fear territory.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-11.mp3" length="2508217" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-11</guid>
+      <pubDate>Sat, 11 Jul 2026 14:18:03 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, July 10, 2026</title>
       <description><![CDATA[All clear across the collateral engine with the basket up seven hundred eighty-eight dollars from the deposited base and Tesla the standout today on a nearly four percent intraday move while sentiment sits in extreme fear at twenty-three.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-10.mp3" length="618623" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-03.mp3" length="2409996" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-03</guid>
       <pubDate>Wed, 03 Jun 2026 14:36:53 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, June 2, 2026</title>
-      <description><![CDATA[Eth has slipped into Near Drift Lower Zone with only forty-five dollars of room above the Drift boundary, while C-R-C-L-x is leading the equity side with a fifty-four percent fee rate on its expanded position.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-02.mp3" length="2273324" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-02</guid>
-      <pubDate>Tue, 02 Jun 2026 14:25:05 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
