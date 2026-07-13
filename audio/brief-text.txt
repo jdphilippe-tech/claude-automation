@@ -1,19 +1,9 @@
-Good morning. It's Saturday, July eleventh — here's how the week landed.
+Good morning. It's Monday, July 13th.
 
-All clear. No action needed.
+Watch — borrow cost is running at five point three percent against near-zero supply yield, a structural carry cost by design, but one to track as draws accumulate through October.
 
-No debt yet — draw begins July. Collateral is sitting at fifty-seven thousand nine hundred sixty-six dollars, which is about two thousand one hundred eighty-seven dollars below the deposited base of sixty thousand one hundred fifty-three dollars — the basket has drifted down with its underlying stocks over the past two weeks. The first draw puts opening LTV well under the forty percent cap.
+On the crypto side — Bitcoin is at sixty-two thousand three hundred forty-eight dollars, sentiment is Fear at twenty-eight.
 
-Nothing drawn yet. First draw July — three thousand seven hundred fifty dollars at Target, under the ceiling of four thousand five hundred. No tracking needed until then.
+On the equity side — S-P-Y is at seven fifty-one, the Nasdaq one hundred is down about one point eight percent today, and V-I-X is at sixteen point one — normal range but moving up.
 
-No borrow cost yet. Supply yield is averaging about zero point zero eight percent across the basket — near zero, but ticking.
-
-Collateral is down about two thousand one hundred eighty-seven dollars from the deposited base of sixty thousand one hundred fifty-three dollars — a decline of roughly three point six percent driven by market movement in the underlying stocks. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
-
-On peg watch: the most recent position data in Airtable is from June twenty-seventh and twenty-eighth — roughly two weeks stale. All six token prices appear below Friday's closes, but that gap reflects the underlying stocks moving higher since the last rate check was logged, not a genuine de-peg. Until fresh rate checks land, peg watch is inconclusive — no flag raised.
-
-Bitcoin finished the week at sixty-four thousand two hundred nineteen dollars, with sentiment at twenty-six — Fear. On equities, S-P-Y closed Friday at seven hundred fifty-four dollars and ninety-five cents, Q-Q-Q at seven hundred twenty-five dollars and fifty-one cents, and V-I-X came in at fifteen point zero three — right at the calm threshold, no stress in the room.
-
-The week's standout was Nvidia — closing Friday at two hundred ten dollars and ninety-six cents, up just under eight percent on the week from Monday's close near one hundred ninety-five dollars and fifty-five cents. That's a strong weekly move on heavy volume, pushing back toward the upper half of its fifty-two week range. Apple also had a quiet but solid week, touching a new fifty-two week high intraday on Friday at three hundred seventeen dollars and forty cents.
-
-Have a good weekend.
+Apple is the standout today — up one point seven percent and touching its fifty-two-week high intraday, the lone green name in the basket while Tesla is down three point three percent and the broader group drifts lower. Have a good one.
