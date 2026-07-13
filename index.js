@@ -1,8 +1,8 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v39
-// Updated: Dynamic cycle ID fetch for WETH/USDC and ETH Hedge
-//          from Asset table (tblrATIQI0ld9tz1y) at runtime.
-//          No code changes needed when opening a new cycle.
+// Daily Portfolio Check — GitHub Actions v40
+// Updated: Adds Kamino USDC Borrow leg capture (gross borrow APY,
+//          carried debt, live-computed LTV; incentive/net in Notes).
+//          Writes a 7th Kamino record to the Lending Actions table.
 //
 // v39 fix: WALLET_WETH_LP added — Uniswap V3 WETH/USDC position
 //          lives at 0x2375369D950D49897193EbCad32d99206C37D10A,
@@ -112,6 +112,9 @@ const KAMINO_POSITIONS = {
   NVDAx:  'recr9BpTygVxkeyCU',
   AAPLx:  'rectkbR1l6gvcx3nl',
 };
+
+// Kamino USDC Borrow position (the off-ramp debt leg). Permanent record ID.
+const KAMINO_USDC_BORROW = 'recaR2C1uC0G0HY2Q';
 
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
@@ -956,7 +959,7 @@ async function getEthHedge() {
 }
 
 // ============================================================
-// MODULE: Kamino xStocks Lending (Solana)
+// MODULE: Kamino xStocks Lending (Solana) — supply legs + USDC borrow leg
 // ============================================================
 
 async function getKaminoPositions() {
@@ -1099,6 +1102,92 @@ async function getKaminoPositions() {
       results[tokenKey] = { supplyUSD, tokenAmt, supplyAPY };
     }
 
+    // ---- Borrow leg: live gross APY (+ incentive if exposed), carried debt, computed LTV ----
+    // Gross borrow APY comes from the same reserve metrics (USDC reserve).
+    // Debt is carried from the most recent logged Borrow event in Airtable (near-static
+    // between draws/repays). LTV is computed live: debt / total collateral value.
+    try {
+      const usdcReserve = metricsArr.find(r =>
+        (r.liquidityToken ?? r.symbol ?? '').toUpperCase() === 'USDC'
+      );
+
+      let grossBorrowAPY = null;   // decimal fraction, e.g. 0.0527 = 5.27%
+      let incentiveAPY   = null;   // decimal fraction
+      if (usdcReserve) {
+        grossBorrowAPY = parseFloat(
+          usdcReserve.borrowApy ?? usdcReserve.borrowApr ?? usdcReserve.borrowInterestApy ?? 0
+        ) || null;
+        // Incentive field name varies by API version — try flat fields, then a rewards array.
+        const flat = parseFloat(
+          usdcReserve.borrowRewardsApy ?? usdcReserve.incentiveBorrowApy ?? usdcReserve.borrowIncentiveApy ?? 0
+        );
+        const arr = usdcReserve.borrowRewards ?? usdcReserve.incentives ?? usdcReserve.rewards ?? [];
+        const arrSum = Array.isArray(arr)
+          ? arr.reduce((s, x) => s + parseFloat(x.apy ?? x.rewardApy ?? x.incentiveApy ?? 0), 0)
+          : 0;
+        incentiveAPY = (arrSum > 0 ? arrSum : flat) || null;
+        // First-run debug: reveals the real field names so we can pin them precisely.
+        console.log(`  [USDC reserve keys] ${Object.keys(usdcReserve).join(', ')}`);
+      } else {
+        console.error('  USDC reserve not found in metrics — cannot read borrow APY');
+      }
+
+      // Debt: carry the most recent logged Borrow USD from Airtable.
+      let debtUSD = null;
+      try {
+        const { default: fetch } = await import('node-fetch');
+        const p = new URLSearchParams();
+        [LF.position, LF.borrowUSD, LF.date].forEach(f => p.append('fields[]', f));
+        p.append('sort[0][field]', LF.date);
+        p.append('sort[0][direction]', 'desc');
+        p.append('pageSize', '100');
+        const res = await fetch(
+          `https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${p}&returnFieldsByFieldId=true`,
+          { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
+        );
+        if (res.ok) {
+          const json = await res.json();
+          for (const rec of (json.records ?? [])) {      // date-desc: first match is newest
+            const link = rec.fields?.[LF.position];
+            const raw  = Array.isArray(link) ? link[0] : link;
+            const pid  = (typeof raw === 'object' && raw) ? raw.id : raw;
+            if (pid !== KAMINO_USDC_BORROW) continue;
+            const v = parseFloat(rec.fields?.[LF.borrowUSD] ?? 0);
+            if (v > 0) { debtUSD = v; break; }
+          }
+        } else {
+          console.error(`  [Airtable] Borrow debt fetch failed: HTTP ${res.status}`);
+        }
+      } catch (e) {
+        console.error(`  Borrow debt fetch error: ${e.message}`);
+      }
+
+      // Collateral value = sum of the six supply USD values computed above.
+      const collateralValue = Object.values(results)
+        .reduce((s, d) => s + (d?.supplyUSD ?? 0), 0);
+
+      const ltv    = (debtUSD != null && collateralValue > 0) ? (debtUSD / collateralValue) * 100 : null;
+      const netDec = (grossBorrowAPY != null && incentiveAPY != null) ? grossBorrowAPY - incentiveAPY : null;
+
+      const noteParts = [];
+      if (grossBorrowAPY != null) noteParts.push(`Gross borrow: ${(grossBorrowAPY * 100).toFixed(2)}%`);
+      if (incentiveAPY   != null) noteParts.push(`USDC incentive: ${(incentiveAPY * 100).toFixed(2)}%`);
+      if (netDec         != null) noteParts.push(`Net: ${(netDec * 100).toFixed(2)}%`);
+      if (collateralValue > 0)    noteParts.push(`Collateral: $${collateralValue.toFixed(2)}`);
+      if (ltv != null)            noteParts.push(`LTV: ${ltv.toFixed(2)}%`);
+      if (debtUSD == null)        noteParts.push('debt: no prior Borrow record found');
+
+      results.__borrow = {
+        borrowUSD: debtUSD,
+        borrowAPY: grossBorrowAPY != null ? grossBorrowAPY * 100 : null,  // gross, whole-percent
+        ltv,
+        notes: noteParts.join(' | '),
+      };
+      console.log(`  Borrow leg: debt ${debtUSD != null ? '$' + debtUSD.toFixed(2) : 'n/a'}, gross ${grossBorrowAPY != null ? (grossBorrowAPY * 100).toFixed(2) + '%' : 'n/a'}, net ${netDec != null ? (netDec * 100).toFixed(2) + '%' : 'n/a'}, LTV ${ltv != null ? ltv.toFixed(2) + '%' : 'n/a'}`);
+    } catch (e) {
+      console.error(`  Borrow leg error: ${e.message}`);
+    }
+
   } catch (e) {
     console.error(`Kamino fatal: ${e.message}`);
   }
@@ -1111,7 +1200,7 @@ async function getKaminoPositions() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v39 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v40 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   // Fetch WETH + Hedge asset records first — needed for both status gate and cycle IDs.
@@ -1304,12 +1393,12 @@ async function main() {
     }
   }
 
-  // Kamino xStocks Lending
+  // Kamino xStocks Lending (6 supply legs + 1 USDC borrow leg)
   if (kamino && Object.keys(kamino).length > 0) {
     const batch = [];
     for (const [tokenKey, data] of Object.entries(kamino)) {
       const posId = KAMINO_POSITIONS[tokenKey];
-      if (!posId) continue;
+      if (!posId) continue;  // skips the __borrow key (handled separately below)
       const fields = {};
       if (data.supplyUSD != null && data.supplyUSD > 0) fields[LF.supplyUSD] = data.supplyUSD;
       if (data.tokenAmt  != null && data.tokenAmt  > 0) fields[LF.tokenAmt]  = data.tokenAmt;
@@ -1319,6 +1408,18 @@ async function main() {
       const tokStr = data.tokenAmt  != null ? `${data.tokenAmt.toFixed(4)} tokens` : 'tokens=pending';
       console.log(`  Queued ${tokenKey}: ${usdStr}, ${tokStr}, APY ${data.supplyAPY != null ? (data.supplyAPY * 100).toFixed(3) + '%' : 'n/a'}`);
     }
+
+    // Borrow leg → Kamino USDC Borrow position (gross APY in field; incentive/net/LTV in Notes)
+    if (kamino.__borrow) {
+      const b = kamino.__borrow;
+      const bFields = {};
+      if (b.borrowUSD != null) bFields[LF.borrowUSD] = b.borrowUSD;
+      if (b.borrowAPY != null) bFields[LF.borrowAPY] = b.borrowAPY;  // gross, whole-percent
+      if (b.notes)             bFields[LF.notes]     = b.notes;
+      batch.push(lendingRecord(KAMINO_USDC_BORROW, bFields));
+      console.log(`  Queued USDC Borrow: ${b.borrowUSD != null ? '$' + b.borrowUSD.toFixed(2) : 'n/a'}, gross APY ${b.borrowAPY != null ? b.borrowAPY.toFixed(2) + '%' : 'n/a'}, LTV ${b.ltv != null ? b.ltv.toFixed(2) + '%' : 'n/a'}`);
+    }
+
     if (batch.length > 0) {
       const ok = await airtableCreate(LENDING_TABLE, batch);
       if (ok) { written += batch.length; console.log(`✓ Kamino: ${batch.length} records written`); }
