@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, July 13, 2026</title>
+      <description><![CDATA[Apple is the lone bright spot in the basket today, up one point seven percent and touching its fifty-two-week high, while Bitcoin trades at sixty-two thousand dollars amid broad equity weakness and the first July draw of three thousand seven hundred fifty dollars is confirmed live.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-13.mp3" length="799182" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-13</guid>
+      <pubDate>Mon, 13 Jul 2026 14:18:00 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, July 11, 2026</title>
       <description><![CDATA[All clear on the collateral engine with no debt yet ahead of July's first draw, Nvidia surging nearly eight percent on the week as the standout, and Bitcoin sitting at sixty-four thousand dollars with sentiment in fear territory.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-11.mp3" length="2508217" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-04.mp3" length="2199763" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-04</guid>
       <pubDate>Thu, 04 Jun 2026 14:25:22 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, June 3, 2026</title>
-      <description><![CDATA[The delta neutral cycle ten closed this morning when Eth broke below the band lower, ending a seven-day run with two hundred and fifty-nine dollars in fees while all six equity positions hold in range with C-R-C-L-x leading at sixty-three percent annualized.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-03.mp3" length="2409996" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-03</guid>
-      <pubDate>Wed, 03 Jun 2026 14:36:53 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
