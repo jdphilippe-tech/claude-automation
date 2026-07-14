@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, July 14, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of July's first draw, while Apple pulls back over one percent against a broadly flat market and Bitcoin holding in extreme fear territory at sixty-three thousand dollars.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-14.mp3" length="614026" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-14</guid>
+      <pubDate>Tue, 14 Jul 2026 14:17:21 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, July 13, 2026</title>
       <description><![CDATA[Apple is the lone bright spot in the basket today, up one point seven percent and touching its fifty-two-week high, while Bitcoin trades at sixty-two thousand dollars amid broad equity weakness and the first July draw of three thousand seven hundred fifty dollars is confirmed live.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-13.mp3" length="799182" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-05.mp3" length="2292550" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-05</guid>
       <pubDate>Fri, 05 Jun 2026 14:22:43 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, June 4, 2026</title>
-      <description><![CDATA[The delta neutral cycle opened today and sits in Normal Zone with a delta balance barely outside tolerance, while C-R-C-L-x leads the equity side at sixty-eight percent annualized with nearly one hundred dollars in pending fees ready to claim.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-04.mp3" length="2199763" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-04</guid>
-      <pubDate>Thu, 04 Jun 2026 14:25:22 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
