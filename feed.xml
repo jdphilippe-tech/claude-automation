@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, July 16, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with no debt drawn yet, Bitcoin sitting at sixty-four thousand dollars in extreme fear territory, and the Nasdaq one hundred slipping on the day.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-16.mp3" length="806705" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-16</guid>
+      <pubDate>Thu, 16 Jul 2026 14:17:41 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, July 15, 2026</title>
       <description><![CDATA[All clear across the collateral engine, with Apple surging over three percent to a fifty-two week high as the standout on an otherwise calm Wednesday.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-15.mp3" length="644537" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-07.mp3" length="1834048" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-07</guid>
       <pubDate>Sun, 07 Jun 2026 14:20:26 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, June 6, 2026</title>
-      <description><![CDATA[The delta neutral strategy is between cycles after C-eleven closed Thursday while Friday's equity selloff — Nasdaq down four percent and VIX spiking to twenty-one — puts all six xStocks positions at elevated out-of-range risk heading into the weekend.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-06.mp3" length="2350646" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-06</guid>
-      <pubDate>Sat, 06 Jun 2026 14:23:52 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
