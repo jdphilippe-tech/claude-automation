@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, July 18, 2026</title>
+      <description><![CDATA[Apple closed the week up five percent and near its fifty-two week high while Bitcoin dropped to sixty-four thousand amid extreme fear sentiment, with the collateral engine's first July draw now on the books at thirty-seven fifty and a blended loan-to-value of six percent.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-18.mp3" length="3068282" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-18</guid>
+      <pubDate>Sat, 18 Jul 2026 14:18:25 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, July 17, 2026</title>
       <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw, while Google is today's standout sliding two point four percent in a broad market pullback with Bitcoin holding near sixty-three thousand dollars and sentiment firmly in fear territory.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-17.mp3" length="714336" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-11.mp3" length="626564" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-11</guid>
       <pubDate>Thu, 11 Jun 2026 14:17:27 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, June 9, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with no debt yet ahead of July's first draw, and Tesla the standout today on a robotaxi launch driving nearly a five percent gain.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-09.mp3" length="756132" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-09</guid>
-      <pubDate>Tue, 09 Jun 2026 15:41:51 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
