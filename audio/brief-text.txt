@@ -1,19 +1,7 @@
-Good morning. It's Saturday, July 18th — here's how the week landed.
+Good morning. It's Monday, July 20th. All clear. No action needed today.
 
-Watch — net carry is positive at five point two percent. The borrow rate of five point two seven percent runs above the basket's blended supply yield of around zero point zero seven percent. This is the structural cost of the draw strategy, but it clears the one percent watch threshold, so flagging it here.
+On the crypto side — Bitcoin is at sixty-four thousand two hundred ninety-seven dollars, sentiment is Fear at twenty-nine.
 
-Collateral is sitting at sixty thousand two hundred forty-four dollars. Blended L-T-V is six point two percent, against the forty percent operating cap and the sixty-five percent liquidation line. Collateral could fall roughly eighty-five percent from here before touching the liquidation line — plenty of runway.
+On the equity side — S-P-Y is at seven hundred forty-four dollars and ninety cents, the Nasdaq one hundred is up modestly, and V-I-X is at eighteen point two nine — normal, no stress showing.
 
-The first draw landed July first — three thousand seven hundred fifty dollars at Target rate, under the ceiling of four thousand five hundred. That's one of four monthly draws in the July through October window. Cumulative drawn is three thousand seven hundred fifty dollars against a Target D-max of fifteen thousand thirty-eight dollars and a Ceiling D-max of eighteen thousand forty-six dollars. Three draws remain before November.
-
-No borrow cost offset yet from supply yield — the basket is earning about zero point zero seven percent blended across the six positions, so the real cost of the debt is essentially the full five point two seven percent borrow rate. Small supply yield is ticking, but it barely moves the needle at this L-T-V.
-
-Collateral is up ninety-one dollars from the deposited base of sixty thousand one hundred fifty-three dollars — essentially flat, a rounding move. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
-
-On peg watch — the most recent token valuations in the system are from July sixth, twelve days ago, which is too stale to run a clean deviation check against today's underlying prices. The underlying stocks have moved materially in that window. No reliable peg signal this week — worth confirming the rate check cadence is running daily so next Saturday has current data.
-
-Bitcoin finished the week at sixty-four thousand one hundred twenty dollars, with sentiment sitting at extreme fear, a reading of twenty-five. On equities, S-P-Y closed at seven hundred forty-three dollars and twenty-nine cents — down about one percent on the day. The Nasdaq one hundred closed at six hundred ninety-five dollars and thirty-three cents, off roughly two point three percent on the week. V-I-X came in at eighteen point seven seven — normal range, but ticking up from last week's close of sixteen point seven three, worth watching if it pushes toward twenty.
-
-The week's standout was Apple — up five point one eight percent on the week, closing at three hundred thirty-three dollars and seventy-four cents, just twenty-five cents shy of its fifty-two-week high of three hundred thirty-four dollars and ninety-nine cents. Everything else in the basket finished lower — Tesla down about three and a half percent, Nvidia off roughly four percent on Friday alone, Google down about one point six percent on the week. Apple bucked the tape convincingly.
-
-Have a good weekend.
+Google is the standout today — up three point six percent to three hundred fifty-nine dollars, one of the sharpest single-session moves in the basket. Have a good one.
