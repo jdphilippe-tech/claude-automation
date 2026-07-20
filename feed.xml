@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, July 20, 2026</title>
+      <description><![CDATA[All clear across the collateral engine with Bitcoin at sixty-four thousand dollars, Google the standout today on a strong three-point-six percent gain, and sentiment sitting in fear territory at twenty-nine.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-20.mp3" length="635759" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-20</guid>
+      <pubDate>Mon, 20 Jul 2026 14:17:37 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, July 18, 2026</title>
       <description><![CDATA[Apple closed the week up five percent and near its fifty-two week high while Bitcoin dropped to sixty-four thousand amid extreme fear sentiment, with the collateral engine's first July draw now on the books at thirty-seven fifty and a blended loan-to-value of six percent.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-18.mp3" length="3068282" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-12.mp3" length="605248" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-12</guid>
       <pubDate>Fri, 12 Jun 2026 14:18:20 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, June 11, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with Bitcoin sitting at sixty-two thousand dollars amid extreme fear sentiment, and Google the day's standout sliding over two percent as V-I-X climbs to elevated territory.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-11.mp3" length="626564" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-11</guid>
-      <pubDate>Thu, 11 Jun 2026 14:17:27 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
