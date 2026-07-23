@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, July 23, 2026</title>
+      <description><![CDATA[Tesla crashing nearly thirteen percent today dominates the session as the collateral engine logs its first July draw of three thousand seven hundred fifty dollars and sentiment slides into fear territory.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-23.mp3" length="788733" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-23</guid>
+      <pubDate>Thu, 23 Jul 2026 14:18:09 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, July 22, 2026</title>
       <description><![CDATA[The collateral engine's first July draw is live at three thousand seven hundred fifty dollars, LTV sitting at six percent with Bitcoin at sixty-five thousand eight hundred fifty-eight dollars and Tesla the day's standout on a three percent drop.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-22.mp3" length="904507" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-16.mp3" length="585186" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-16</guid>
       <pubDate>Tue, 16 Jun 2026 14:17:19 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Monday, June 15, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with equities pushing higher today as S-P-Y hits seven hundred fifty-two dollars while Bitcoin sits at sixty-six thousand in extreme fear territory.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-15.mp3" length="772432" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-15</guid>
-      <pubDate>Mon, 15 Jun 2026 14:18:21 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
