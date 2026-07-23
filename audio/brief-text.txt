@@ -1,9 +1,9 @@
-Good morning. It's Wednesday, July twenty-second.
+Good morning. It's Thursday, July twenty-third.
 
-Watch — net borrow cost is running at five point one percent against a supply yield of point zero six percent, which is the expected operating state now that the first draw is live. No action needed — LTV is at six percent, well inside the forty percent cap.
+Watch — net carry is now live at roughly five percent borrow cost on the first July draw.
 
-On the crypto side — Bitcoin is at sixty-five thousand eight hundred fifty-eight dollars, sentiment is Fear at thirty-three.
+On the crypto side — Bitcoin is at sixty-five thousand fourteen dollars, sentiment is Fear at thirty-one.
 
-On the equity side — S-P-Y is at seven hundred forty-four dollars, the Nasdaq one hundred is at six hundred ninety-six — roughly flat, and V-I-X is at sixteen point eight five — normal, calm market conditions.
+On the equity side — S-P-Y is at seven hundred forty dollars, the Nasdaq one hundred is down about one and a half percent, and V-I-X is at nineteen point two one — elevated end of normal, signaling some stress in the market today.
 
-Tesla is the standout today — down two point nine six percent to three hundred sixty-nine dollars, the sharpest move in the basket. Apple is also off two point one four percent, while Google is holding up with a one and a half percent gain. Have a good one.
+Tesla is the standout today — down nearly thirteen percent, trading at three hundred twenty-six dollars against yesterday's close of three hundred seventy-four. That's a notable single-session drop — worth monitoring given the Tesla-x position in the collateral basket. Have a good one.
