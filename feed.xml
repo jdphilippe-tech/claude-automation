@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, July 25, 2026</title>
+      <description><![CDATA[The first July draw landed on schedule at three thousand seven hundred fifty dollars, collateral is sitting five percent below the deposited base after Tesla's fifteen percent weekly selloff dragged the basket, and S-P-Y-x is showing a slim fifty-three basis-point premium against its underlying.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-25.mp3" length="2847599" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-25</guid>
+      <pubDate>Sat, 25 Jul 2026 14:20:36 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, July 23, 2026</title>
       <description><![CDATA[Tesla crashing nearly thirteen percent today dominates the session as the collateral engine logs its first July draw of three thousand seven hundred fifty dollars and sentiment slides into fear territory.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-23.mp3" length="788733" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-17.mp3" length="684661" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-17</guid>
       <pubDate>Wed, 17 Jun 2026 14:17:56 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, June 16, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with total collateral just above the deposited base and Apple the standout today on a two and a half percent move.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-16.mp3" length="585186" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-16</guid>
-      <pubDate>Tue, 16 Jun 2026 14:17:19 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>

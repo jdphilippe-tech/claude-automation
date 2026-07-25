@@ -1,9 +1,19 @@
-Good morning. It's Thursday, July twenty-third.
+Good morning. It's Saturday, July twenty-fifth — here's how the week landed.
 
-Watch — net carry is now live at roughly five percent borrow cost on the first July draw.
+Watch — S-P-Y-x is showing fifty-three basis points of premium versus S-P-Y, just over the half-percent flag line. Worth monitoring into next week, but no action needed today.
 
-On the crypto side — Bitcoin is at sixty-five thousand fourteen dollars, sentiment is Fear at thirty-one.
+The first draw is in. Three thousand seven hundred fifty dollars borrowed on July first at five point two seven percent — right on Target, right on schedule. Opening L-T-V is six point six percent, against the forty percent operating cap and the sixty-five percent liquidation line. The collateral would need to fall roughly eighty-four percent from here before hitting the cap. No stress.
 
-On the equity side — S-P-Y is at seven hundred forty dollars, the Nasdaq one hundred is down about one and a half percent, and V-I-X is at nineteen point two one — elevated end of normal, signaling some stress in the market today.
+Nothing else drawn this month. Cumulative debt stands at three thousand seven hundred fifty dollars against a target D-max of fifteen thousand thirty-eight dollars and a ceiling D-max of eighteen thousand forty-six dollars. Three months remain in the window — August, September, October. Pace is on track.
 
-Tesla is the standout today — down nearly thirteen percent, trading at three hundred twenty-six dollars against yesterday's close of three hundred seventy-four. That's a notable single-session drop — worth monitoring given the Tesla-x position in the collateral basket. Have a good one.
+Borrow rate is five point two seven percent. Supply yield is averaging zero point zero six percent across the basket — real net carry cost is five point two one percent. That is the structural cost of the draw strategy, expected and accounted for.
+
+Collateral is sitting at fifty-seven thousand one hundred dollars — down three thousand fifty-two dollars, or five point one percent, from the deposited base of sixty thousand one hundred fifty-three dollars. That gap is almost entirely Tesla and Google selling off this week. As always — that is cushion, not borrowing room. The draw is sized off the deposited base, not market value.
+
+On peg watch — S-P-Y-x is showing fifty-three basis points of premium versus S-P-Y, the only flag of the six. Tesla-x, Nvidia-x, Google-x, Apple-x, and Q-Q-Q-x all tracked their underlyings tightly — within thirty basis points. The S-P-Y-x gap is marginal but worth a glance early next week.
+
+Bitcoin finished the week at sixty-four thousand one hundred four dollars, sentiment sitting at twenty-seven — Fear. On equities, S-P-Y closed around seven hundred thirty-nine dollars, the Nasdaq one hundred pulled back roughly two point eight percent on the week, and V-I-X is elevated — the market is clearly pricing in some uncertainty after a difficult earnings stretch.
+
+The week's standout was Tesla — down fifteen point three percent, closing at three hundred thirteen dollars. Likely an earnings-driven reset. Tesla-x tracked it cleanly, so no collateral surprise there, but that position's notional value took a real hit. Google was the second major mover, off nine point two percent — another earnings story. On the other side, Nvidia and Apple each gained roughly two percent and were the quiet bright spots in an otherwise rough week for the basket.
+
+Have a good weekend.
