@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, July 31, 2026</title>
+      <description><![CDATA[Apple is down more than ten percent today — likely on earnings — marking the session's clear standout while the collateral engine logs its first July draw at a blended L-T-V well under the cap.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-31.mp3" length="845157" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-07-31</guid>
+      <pubDate>Fri, 31 Jul 2026 14:19:49 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, July 30, 2026</title>
       <description><![CDATA[All systems operating with the first July draw of three thousand seven hundred fifty dollars landed and Nvidia the day's standout up nearly three percent.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-30.mp3" length="989353" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-24.mp3" length="758222" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-24</guid>
       <pubDate>Wed, 24 Jun 2026 14:18:09 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Monday, June 22, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw, while Google is the standout today falling nearly five percent and dragging sentiment to extreme fear at twenty.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-22.mp3" length="695110" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-22</guid>
-      <pubDate>Mon, 22 Jun 2026 14:17:41 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
