@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, August 1, 2026</title>
+      <description><![CDATA[S-P-Y-x is showing a slight peg gap above fifty basis points while Google surged nearly seven percent on earnings Friday and Apple tumbled more than seven percent, with the collateral engine running its first active borrow month at six and a half percent L-T-V.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-01.mp3" length="2832971" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-01</guid>
+      <pubDate>Sat, 01 Aug 2026 14:19:26 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, July 31, 2026</title>
       <description><![CDATA[Apple is down more than ten percent today — likely on earnings — marking the session's clear standout while the collateral engine logs its first July draw at a blended L-T-V well under the cap.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-31.mp3" length="845157" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-25.mp3" length="661673" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-25</guid>
       <pubDate>Thu, 25 Jun 2026 14:17:49 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, June 24, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw window, and Google the equity standout today up nearly one percent while Bitcoin sits at sixty-one thousand dollars amid extreme fear sentiment.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-24.mp3" length="758222" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-24</guid>
-      <pubDate>Wed, 24 Jun 2026 14:18:09 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
