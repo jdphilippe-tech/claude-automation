@@ -1,6 +1,14 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v40
-// Updated: Adds Kamino USDC Borrow leg capture (gross borrow APY,
+// Daily Portfolio Check — GitHub Actions v41
+// v41: Kamino module now reads the on-chain OBLIGATION directly
+//      (collateral = dividend/split-scaled depositedValueSf;
+//       debt = interest-accrued borrow marketValueSf; LTV computed live).
+//      Fixes two "read-assumed-values" bugs: frozen raw token amount
+//      (missed the Solana scaled-UI multiplier) and Airtable-echoed debt
+//      (missed accrued interest). Falls back to prior behavior if the
+//      chain read fails. Zero new dependencies (raw parse, Raydium-style).
+//
+// v40: Adds Kamino USDC Borrow leg capture (gross borrow APY,
 //          carried debt, live-computed LTV; incentive/net in Notes).
 //          Writes a 7th Kamino record to the Lending Actions table.
 //
@@ -115,6 +123,19 @@ const KAMINO_POSITIONS = {
 
 // Kamino USDC Borrow position (the off-ramp debt leg). Permanent record ID.
 const KAMINO_USDC_BORROW = 'recaR2C1uC0G0HY2Q';
+
+// ---- Kamino KLend on-chain (v41 live obligation read) ----
+const KLEND_PROGRAM_ID = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD';
+const SF_SHIFT  = 40n;        // Kamino scaled fraction = value * 2^60; (>>40)/2^20 keeps Number precision
+const SF_DIV20  = 1048576;    // 2^20
+
+// OPTIONAL per-leg exactness: after the first run, copy the six reserve
+// addresses from the "[obligation] per-reserve USD" log line into this map
+// (symbol -> reserve pubkey). While empty, per-leg supply USD uses the prior
+// approximation; the risk-critical total/debt/LTV always use the live read.
+const KAMINO_RESERVES = {
+  // SPYx: '...', QQQx: '...', NVDAx: '...', TSLAx: '...', GOOGLx: '...', AAPLx: '...',
+};
 
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
@@ -957,87 +978,138 @@ async function getEthHedge() {
     return null;
   }
 }
+// ============================================================
+// KAMINO LIVE-READ FIX — drop-in replacement
+// Fixes two bugs, both rooted in "read assumed values, not chain state":
+//   BUG 1 (collateral): per-leg USD used the FROZEN raw token amount from
+//          Airtable → missed the Solana scaled-UI dividend/split multiplier.
+//   BUG 2 (debt): borrow USD was echoed from the last Airtable Borrow row →
+//          missed accrued interest between draws, and would misread a split.
+//
+// FIX: read the Kamino obligation account directly on-chain (same raw-parse
+//      style as the Raydium module) and take the values Kamino itself stores —
+//      already multiplier-scaled (collateral) and interest-accrued (debt).
+//
+// Layout verified against @kamino-finance/klend-sdk v10 codegen:
+//   depositedValueSf (total collateral, USD ×2^60) @ byte 1192
+//   borrows[0].marketValueSf (USDC debt, USD ×2^60) @ byte 1312
+//   deposits[i].marketValueSf (per-leg, USD ×2^60) @ 96 + i*136 + 40
+//   Program: KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD
+//
+// Fully defensive: if the on-chain read fails or returns implausible values,
+// it FALLS BACK to the prior Airtable-echo behavior so the pipeline never
+// breaks or writes garbage. Verify on first run against the Kamino UI.
+// ============================================================
 
+const KLEND_PROGRAM_ID = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD';
+const SF_SHIFT = 40n;          // 2^60 = (>>40) then /2^20 — keeps Number precision
+const SF_DIV20 = 1048576;      // 2^20
+
+function readU128LE(buf, offset) {
+  const lo = buf.readBigUInt64LE(offset);
+  const hi = buf.readBigUInt64LE(offset + 8);
+  return lo | (hi << 64n);
+}
+function sfToUsd(sf) { return Number(sf >> SF_SHIFT) / SF_DIV20; }
+
+// Reads the live Kamino obligation for our wallet in the given market.
+// Returns { collateralUSD, debtUSD, ltv, perReserve: {addr: usd}, obligation }
+// or null on any failure (caller falls back).
+async function getKaminoLiveObligation(marketAddress) {
+  try {
+    const accounts = await solRpc('getProgramAccounts', [
+      KLEND_PROGRAM_ID,
+      {
+        encoding: 'base64',
+        filters: [
+          { memcmp: { offset: 32, bytes: marketAddress } },          // lendingMarket
+          { memcmp: { offset: 64, bytes: WALLET_KAMINO_LENDING } },  // owner
+        ],
+      },
+    ]);
+
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      console.error('  [obligation] none found via getProgramAccounts (RPC may block gPA — set SOL_RPC_URL to a full-access endpoint)');
+      return null;
+    }
+    // Pick the largest account (the obligation is ~3.3KB; guards against stray matches)
+    accounts.sort((a, b) => (b.account?.data?.[0]?.length ?? 0) - (a.account?.data?.[0]?.length ?? 0));
+    const buf = Buffer.from(accounts[0].account.data[0], 'base64');
+    const obligation = accounts[0].pubkey;
+
+    // discriminator check: [168,206,141,106,88,76,172,167]
+    const DISC = Buffer.from([168, 206, 141, 106, 88, 76, 172, 167]);
+    if (!buf.slice(0, 8).equals(DISC)) {
+      console.error('  [obligation] discriminator mismatch — not an Obligation account');
+      return null;
+    }
+
+    const collateralUSD = sfToUsd(readU128LE(buf, 1192));   // depositedValueSf
+    const debtUSD       = sfToUsd(readU128LE(buf, 1312));   // borrows[0].marketValueSf
+
+    // Per-leg: deposits[] at 96, entry size 136, marketValueSf at +40, reserve pubkey at +0
+    const perReserve = {};
+    for (let i = 0; i < 8; i++) {
+      const base = 96 + i * 136;
+      const mvSf = readU128LE(buf, base + 40);
+      if (mvSf === 0n) continue;
+      const reserveBytes = Array.from(buf.slice(base, base + 32));
+      const reserveAddr = base58EncodeBytes(reserveBytes);  // helper already in file (Raydium module)
+      perReserve[reserveAddr] = sfToUsd(mvSf);
+    }
+
+    // Sanity gate: collateral must be plausible ($1k–$1M) or we don't trust the parse
+    if (!(collateralUSD > 1000 && collateralUSD < 1_000_000)) {
+      console.error(`  [obligation] implausible collateral $${collateralUSD.toFixed(2)} — falling back`);
+      return null;
+    }
+
+    const ltv = collateralUSD > 0 ? (debtUSD / collateralUSD) * 100 : null;
+    console.log(`  [obligation] ${obligation}`);
+    console.log(`  [obligation] LIVE collateral $${collateralUSD.toFixed(2)} | debt $${debtUSD.toFixed(2)} | LTV ${ltv?.toFixed(2)}%`);
+    console.log(`  [obligation] per-reserve USD: ${Object.entries(perReserve).map(([a, v]) => `${a.slice(0,6)}..=$${v.toFixed(0)}`).join(', ')}`);
+    return { collateralUSD, debtUSD, ltv, perReserve, obligation };
+  } catch (e) {
+    console.error(`  [obligation] read error: ${e.message} — falling back`);
+    return null;
+  }
+}
 // ============================================================
-// MODULE: Kamino xStocks Lending (Solana) — supply legs + USDC borrow leg
+// MODULE: Kamino xStocks Lending (Solana) — LIVE OBLIGATION READ
+// Replaces the whole getKaminoPositions() function.
+// APY still comes from the Kamino REST API (correct as-is).
+// Collateral USD, debt USD, and LTV now come from the on-chain
+// obligation (dividend-scaled + interest-accrued). Falls back to
+// the prior Airtable-echo behavior if the chain read fails.
 // ============================================================
+
+// OPTIONAL per-leg exactness: after the first run, copy the six reserve
+// addresses from the "[obligation] per-reserve USD" log line into this map
+// (symbol -> reserve pubkey). While empty, per-leg supply USD uses the prior
+// approximation; the risk-critical total/debt/LTV always use the live read.
+const KAMINO_RESERVES = {
+  // SPYx: '...', QQQx: '...', NVDAx: '...', TSLAx: '...', GOOGLx: '...', AAPLx: '...',
+};
 
 async function getKaminoPositions() {
   console.log('\n--- Kamino xStocks Lending ---');
   const results = {};
 
   try {
-    // Step 1: Discover xStocks market address
-    // Try several Kamino API endpoint patterns — the configs endpoint path varies by API version.
-    // XSTOCKS_MARKET_ADDRESS can be hardcoded once confirmed from the Kamino UI URL.
     const XSTOCKS_MARKET_ADDRESS = process.env.KAMINO_XSTOCKS_MARKET ?? '5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua';
-
     let marketAddress = XSTOCKS_MARKET_ADDRESS;
-
-    if (!marketAddress) {
-      const configEndpoints = [
-        `${KAMINO_API}/v2/lending/markets`,
-        `${KAMINO_API}/lending/v2/markets`,
-        `${KAMINO_API}/kamino-market/configs`,
-        `${KAMINO_API}/v2/markets`,
-      ];
-
-      for (const endpoint of configEndpoints) {
-        const res = await fetchWithTimeout(endpoint);
-        if (!res) continue;
-        const arr = Array.isArray(res) ? res : (res.markets ?? res.data ?? []);
-        if (!Array.isArray(arr) || arr.length === 0) continue;
-        const found = arr.find(m =>
-          m.name?.toLowerCase().includes('xstock') ||
-          m.description?.toLowerCase().includes('xstock')
-        );
-        if (found) {
-          marketAddress = found.lendingMarket ?? found.market ?? found.address;
-          console.log(`  Market found via ${endpoint}: ${found.name} (${marketAddress})`);
-          break;
-        }
-      }
-    }
-
-    if (!marketAddress) {
-      throw new Error(
-        'xStocks market address not found. ' +
-        'Set KAMINO_XSTOCKS_MARKET env variable in GitHub repo variables ' +
-        'with the market address from app.kamino.finance/lending/{address}'
-      );
-    }
-
+    if (!marketAddress) { throw new Error('xStocks market address not set'); }
     console.log(`  Using xStocks market: ${marketAddress}`);
 
-    // Step 2: Fetch reserve metrics (APY per token)
-    const reserveMetrics = await fetchWithTimeout(
-      `${KAMINO_API}/kamino-market/${marketAddress}/reserves/metrics`
-    );
+    // ---- LIVE on-chain obligation read (collateral, debt, LTV, per-reserve) ----
+    const liveObl = await getKaminoLiveObligation(marketAddress);
 
-    const apyBySymbol = {};
+    // ---- APY per token from Kamino REST API (unchanged, correct) ----
+    const reserveMetrics = await fetchWithTimeout(`${KAMINO_API}/kamino-market/${marketAddress}/reserves/metrics`);
     const metricsArr = Array.isArray(reserveMetrics) ? reserveMetrics : (reserveMetrics?.reserves ?? []);
-    for (const r of metricsArr) {
-      const sym = (r.liquidityToken ?? r.symbol ?? '').toUpperCase();
-      if (sym) apyBySymbol[sym] = parseFloat(r.supplyApy ?? 0);
-    }
-    console.log(`  Reserve APYs loaded: ${Object.keys(apyBySymbol).join(', ')}`);
 
-    // Step 3: Read token amounts from Airtable Lending Actions.
-    //
-    // kTokens are held in Kamino's obligation program account, not the user's wallet.
-    // The Kamino REST API does not expose obligation data at any public endpoint.
-    //
-    // Solution: read the most recent token amount per position from Airtable.
-    // The initial deposit records (entered at position open) have token amounts.
-    // Current supply USD = token_amount × (totalSupplyUsd / totalSupply) from reserve metrics.
-    // This gives an accurate mark-to-market USD value without any blockchain RPC calls.
-
+    // ---- Token amounts from Airtable (only used for fallback per-leg USD) ----
     const kaminoPositionIds = new Set(Object.values(KAMINO_POSITIONS));
-
-    // Fetch Lending Actions with token amounts.
-    // Use returnFieldsByFieldId=true so response keys match our LF field ID constants.
-    // Filter only by token amount presence (formula uses display names — position field
-    // name is unknown so we filter by position ID in JavaScript after fetch).
     let lendingActionsRaw = [];
     try {
       const { default: fetch } = await import('node-fetch');
@@ -1047,126 +1119,87 @@ async function getKaminoPositions() {
       params.append('sort[0][field]', LF.date);
       params.append('sort[0][direction]', 'desc');
       params.append('pageSize', '100');
-      const res = await fetch(
-        `https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${params}&returnFieldsByFieldId=true`,
-        { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
-      );
-      if (res.ok) {
-        const json = await res.json();
-        lendingActionsRaw = json.records ?? [];
-        console.log(`  Airtable token amount records: ${lendingActionsRaw.length} found`);
-      } else {
-        console.error(`  [Airtable] Token amount fetch failed: HTTP ${res.status}`);
-      }
-    } catch (e) {
-      console.error(`  Token amount Airtable fetch error: ${e.message}`);
-    }
+      const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${params}&returnFieldsByFieldId=true`,
+        { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } });
+      if (res.ok) { lendingActionsRaw = (await res.json()).records ?? []; }
+    } catch (e) { console.error(`  Token amount Airtable fetch error: ${e.message}`); }
 
-    // Build most-recent token amount per Kamino position.
-    // Airtable returns linked record fields as [{id, name}] objects — extract .id
     const kaminoTokenAmounts = {};
     for (const record of lendingActionsRaw) {
       const posLinks = record.fields?.[LF.position];
       const rawLink  = Array.isArray(posLinks) ? posLinks[0] : posLinks;
       const posId    = (typeof rawLink === 'object' && rawLink !== null) ? rawLink.id : rawLink;
       if (!posId || !kaminoPositionIds.has(posId)) continue;
-
       const tokenKey = Object.keys(KAMINO_POSITIONS).find(k => KAMINO_POSITIONS[k] === posId);
       if (!tokenKey || kaminoTokenAmounts[tokenKey] !== undefined) continue;
-
       const tokenAmt = parseFloat(record.fields?.[LF.tokenAmt] ?? 0);
       if (tokenAmt > 0) kaminoTokenAmounts[tokenKey] = tokenAmt;
     }
-    console.log(`  Token amounts resolved: ${Object.keys(kaminoTokenAmounts).join(', ') || 'none'}`);
 
-    // Step 4: For each tracked reserve, compute current supply USD and merge with APY
+    // ---- Per-leg supply USD + APY ----
     for (const r of metricsArr) {
       const sym = (r.liquidityToken ?? r.symbol ?? '').toUpperCase();
       const tokenKey = Object.keys(KAMINO_POSITIONS).find(k => k.toUpperCase() === sym);
       if (!tokenKey) continue;
 
       const supplyAPY = parseFloat(r.supplyApy ?? 0);
-      const totalSupplyTokens = parseFloat(r.totalSupply ?? 0);
-      const totalSupplyUsd    = parseFloat(r.totalSupplyUsd ?? 0);
-      const tokenAmt = kaminoTokenAmounts[tokenKey] ?? null;
+      const tokenAmt  = kaminoTokenAmounts[tokenKey] ?? null;
 
+      // Preferred: exact per-leg USD from live obligation (needs reserve address mapping)
       let supplyUSD = null;
-      if (tokenAmt != null && totalSupplyTokens > 0) {
-        const pricePerToken = totalSupplyUsd / totalSupplyTokens;
-        supplyUSD = tokenAmt * pricePerToken;
-        console.log(`  ${tokenKey}: ${tokenAmt.toFixed(4)} tokens × $${pricePerToken.toFixed(4)} = $${supplyUSD.toFixed(2)}, APY: ${(supplyAPY * 100).toFixed(3)}%`);
-      } else {
-        console.log(`  ${tokenKey}: no prior token amount in Airtable — APY only: ${(supplyAPY * 100).toFixed(3)}%`);
+      const reserveAddr = KAMINO_RESERVES[tokenKey];
+      if (liveObl && reserveAddr && liveObl.perReserve[reserveAddr] != null) {
+        supplyUSD = liveObl.perReserve[reserveAddr];
+      } else if (tokenAmt != null) {
+        // Fallback: prior approximation (token amt x price-per-token from metrics)
+        const totalSupplyTokens = parseFloat(r.totalSupply ?? 0);
+        const totalSupplyUsd    = parseFloat(r.totalSupplyUsd ?? 0);
+        if (totalSupplyTokens > 0) supplyUSD = tokenAmt * (totalSupplyUsd / totalSupplyTokens);
       }
 
       results[tokenKey] = { supplyUSD, tokenAmt, supplyAPY };
+      console.log(`  ${tokenKey}: ${supplyUSD != null ? '$' + supplyUSD.toFixed(2) : 'USD=pending'}, APY ${(supplyAPY * 100).toFixed(3)}%${(liveObl && reserveAddr) ? ' [live]' : ''}`);
     }
 
-    // ---- Borrow leg: live gross APY (+ incentive if exposed), carried debt, computed LTV ----
-    // Gross borrow APY comes from the same reserve metrics (USDC reserve).
-    // Debt is carried from the most recent logged Borrow event in Airtable (near-static
-    // between draws/repays). LTV is computed live: debt / total collateral value.
+    // ---- Borrow leg: gross+incentive APY from API; debt/collateral/LTV from live obligation ----
     try {
-      const usdcReserve = metricsArr.find(r =>
-        (r.liquidityToken ?? r.symbol ?? '').toUpperCase() === 'USDC'
-      );
-
-      let grossBorrowAPY = null;   // decimal fraction, e.g. 0.0527 = 5.27%
-      let incentiveAPY   = null;   // decimal fraction
+      const usdcReserve = metricsArr.find(r => (r.liquidityToken ?? r.symbol ?? '').toUpperCase() === 'USDC');
+      let grossBorrowAPY = null, incentiveAPY = null;
       if (usdcReserve) {
-        grossBorrowAPY = parseFloat(
-          usdcReserve.borrowApy ?? usdcReserve.borrowApr ?? usdcReserve.borrowInterestApy ?? 0
-        ) || null;
-        // Incentive field name varies by API version — try flat fields, then a rewards array.
-        const flat = parseFloat(
-          usdcReserve.borrowRewardsApy ?? usdcReserve.incentiveBorrowApy ?? usdcReserve.borrowIncentiveApy ?? 0
-        );
-        const arr = usdcReserve.borrowRewards ?? usdcReserve.incentives ?? usdcReserve.rewards ?? [];
-        const arrSum = Array.isArray(arr)
-          ? arr.reduce((s, x) => s + parseFloat(x.apy ?? x.rewardApy ?? x.incentiveApy ?? 0), 0)
-          : 0;
+        grossBorrowAPY = parseFloat(usdcReserve.borrowApy ?? usdcReserve.borrowApr ?? usdcReserve.borrowInterestApy ?? 0) || null;
+        const flat = parseFloat(usdcReserve.borrowRewardsApy ?? usdcReserve.incentiveBorrowApy ?? usdcReserve.borrowIncentiveApy ?? 0);
+        const arr  = usdcReserve.borrowRewards ?? usdcReserve.incentives ?? usdcReserve.rewards ?? [];
+        const arrSum = Array.isArray(arr) ? arr.reduce((s, x) => s + parseFloat(x.apy ?? x.rewardApy ?? x.incentiveApy ?? 0), 0) : 0;
         incentiveAPY = (arrSum > 0 ? arrSum : flat) || null;
-        // First-run debug: reveals the real field names so we can pin them precisely.
-        console.log(`  [USDC reserve keys] ${Object.keys(usdcReserve).join(', ')}`);
-      } else {
-        console.error('  USDC reserve not found in metrics — cannot read borrow APY');
-      }
+      } else { console.error('  USDC reserve not found in metrics'); }
 
-      // Debt: carry the most recent logged Borrow USD from Airtable.
-      let debtUSD = null;
-      try {
-        const { default: fetch } = await import('node-fetch');
-        const p = new URLSearchParams();
-        [LF.position, LF.borrowUSD, LF.date].forEach(f => p.append('fields[]', f));
-        p.append('sort[0][field]', LF.date);
-        p.append('sort[0][direction]', 'desc');
-        p.append('pageSize', '100');
-        const res = await fetch(
-          `https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${p}&returnFieldsByFieldId=true`,
-          { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } }
-        );
-        if (res.ok) {
-          const json = await res.json();
-          for (const rec of (json.records ?? [])) {      // date-desc: first match is newest
-            const link = rec.fields?.[LF.position];
-            const raw  = Array.isArray(link) ? link[0] : link;
-            const pid  = (typeof raw === 'object' && raw) ? raw.id : raw;
-            if (pid !== KAMINO_USDC_BORROW) continue;
-            const v = parseFloat(rec.fields?.[LF.borrowUSD] ?? 0);
-            if (v > 0) { debtUSD = v; break; }
+      // LIVE debt + collateral (with fallback to prior behavior)
+      let debtUSD = liveObl?.debtUSD ?? null;
+      let collateralValue = liveObl?.collateralUSD ?? Object.values(results).reduce((s, d) => s + (d?.supplyUSD ?? 0), 0);
+      let debtSource = liveObl?.debtUSD != null ? 'live' : null;
+
+      if (debtUSD == null) {  // fallback: last logged Borrow row from Airtable
+        try {
+          const { default: fetch } = await import('node-fetch');
+          const p = new URLSearchParams();
+          [LF.position, LF.borrowUSD, LF.date].forEach(f => p.append('fields[]', f));
+          p.append('sort[0][field]', LF.date); p.append('sort[0][direction]', 'desc'); p.append('pageSize', '100');
+          const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${p}&returnFieldsByFieldId=true`,
+            { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } });
+          if (res.ok) {
+            for (const rec of ((await res.json()).records ?? [])) {
+              const link = rec.fields?.[LF.position];
+              const raw  = Array.isArray(link) ? link[0] : link;
+              const pid  = (typeof raw === 'object' && raw) ? raw.id : raw;
+              if (pid !== KAMINO_USDC_BORROW) continue;
+              const v = parseFloat(rec.fields?.[LF.borrowUSD] ?? 0);
+              if (v > 0) { debtUSD = v; debtSource = 'airtable-echo'; break; }
+            }
           }
-        } else {
-          console.error(`  [Airtable] Borrow debt fetch failed: HTTP ${res.status}`);
-        }
-      } catch (e) {
-        console.error(`  Borrow debt fetch error: ${e.message}`);
+        } catch (e) { console.error(`  Borrow debt fallback error: ${e.message}`); }
       }
 
-      // Collateral value = sum of the six supply USD values computed above.
-      const collateralValue = Object.values(results)
-        .reduce((s, d) => s + (d?.supplyUSD ?? 0), 0);
-
-      const ltv    = (debtUSD != null && collateralValue > 0) ? (debtUSD / collateralValue) * 100 : null;
+      const ltv    = liveObl?.ltv ?? ((debtUSD != null && collateralValue > 0) ? (debtUSD / collateralValue) * 100 : null);
       const netDec = (grossBorrowAPY != null && incentiveAPY != null) ? grossBorrowAPY - incentiveAPY : null;
 
       const noteParts = [];
@@ -1175,22 +1208,18 @@ async function getKaminoPositions() {
       if (netDec         != null) noteParts.push(`Net: ${(netDec * 100).toFixed(2)}%`);
       if (collateralValue > 0)    noteParts.push(`Collateral: $${collateralValue.toFixed(2)}`);
       if (ltv != null)            noteParts.push(`LTV: ${ltv.toFixed(2)}%`);
-      if (debtUSD == null)        noteParts.push('debt: no prior Borrow record found');
+      noteParts.push(`src: ${debtSource ?? 'none'}`);
 
       results.__borrow = {
         borrowUSD: debtUSD,
-        borrowAPY: grossBorrowAPY != null ? grossBorrowAPY * 100 : null,  // gross, whole-percent
+        borrowAPY: grossBorrowAPY != null ? grossBorrowAPY * 100 : null,
         ltv,
         notes: noteParts.join(' | '),
       };
-      console.log(`  Borrow leg: debt ${debtUSD != null ? '$' + debtUSD.toFixed(2) : 'n/a'}, gross ${grossBorrowAPY != null ? (grossBorrowAPY * 100).toFixed(2) + '%' : 'n/a'}, net ${netDec != null ? (netDec * 100).toFixed(2) + '%' : 'n/a'}, LTV ${ltv != null ? ltv.toFixed(2) + '%' : 'n/a'}`);
-    } catch (e) {
-      console.error(`  Borrow leg error: ${e.message}`);
-    }
+      console.log(`  Borrow leg [${debtSource}]: debt ${debtUSD != null ? '$' + debtUSD.toFixed(2) : 'n/a'}, gross ${grossBorrowAPY != null ? (grossBorrowAPY * 100).toFixed(2) + '%' : 'n/a'}, LTV ${ltv != null ? ltv.toFixed(2) + '%' : 'n/a'}`);
+    } catch (e) { console.error(`  Borrow leg error: ${e.message}`); }
 
-  } catch (e) {
-    console.error(`Kamino fatal: ${e.message}`);
-  }
+  } catch (e) { console.error(`Kamino fatal: ${e.message}`); }
 
   return results;
 }
@@ -1200,7 +1229,7 @@ async function getKaminoPositions() {
 // ============================================================
 
 async function main() {
-  console.log(`\n====== Daily Portfolio Check v40 — ${NOW_UTC} ======`);
+  console.log(`\n====== Daily Portfolio Check v41 — ${NOW_UTC} ======`);
   if (RAYDIUM_DRY_RUN) console.log('ℹ️  RAYDIUM_DRY_RUN=true — Raydium will NOT write to Airtable');
 
   // Fetch WETH + Hedge asset records first — needed for both status gate and cycle IDs.
