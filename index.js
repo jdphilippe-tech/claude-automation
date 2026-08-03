@@ -1033,8 +1033,26 @@ async function getKaminoLiveObligation(marketAddress) {
       return null;
     }
 
-    const collateralUSD = sfToUsd(readU128LE(buf, 1192));   // depositedValueSf
-    const debtUSD       = sfToUsd(readU128LE(buf, 1312));   // borrows[0].marketValueSf
+    const collateralUSD = sfToUsd(readU128LE(buf, 1192));   // depositedValueSf (total, dividend-scaled)
+
+    // Debt: SUM all borrow entries — Kamino may keep separate entries per draw
+    // (reading only borrows[0] previously missed later draws). borrows[] starts
+    // at 1208, stride 200; per entry: borrowReserve @+0, marketValueSf @+104,
+    // borrowedAmountSf @+88. Cross-check against Kamino's own aggregate
+    // borrowedAssetsMarketValueSf @ 2224. Use the larger (guards undercount).
+    let debtSum = 0;
+    const borrowLegs = [];
+    for (let i = 0; i < 5; i++) {
+      const entry = 1208 + i * 200;
+      const reserveEmpty = buf.slice(entry, entry + 32).every(b => b === 0);
+      if (reserveEmpty) continue;
+      const mv = sfToUsd(readU128LE(buf, entry + 104));  // marketValueSf
+      if (mv > 0) { debtSum += mv; borrowLegs.push(mv); }
+    }
+    const aggDebtUSD = sfToUsd(readU128LE(buf, 2224));   // borrowedAssetsMarketValueSf (Kamino's total)
+    const amt0USD    = sfToUsd(readU128LE(buf, 1296)) / 1e6;  // borrows[0].borrowedAmountSf (token→USD diag)
+    console.log(`  [obligation] debt legs: [${borrowLegs.map(v => '$' + v.toFixed(2)).join(', ')}] sum=$${debtSum.toFixed(2)} | aggregate=$${aggDebtUSD.toFixed(2)} | amt0=$${amt0USD.toFixed(2)}`);
+    const debtUSD = Math.max(debtSum, aggDebtUSD);   // undercount is the failure mode; take the larger
 
     // Per-leg: deposits[] at 96, entry size 136, marketValueSf at +40, reserve pubkey at +0
     const perReserve = {};
