@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, August 3, 2026</title>
+      <description><![CDATA[All clear across the collateral engine with Google surging over three percent today and Bitcoin sitting at sixty-three thousand dollars amid fear-level sentiment.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-03.mp3" length="578499" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-03</guid>
+      <pubDate>Mon, 03 Aug 2026 14:17:11 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, August 1, 2026</title>
       <description><![CDATA[S-P-Y-x is showing a slight peg gap above fifty basis points while Google surged nearly seven percent on earnings Friday and Apple tumbled more than seven percent, with the collateral engine running its first active borrow month at six and a half percent L-T-V.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-01.mp3" length="2832971" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-26.mp3" length="745683" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-26</guid>
       <pubDate>Fri, 26 Jun 2026 14:18:03 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, June 25, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt ahead of the July draw, while Apple is the standout today down over five percent on heavy volume.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-25.mp3" length="661673" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-25</guid>
-      <pubDate>Thu, 25 Jun 2026 14:17:49 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>

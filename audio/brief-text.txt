@@ -1,17 +1,9 @@
-Good morning. It's Saturday, August 1st — here's how the week landed.
+Good morning. It's Monday, August third.
 
-Watch — S-P-Y-x is showing fifty-three basis points of gap above its underlying. Not an action threshold, but worth a check heading into next week.
+All clear. No action needed today.
 
-No debt yet became first draw this month. Three thousand seven hundred fifty dollars landed on July 1st — the full Target amount. Blended L-T-V now sits at six point five percent against the forty percent operating cap and the sixty-five percent liquidation line. Collateral would need to fall by more than eighty percent from here before touching the liquidation line. Plenty of headroom.
+On the crypto side — Bitcoin is at sixty-three thousand two hundred forty-nine dollars, sentiment is Fear at twenty-eight.
 
-One draw in, three to go. Three thousand seven hundred fifty dollars drawn cumulative, tracking exactly to the Target of fifteen thousand thirty-eight dollars and well under the ceiling of eighteen thousand forty-six. August, September, and October draws remain on schedule.
+On the equity side — S-P-Y is at seven hundred fifty-four dollars, the Nasdaq one hundred is up about one percent, and V-I-X is at sixteen — normal, no stress.
 
-Borrow rate is running at eight point two percent. Supply yield across the basket is covering less than one tenth of a percent — so the real cost of debt is just over eight percent. That sits on a borrowed balance of three thousand seven hundred fifty dollars for now — a small absolute number, but worth watching as draws accumulate through October.
-
-Collateral is down two thousand eight hundred ten dollars from the deposited base of sixty thousand one hundred fifty-three dollars — the basket gave back a bit of ground this week. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
-
-S-P-Y-x is the one flag. Token price is running fifty-three basis points above S-P-Y's Friday close of seven hundred forty-seven dollars. The other five are clean — Q-Q-Q-x, Nvidia-x, Tesla-x, Google-x, and Apple-x are all within twenty-five basis points of their underlyings. No action needed, but keep an eye on S-P-Y-x if the gap widens early next week.
-
-Bitcoin finished the week at sixty-three thousand dollars, with sentiment at twenty-seven — firmly in Fear territory. On equities, S-P-Y closed at seven hundred forty-seven dollars, Q-Q-Q finished at six hundred eighty-eight dollars — about one percent higher on the week — and V-I-X settled at sixteen, sitting in the normal range as markets worked through a heavy earnings calendar.
-
-The week's standout was Google — closing Friday at three hundred fifty-six dollars, up nearly seven percent on the session after a strong earnings report. That is a substantial single-day move. Worth noting in the other direction: Apple dropped more than seven percent on Friday, closing at three hundred nine dollars, after a disappointing earnings print. Two names, two very different outcomes on the same tape. Have a good weekend.
+Google is the standout today — up three and a half percent to three hundred sixty-eight dollars, pulling the Nasdaq higher to open the week. Have a good one.
