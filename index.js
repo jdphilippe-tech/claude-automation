@@ -1035,24 +1035,25 @@ async function getKaminoLiveObligation(marketAddress) {
 
     const collateralUSD = sfToUsd(readU128LE(buf, 1192));   // depositedValueSf (total, dividend-scaled)
 
-    // Debt: SUM all borrow entries — Kamino may keep separate entries per draw
-    // (reading only borrows[0] previously missed later draws). borrows[] starts
-    // at 1208, stride 200; per entry: borrowReserve @+0, marketValueSf @+104,
-    // borrowedAmountSf @+88. Cross-check against Kamino's own aggregate
-    // borrowedAssetsMarketValueSf @ 2224. Use the larger (guards undercount).
-    let debtSum = 0;
+    // Debt: the USD *value* fields (marketValueSf @1312, aggregate @2224) are
+    // STALE — they only refresh when the obligation is touched on-chain. The
+    // borrowed *token amount* (borrowedAmountSf @1296) accrues live. For a USDC
+    // borrow (~$1) that token amount IS the dollar debt. Confirmed 2026-08-03:
+    // marketValueSf/aggregate=$3766 (stale July) but borrowedAmountSf=$7517 (matches UI).
+    // Read amount for every non-empty borrow entry and sum (handles multi-borrow too).
+    let debtUSD = 0;
     const borrowLegs = [];
     for (let i = 0; i < 5; i++) {
       const entry = 1208 + i * 200;
       const reserveEmpty = buf.slice(entry, entry + 32).every(b => b === 0);
       if (reserveEmpty) continue;
-      const mv = sfToUsd(readU128LE(buf, entry + 104));  // marketValueSf
-      if (mv > 0) { debtSum += mv; borrowLegs.push(mv); }
+      const amt = sfToUsd(readU128LE(buf, entry + 88)) / 1e6;  // borrowedAmountSf, USDC 6dp -> USD
+      if (amt > 0) { debtUSD += amt; borrowLegs.push(amt); }
     }
-    const aggDebtUSD = sfToUsd(readU128LE(buf, 2224));   // borrowedAssetsMarketValueSf (Kamino's total)
-    const amt0USD    = sfToUsd(readU128LE(buf, 1296)) / 1e6;  // borrows[0].borrowedAmountSf (token→USD diag)
-    console.log(`  [obligation] debt legs: [${borrowLegs.map(v => '$' + v.toFixed(2)).join(', ')}] sum=$${debtSum.toFixed(2)} | aggregate=$${aggDebtUSD.toFixed(2)} | amt0=$${amt0USD.toFixed(2)}`);
-    const debtUSD = Math.max(debtSum, aggDebtUSD);   // undercount is the failure mode; take the larger
+    // Diagnostics: stale value fields kept for visibility (do NOT use for debt).
+    const staleMv0  = sfToUsd(readU128LE(buf, 1312));
+    const staleAgg  = sfToUsd(readU128LE(buf, 2224));
+    console.log(`  [obligation] debt (live borrowedAmount) legs: [${borrowLegs.map(v => '$' + v.toFixed(2)).join(', ')}] = $${debtUSD.toFixed(2)}  |  stale value fields: mv0=$${staleMv0.toFixed(2)} agg=$${staleAgg.toFixed(2)}`);
 
     // Per-leg: deposits[] at 96, entry size 136, marketValueSf at +40, reserve pubkey at +0
     const perReserve = {};
