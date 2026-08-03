@@ -123,19 +123,8 @@ const KAMINO_POSITIONS = {
 
 // Kamino USDC Borrow position (the off-ramp debt leg). Permanent record ID.
 const KAMINO_USDC_BORROW = 'recaR2C1uC0G0HY2Q';
-
-// ---- Kamino KLend on-chain (v41 live obligation read) ----
-const KLEND_PROGRAM_ID = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD';
-const SF_SHIFT  = 40n;        // Kamino scaled fraction = value * 2^60; (>>40)/2^20 keeps Number precision
-const SF_DIV20  = 1048576;    // 2^20
-
-// OPTIONAL per-leg exactness: after the first run, copy the six reserve
-// addresses from the "[obligation] per-reserve USD" log line into this map
-// (symbol -> reserve pubkey). While empty, per-leg supply USD uses the prior
-// approximation; the risk-critical total/debt/LTV always use the live read.
-const KAMINO_RESERVES = {
-  // SPYx: '...', QQQx: '...', NVDAx: '...', TSLAx: '...', GOOGLx: '...', AAPLx: '...',
-};
+// NOTE: Kamino KLend on-chain constants (KLEND_PROGRAM_ID, SF_SHIFT, SF_DIV20,
+// KAMINO_RESERVES) are declared in the Kamino module section, next to their use.
 
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
