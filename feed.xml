@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, August 4, 2026</title>
+      <description><![CDATA[The collateral engine now has its first draw on the books at seven thousand five hundred seventeen dollars, with L-T-V at twelve point seven percent and Bitcoin at sixty-three thousand seven hundred forty-two dollars amid extreme fear sentiment.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-04.mp3" length="901582" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-04</guid>
+      <pubDate>Tue, 04 Aug 2026 14:20:11 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, August 3, 2026</title>
       <description><![CDATA[All clear across the collateral engine with Google surging over three percent today and Bitcoin sitting at sixty-three thousand dollars amid fear-level sentiment.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-03.mp3" length="578499" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-27.mp3" length="1951495" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-27</guid>
       <pubDate>Sat, 27 Jun 2026 14:19:26 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Friday, June 26, 2026</title>
-      <description><![CDATA[All clear on the collateral engine heading into the weekend, with Bitcoin slipping below sixty thousand dollars and sentiment in extreme fear at thirteen.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-26.mp3" length="745683" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-26</guid>
-      <pubDate>Fri, 26 Jun 2026 14:18:03 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
