@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Wednesday, August 5, 2026</title>
+      <description><![CDATA[Nvidia surges four and a half percent today while the collateral engine shows a twelve percent L-T-V with borrow rate running at eight point three percent — first draw is live.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-05.mp3" length="700125" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-05</guid>
+      <pubDate>Wed, 05 Aug 2026 14:18:42 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Tuesday, August 4, 2026</title>
       <description><![CDATA[The collateral engine now has its first draw on the books at seven thousand five hundred seventeen dollars, with L-T-V at twelve point seven percent and Bitcoin at sixty-three thousand seven hundred forty-two dollars amid extreme fear sentiment.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-04.mp3" length="901582" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-29.mp3" length="660837" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-06-29</guid>
       <pubDate>Mon, 29 Jun 2026 14:17:15 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, June 27, 2026</title>
-      <description><![CDATA[A rough week closes with Bitcoin at sixty thousand dollars, extreme fear at fifteen, and Nvidia down nearly eight percent as markets broadly retreated — the collateral engine sits debt-free with the basket roughly flat versus its deposited base.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-27.mp3" length="1951495" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-27</guid>
-      <pubDate>Sat, 27 Jun 2026 14:19:26 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
