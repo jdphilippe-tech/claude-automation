@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, August 7, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with the first draw underway at twelve point six percent LTV, Bitcoin at sixty-four thousand dollars with sentiment in fear, and equity markets holding steady.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-07.mp3" length="726457" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-07</guid>
+      <pubDate>Fri, 07 Aug 2026 14:18:45 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, August 6, 2026</title>
       <description><![CDATA[All clear across the collateral engine with Bitcoin at sixty-four thousand dollars and Nvidia the standout on a nearly one percent gain in a cautious market.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-06.mp3" length="673376" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-01.mp3" length="695110" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-01</guid>
       <pubDate>Wed, 01 Jul 2026 14:17:01 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, June 30, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw window, Bitcoin sitting at fifty-eight thousand nine hundred sixteen dollars in extreme fear territory, and Apple the day's standout up one point five percent.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-06-30.mp3" length="636177" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-06-30</guid>
-      <pubDate>Tue, 30 Jun 2026 14:17:22 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
