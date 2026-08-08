@@ -1,9 +1,17 @@
-Good morning. It's Friday, August seventh.
+Good morning. It's Saturday, August eighth — here's how the week landed.
 
-All clear. No action needed today.
+All clear. No action needed. L-T-V is sitting at six point six percent, deep in the green.
 
-On the crypto side — Bitcoin is at sixty-four thousand eight hundred twenty-two dollars, sentiment is Fear at twenty-nine.
+On collateral health: the first draw is confirmed — three thousand seven hundred fifty dollars was drawn in July. L-T-V sits at six point six percent against the forty percent operating cap and the sixty-five percent liquidation line. There's substantial runway before the cap.
 
-On the equity side — S-P-Y is at seven hundred seventy dollars, the Nasdaq one hundred is at seven hundred eighteen dollars, and V-I-X is at fifteen — low-normal, no stress in the tape.
+On borrowing pace: one draw logged, three thousand seven hundred fifty dollars, right at the monthly Target. That puts cumulative debt at three thousand seven hundred fifty dollars against the Target D-max of fifteen thousand thirty-eight dollars and the Ceiling D-max of eighteen thousand forty-six dollars. Three draws remain in the July through October window.
 
-Nvidia is the standout today — up about one and a half percent to two hundred twenty-two dollars, capping a week that added over seven percent from Monday. The fifty-two week high is at two hundred thirty-six — worth tracking next week. Have a good one.
+On net carry: borrow rate is running at four point nine nine percent. Supply yield is covering zero point zero six percent across the basket — the real cost of debt is approximately four point nine three percent annualized. That's expected for this window.
+
+On growth: collateral is down three thousand fifty-two dollars from the deposited base of sixty thousand one hundred fifty-three dollars — that's roughly five point one percent below base. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
+
+On peg watch: the last Kamino rate check landed July twenty-sixth — roughly two weeks ago. With S-P-Y up three and a half percent and Nvidia up nearly twelve percent since that snapshot, the token-to-underlying comparisons reflect market movement, not peg failure. Apple-x is the only clean read — less than a tenth of a percent off. The others are not assessable this week due to stale data. Worth noting: the rate check cadence appears to have gone quiet — worth verifying the automation is running.
+
+On market pulse: Bitcoin finished the week at sixty-five thousand twelve dollars. Sentiment is Fear at thirty — the market's cautious backdrop. On equities, S-P-Y closed at seven hundred seventy-three dollars, up three point five percent on the week and near its fifty-two-week high. The Nasdaq one hundred closed at seven hundred twenty-three dollars, up five point one percent on the week. V-I-X came in at fourteen point nine — low, calm tape.
+
+The week's standout was Nvidia — up eleven point six percent on the week, closing at two hundred twenty-three dollars and ninety-six cents, within striking distance of its fifty-two-week high of two hundred thirty-six dollars. The move came on broad tech momentum and puts Nvidia-x as the most active collateral leg to watch on any next rate check. Have a good weekend.
