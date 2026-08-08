@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, August 8, 2026</title>
+      <description><![CDATA[All clear across the collateral engine with the first draw of three thousand seven hundred fifty dollars confirmed, Nvidia the week's standout up nearly twelve percent, and Bitcoin sitting at sixty-five thousand dollars amid a fear reading.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-08.mp3" length="2737676" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-08</guid>
+      <pubDate>Sat, 08 Aug 2026 14:18:44 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, August 7, 2026</title>
       <description><![CDATA[All clear on the collateral engine with the first draw underway at twelve point six percent LTV, Bitcoin at sixty-four thousand dollars with sentiment in fear, and equity markets holding steady.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-07.mp3" length="726457" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-03.mp3" length="749444" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-03</guid>
       <pubDate>Fri, 03 Jul 2026 14:17:07 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, July 1, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt drawn yet and Bitcoin sliding under sixty thousand dollars against a backdrop of extreme fear in crypto sentiment with Nvidia the day's standout on a two percent pullback.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-01.mp3" length="695110" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-01</guid>
-      <pubDate>Wed, 01 Jul 2026 14:17:01 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
