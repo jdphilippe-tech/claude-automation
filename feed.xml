@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, August 10, 2026</title>
+      <description><![CDATA[One sentence about the most notable thing today — Nvidia surging over seven percent with LTV at twelve percent and all clear on collateral health.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-10.mp3" length="801271" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-10</guid>
+      <pubDate>Mon, 10 Aug 2026 14:19:23 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, August 8, 2026</title>
       <description><![CDATA[All clear across the collateral engine with the first draw of three thousand seven hundred fifty dollars confirmed, Nvidia the week's standout up nearly twelve percent, and Bitcoin sitting at sixty-five thousand dollars amid a fear reading.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-08.mp3" length="2737676" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-06.mp3" length="599397" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-06</guid>
       <pubDate>Mon, 06 Jul 2026 14:17:23 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Friday, July 3, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw window, while Tesla tumbles nearly eight percent today on heavy volume amid broad market softness.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-03.mp3" length="749444" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-03</guid>
-      <pubDate>Fri, 03 Jul 2026 14:17:07 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
