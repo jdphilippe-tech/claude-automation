@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, August 11, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with the first July borrow confirmed at three thousand seven hundred fifty dollars — L-T-V sits at just over six percent, well inside the forty percent cap, and Tesla is the standout today up two percent while Apple drops over two percent.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-11.mp3" length="657075" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-11</guid>
+      <pubDate>Tue, 11 Aug 2026 14:19:12 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, August 10, 2026</title>
       <description><![CDATA[One sentence about the most notable thing today — Nvidia surging over seven percent with LTV at twelve percent and all clear on collateral health.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-10.mp3" length="801271" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-07.mp3" length="674212" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-07</guid>
       <pubDate>Tue, 07 Jul 2026 14:17:25 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Monday, July 6, 2026</title>
-      <description><![CDATA[All clear on the collateral engine as the July draw window opens, with Tesla leading the basket today up nearly three percent and Bitcoin holding near sixty-two thousand dollars amid extreme fear sentiment.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-06.mp3" length="599397" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-06</guid>
-      <pubDate>Mon, 06 Jul 2026 14:17:23 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
