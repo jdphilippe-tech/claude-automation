@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, August 14, 2026</title>
+      <description><![CDATA[Net borrow cost flagging a watch with Tesla the standout equity today up two point four percent while Bitcoin holds at sixty-two thousand five hundred fifty-five dollars in a fear-driven market.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-14.mp3" length="759057" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-14</guid>
+      <pubDate>Fri, 14 Aug 2026 14:18:42 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, August 13, 2026</title>
       <description><![CDATA[All clear across the collateral engine with Bitcoin at sixty-three thousand seven hundred fifty-three dollars and Tesla the day's standout, up one point six percent.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-13.mp3" length="651224" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-10.mp3" length="618623" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-10</guid>
       <pubDate>Fri, 10 Jul 2026 14:17:48 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, July 9, 2026</title>
-      <description><![CDATA[The collateral engine's first July draw landed at three thousand seven hundred fifty dollars, putting opening L-T-V at a clean six point two percent — and Google is the day's standout, sliding four percent on the session.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-09.mp3" length="808795" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-09</guid>
-      <pubDate>Thu, 09 Jul 2026 14:19:56 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
