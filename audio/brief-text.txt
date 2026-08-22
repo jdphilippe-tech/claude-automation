@@ -1,9 +1,17 @@
-Good morning. It's Friday, August twenty-first.
+Good morning. It's Saturday, August twenty-second — here's how the week landed.
 
-Watch — the Moonwell borrow is at six point nine percent against a Kamino supply yield of roughly zero point zero five percent. Real carry cost is well above one percent. L-T-V is twelve point six percent, safely under the forty percent cap — no action required — but that rate spread deserves attention heading into the weekend.
+Watch — S-P-Y-x is showing fifty-four basis points of premium to its underlying, just above the half-percent flag.
 
-On the crypto side — Bitcoin is at seventy-six thousand seven hundred ninety-two dollars, sentiment is Greed at seventy-two.
+Collateral is sitting at fifty-nine thousand nine hundred twenty-seven dollars, against the deposited base of sixty thousand one hundred fifty-three. Blended LTV is twelve point five percent — well inside the forty percent operating cap and a long way from the sixty-five percent liquidation line. Collateral would need to fall nearly sixty-nine percent from here before the LTV cap triggers.
 
-On the equity side — S-P-Y is at seven hundred sixty-two dollars, the Nasdaq one hundred is roughly flat, and V-I-X is at sixteen — calm.
+Two draws are in — July and August, at roughly three thousand seven hundred fifty dollars each, totaling seven thousand five hundred seventeen dollars. Target D-max is fifteen thousand thirty-eight; ceiling is eighteen thousand forty-six. Two months remain in the window — September and October — and you're right on pace.
 
-Tesla is the standout today — up about four percent to three hundred fifty-eight dollars off yesterday's three hundred forty-five close. Have a good one.
+Borrow rate is four point four percent; supply yield averages a thin zero point zero six percent across the basket — real cost of carry is about four point three six percent. Structural and expected; no offsets active.
+
+Collateral is down about two hundred twenty-six dollars from the deposited base, tracking a soft equity week. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
+
+Five of the six tokens tracked their underlying tightly. S-P-Y-x is the outlier — trading at seven hundred sixty-nine eighty-eight against S-P-Y's Friday close of seven hundred sixty-five seventy-two, a fifty-four basis point premium. Worth an eye heading into next week. All others are within forty basis points.
+
+Bitcoin finished the week at seventy-seven thousand and thirty-one dollars, sentiment greed at seventy-one. S-P-Y closed at seven hundred sixty-five seventy-two — down about zero point nine percent on the week. Q-Q-Q was the heavier mover, off two point two percent to seven hundred thirteen forty-four. V-I-X settled at fifteen point one three — normal territory, though it spiked to sixteen on Thursday before pulling back.
+
+The week's standout was Tesla — up nearly seven percent for the week, closing Friday at three hundred sixty-two eighty-six on a six percent single-day surge with nearly double average daily volume. Intraday high of three hundred sixty-six fifty. No clear catalyst in the news cycle — worth watching whether it holds Monday. Have a good weekend.

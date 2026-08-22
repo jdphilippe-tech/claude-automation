@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, August 22, 2026</title>
+      <description><![CDATA[Tesla surged nearly seven percent on the week with the collateral engine two draws into its borrow window and S-P-Y-x flagging a slight premium worth watching.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-22.mp3" length="2590555" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-22</guid>
+      <pubDate>Sat, 22 Aug 2026 14:20:08 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, August 21, 2026</title>
       <description><![CDATA[All clear on LTV with Tesla surging nearly four percent today, though the borrow rate on the Moonwell draw is running above six percent against a near-zero supply yield worth watching.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-21.mp3" length="943795" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-17.mp3" length="714336" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-17</guid>
       <pubDate>Fri, 17 Jul 2026 14:17:25 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, July 16, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt drawn yet, Bitcoin sitting at sixty-four thousand dollars in extreme fear territory, and the Nasdaq one hundred slipping on the day.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-16.mp3" length="806705" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-16</guid>
-      <pubDate>Thu, 16 Jul 2026 14:17:41 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
