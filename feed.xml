@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, August 24, 2026</title>
+      <description><![CDATA[All-clear on collateral health with LTV at under seven percent but Nvidia leads a broad tech pullback on the equity side this Monday morning.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-24.mp3" length="1013177" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-24</guid>
+      <pubDate>Mon, 24 Aug 2026 14:20:03 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, August 22, 2026</title>
       <description><![CDATA[Tesla surged nearly seven percent on the week with the collateral engine two draws into its borrow window and S-P-Y-x flagging a slight premium worth watching.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-22.mp3" length="2590555" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-18.mp3" length="3068282" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-18</guid>
       <pubDate>Sat, 18 Jul 2026 14:18:25 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Friday, July 17, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of the July draw, while Google is today's standout sliding two point four percent in a broad market pullback with Bitcoin holding near sixty-three thousand dollars and sentiment firmly in fear territory.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-17.mp3" length="714336" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-17</guid>
-      <pubDate>Fri, 17 Jul 2026 14:17:25 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
