@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, August 25, 2026</title>
+      <description><![CDATA[All clear across the collateral engine with L-T-V at twelve point six percent and Nvidia earnings dropping tomorrow making it today's clear standout.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-25.mp3" length="614862" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-25</guid>
+      <pubDate>Tue, 25 Aug 2026 14:18:42 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, August 24, 2026</title>
       <description><![CDATA[All-clear on collateral health with LTV at under seven percent but Nvidia leads a broad tech pullback on the equity side this Monday morning.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-24.mp3" length="1013177" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-20.mp3" length="635759" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-20</guid>
       <pubDate>Mon, 20 Jul 2026 14:17:37 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, July 18, 2026</title>
-      <description><![CDATA[Apple closed the week up five percent and near its fifty-two week high while Bitcoin dropped to sixty-four thousand amid extreme fear sentiment, with the collateral engine's first July draw now on the books at thirty-seven fifty and a blended loan-to-value of six percent.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-18.mp3" length="3068282" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-18</guid>
-      <pubDate>Sat, 18 Jul 2026 14:18:25 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
