@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Wednesday, August 26, 2026</title>
+      <description><![CDATA[Active borrow of seven thousand five hundred seventeen dollars is running at four point six percent against near-zero supply yield, with L-T-V at twelve point six percent and Apple the day's standout equity up nearly one percent.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-26.mp3" length="672122" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-26</guid>
+      <pubDate>Wed, 26 Aug 2026 14:19:33 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Tuesday, August 25, 2026</title>
       <description><![CDATA[All clear across the collateral engine with L-T-V at twelve point six percent and Nvidia earnings dropping tomorrow making it today's clear standout.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-25.mp3" length="614862" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-21.mp3" length="706813" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-21</guid>
       <pubDate>Tue, 21 Jul 2026 14:17:23 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Monday, July 20, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with Bitcoin at sixty-four thousand dollars, Google the standout today on a strong three-point-six percent gain, and sentiment sitting in fear territory at twenty-nine.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-20.mp3" length="635759" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-20</guid>
-      <pubDate>Mon, 20 Jul 2026 14:17:37 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
