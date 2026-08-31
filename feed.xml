@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, August 31, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with Tesla up three and a half percent leading the basket and the V-I-X ticking just above fifteen on a soft market open.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-31.mp3" length="697199" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-08-31</guid>
+      <pubDate>Mon, 31 Aug 2026 14:17:33 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, August 28, 2026</title>
       <description><![CDATA[All clear across the collateral engine with Bitcoin near seventy-eight thousand dollars and Nvidia the day's standout, sliding nearly two percent amid broad tech softness.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-28.mp3" length="665435" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-25.mp3" length="2847599" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-25</guid>
       <pubDate>Sat, 25 Jul 2026 14:20:36 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, July 23, 2026</title>
-      <description><![CDATA[Tesla crashing nearly thirteen percent today dominates the session as the collateral engine logs its first July draw of three thousand seven hundred fifty dollars and sentiment slides into fear territory.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-23.mp3" length="788733" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-23</guid>
-      <pubDate>Thu, 23 Jul 2026 14:18:09 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
