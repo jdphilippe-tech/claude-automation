@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, September 1, 2026</title>
+      <description><![CDATA[All clear across the collateral engine with Bitcoin at seventy-eight thousand two hundred fifty-three dollars and Tesla the day's standout, sliding two and a half percent on the first trading day of September.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-01.mp3" length="675048" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-01</guid>
+      <pubDate>Tue, 01 Sep 2026 14:18:19 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, August 31, 2026</title>
       <description><![CDATA[All clear on the collateral engine with Tesla up three and a half percent leading the basket and the V-I-X ticking just above fifteen on a soft market open.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-31.mp3" length="697199" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-27.mp3" length="657911" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-27</guid>
       <pubDate>Mon, 27 Jul 2026 14:17:46 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, July 25, 2026</title>
-      <description><![CDATA[The first July draw landed on schedule at three thousand seven hundred fifty dollars, collateral is sitting five percent below the deposited base after Tesla's fifteen percent weekly selloff dragged the basket, and S-P-Y-x is showing a slim fifty-three basis-point premium against its underlying.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-25.mp3" length="2847599" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-25</guid>
-      <pubDate>Sat, 25 Jul 2026 14:20:36 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
