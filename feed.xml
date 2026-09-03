@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, September 3, 2026</title>
+      <description><![CDATA[All clear on collateral health with the draw sitting at eighteen percent L-T-V and Tesla the standout today on a nearly six percent gain.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-03.mp3" length="689676" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-03</guid>
+      <pubDate>Thu, 03 Sep 2026 14:18:04 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, September 2, 2026</title>
       <description><![CDATA[[one sentence for the audio description]]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-02.mp3" length="713082" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-29.mp3" length="669196" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-29</guid>
       <pubDate>Wed, 29 Jul 2026 14:17:48 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, July 28, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt drawn yet, Bitcoin at sixty-three thousand dollars, and Apple touching a fifty-two week high intraday while Tesla slides two and a half percent.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-28.mp3" length="654986" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-28</guid>
-      <pubDate>Tue, 28 Jul 2026 14:17:30 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
