@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, September 4, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with no debt yet ahead of July's first draw, while Tesla is the day's standout tumbling nearly six percent and Bitcoin sitting near seventy-nine thousand dollars.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-04.mp3" length="709320" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-04</guid>
+      <pubDate>Fri, 04 Sep 2026 14:16:59 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, September 3, 2026</title>
       <description><![CDATA[All clear on collateral health with the draw sitting at eighteen percent L-T-V and Tesla the standout today on a nearly six percent gain.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-03.mp3" length="689676" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-30.mp3" length="989353" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-30</guid>
       <pubDate>Thu, 30 Jul 2026 14:18:27 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, July 29, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with the first draw landed at three thousand seven hundred fifty dollars and Apple touching a fifty-two week high while the rest of the basket trades in the red.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-29.mp3" length="669196" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-29</guid>
-      <pubDate>Wed, 29 Jul 2026 14:17:48 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
