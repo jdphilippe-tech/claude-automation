@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, September 5, 2026</title>
+      <description><![CDATA[All six xStock tokens tracking well with S-P-Y-x showing a slim fifty-six basis point premium, Nvidia the week's standout up over four percent, and the collateral engine carrying eleven thousand three hundred dollars of live debt at eighteen point six percent LTV — well inside the forty percent cap.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-05.mp3" length="2990959" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-05</guid>
+      <pubDate>Sat, 05 Sep 2026 14:18:07 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, September 4, 2026</title>
       <description><![CDATA[All clear on the collateral engine with no debt yet ahead of July's first draw, while Tesla is the day's standout tumbling nearly six percent and Bitcoin sitting near seventy-nine thousand dollars.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-04.mp3" length="709320" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-31.mp3" length="845157" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-07-31</guid>
       <pubDate>Fri, 31 Jul 2026 14:19:49 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, July 30, 2026</title>
-      <description><![CDATA[All systems operating with the first July draw of three thousand seven hundred fifty dollars landed and Nvidia the day's standout up nearly three percent.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-30.mp3" length="989353" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-30</guid>
-      <pubDate>Thu, 30 Jul 2026 14:18:27 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
