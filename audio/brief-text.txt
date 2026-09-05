@@ -1,9 +1,19 @@
-Good morning. It's Friday, September 4th.
+Good morning. It's Saturday, September fifth — here's how the week landed.
 
-All clear. No action needed today.
+Watch — S-P-Y-x is showing fifty-six basis points above its underlying as of Friday's close, and net carry is running at just under five percent with supply yields near zero across the basket.
 
-On the crypto side — Bitcoin is at seventy-nine thousand four hundred eighteen dollars, sentiment is Greed at seventy-four.
+No debt yet — draw begins July. Just kidding — the draw is live. Blended LTV is eighteen point six percent, against the forty percent operating cap and the sixty-five percent liquidation line. Collateral could fall roughly fifty-three percent from here before touching the liquidation line — plenty of room.
 
-On the equity side — S-P-Y is at seven hundred seventy-one dollars, the Nasdaq one hundred is up about zero point four percent, and V-I-X is at fourteen — comfortably low.
+Eleven thousand three hundred dollars is outstanding. The four-month window runs July through October, with a Target D-max of fifteen thousand thirty-eight dollars and a ceiling of eighteen thousand forty-six. You're running ahead of the monthly Target pace of three thousand seven hundred fifty dollars — worth keeping an eye on as October approaches, but still inside the ceiling with room to spare.
 
-Tesla is the standout today — down nearly six percent to three hundred fifty-four dollars, the sharpest drop in the basket. Apple is also softer, off about two percent, while Nvidia is the one name swimming upstream, up two point four percent near its fifty-two week high. Have a good one.
+Borrow rate is five point zero three percent. Supply yield is averaging zero point zero seven percent across the basket — no offset worth speaking of. Real cost of debt is just under five percent. That's the structural cost of this engine — expected given the collateral is parked in low-yield xStock positions.
+
+Collateral is up five hundred twenty-three dollars — about zero point nine percent — from the deposited base of sixty thousand one hundred fifty-three dollars. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
+
+Peg watch: S-P-Y-x is the one to flag this week — fifty-six basis points above S-P-Y as of Friday's close, just over the half-percent threshold. Likely a data timing artifact at the close, but worth a glance if it persists into next week. The other five — Q-Q-Q-x, Apple-x, Google-x, Tesla-x, and Nvidia-x — all tracked within thirty basis points. No de-peg pressure there.
+
+Bitcoin finished the week at seventy-nine thousand six hundred seventy-four dollars, sentiment sitting at Greed, seventy-three. On equities, S-P-Y closed Friday at seven hundred seventy dollars and nineteen cents — up about zero point four percent on the week. The Nasdaq one hundred closed at seven hundred eighteen dollars and ninety-six cents, up about zero point three percent on the week. V-I-X closed at fourteen point five three — low territory, calm macro backdrop.
+
+The week's standout was Nvidia — up four point three percent on the week, closing at two hundred thirty dollars and thirty-six cents, within striking distance of its fifty-two week high of two hundred thirty-six fifty-four. Tesla was worth flagging too — down nearly six percent on Friday alone, closing at three hundred fifty-four dollars and eight cents, trimming the week's earlier gains to finish down about three point eight percent. Keep an eye on it given its position in the basket.
+
+Have a good weekend.
