@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, September 7, 2026</title>
+      <description><![CDATA[Markets closed for Labor Day with Tesla shedding nearly six percent at Friday's close, while the collateral engine flags a net borrow cost running close to five percent.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-07.mp3" length="895730" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-07</guid>
+      <pubDate>Mon, 07 Sep 2026 14:19:18 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, September 5, 2026</title>
       <description><![CDATA[All six xStock tokens tracking well with S-P-Y-x showing a slim fifty-six basis point premium, Nvidia the week's standout up over four percent, and the collateral engine carrying eleven thousand three hundred dollars of live debt at eighteen point six percent LTV — well inside the forty percent cap.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-05.mp3" length="2990959" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-01.mp3" length="2832971" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-01</guid>
       <pubDate>Sat, 01 Aug 2026 14:19:26 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Friday, July 31, 2026</title>
-      <description><![CDATA[Apple is down more than ten percent today — likely on earnings — marking the session's clear standout while the collateral engine logs its first July draw at a blended L-T-V well under the cap.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-07-31.mp3" length="845157" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-07-31</guid>
-      <pubDate>Fri, 31 Jul 2026 14:19:49 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
