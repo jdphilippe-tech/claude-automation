@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, September 8, 2026</title>
+      <description><![CDATA[Status watch on net carry with the borrow rate outpacing supply yield, while Tesla bucks a soft tape with a two percent gain and Bitcoin sits just above seventy-eight thousand dollars.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-08.mp3" length="976814" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-08</guid>
+      <pubDate>Tue, 08 Sep 2026 14:18:05 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, September 7, 2026</title>
       <description><![CDATA[Markets closed for Labor Day with Tesla shedding nearly six percent at Friday's close, while the collateral engine flags a net borrow cost running close to five percent.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-07.mp3" length="895730" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-03.mp3" length="578499" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-03</guid>
       <pubDate>Mon, 03 Aug 2026 14:17:11 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, August 1, 2026</title>
-      <description><![CDATA[S-P-Y-x is showing a slight peg gap above fifty basis points while Google surged nearly seven percent on earnings Friday and Apple tumbled more than seven percent, with the collateral engine running its first active borrow month at six and a half percent L-T-V.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-01.mp3" length="2832971" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-08-01</guid>
-      <pubDate>Sat, 01 Aug 2026 14:19:26 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
