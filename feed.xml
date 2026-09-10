@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, September 10, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with nineteen percent L-T-V and Apple bucking a broad market selloff with a gain of over one percent.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-10.mp3" length="876922" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-10</guid>
+      <pubDate>Thu, 10 Sep 2026 14:18:11 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, September 9, 2026</title>
       <description><![CDATA[Status watch on net carry cost with the borrow program running at five point one percent above supply yield, Bitcoin pulling back below eighty thousand dollars and Apple the equity standout on a near two percent decline.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-09.mp3" length="818408" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-05.mp3" length="700125" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-05</guid>
       <pubDate>Wed, 05 Aug 2026 14:18:42 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, August 4, 2026</title>
-      <description><![CDATA[The collateral engine now has its first draw on the books at seven thousand five hundred seventeen dollars, with L-T-V at twelve point seven percent and Bitcoin at sixty-three thousand seven hundred forty-two dollars amid extreme fear sentiment.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-04.mp3" length="901582" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-08-04</guid>
-      <pubDate>Tue, 04 Aug 2026 14:20:11 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
