@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, September 12, 2026</title>
+      <description><![CDATA[All positions on pace with draw at eleven thousand three hundred dollars and Apple the week's standout up nearly four percent, while S-P-Y-x shows a slim peg gap just above the half-percent flag.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-12.mp3" length="2705075" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-12</guid>
+      <pubDate>Sat, 12 Sep 2026 14:20:07 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, September 11, 2026</title>
       <description><![CDATA[All clear across the collateral engine with Google leading the basket up two percent on a broad equity rally and the V-I-X dropping to its lowest level this week.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-11.mp3" length="770760" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-07.mp3" length="726457" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-07</guid>
       <pubDate>Fri, 07 Aug 2026 14:18:45 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, August 6, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with Bitcoin at sixty-four thousand dollars and Nvidia the standout on a nearly one percent gain in a cautious market.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-06.mp3" length="673376" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-08-06</guid>
-      <pubDate>Thu, 06 Aug 2026 14:20:09 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
