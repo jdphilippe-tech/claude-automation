@@ -1,17 +1,9 @@
-Good morning. It's Saturday, September 12th — here's how the week landed.
+Good morning. It's Monday, September fourteenth.
 
-Watch — S-P-Y-x is showing a fifty-eight basis point premium over its underlying, just above the half-percent flag threshold. Net carry is four point nine five percent, the expected ongoing cost of the active draw.
+All clear. No action needed today.
 
-Collateral health: Blended L-T-V is eighteen point seven percent, against the forty percent operating cap and the sixty-five percent liquidation line. Plenty of room on both sides — no action needed.
+On the crypto side — Bitcoin is at seventy-eight thousand four hundred fifty-six dollars, sentiment is Greed at fifty-seven.
 
-Borrowing pace: Eleven thousand three hundred dollars drawn through July, August, and September — three months in, one to go. Target D-max is fifteen thousand thirty-eight dollars, Ceiling D-max is eighteen thousand forty-six dollars. About three thousand seven hundred dollars remaining to Target D-max, with October as the final draw month. Pace is on track.
+On the equity side — S-P-Y is at seven hundred sixty dollars, the Nasdaq one hundred is down about one point one percent, and V-I-X is at seventeen point three four — normal range, but up nine percent off Friday's close.
 
-Net carry: Borrow rate is five point one two percent, supply yield is zero point one seven percent — real cost of debt is four point nine five percent. This is the expected structural cost of the draw strategy, not a new development.
-
-Collateral is sitting two hundred fifty-seven dollars above the deposited base of sixty thousand one hundred fifty-three dollars — a gain of less than one percent. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
-
-Peg watch: S-P-Y-x is showing fifty-eight basis points of premium versus S-P-Y — just over the flag line, likely settlement timing, but worth watching into next week. Q-Q-Q-x, Nvidia-x, Tesla-x, Google-x, and Apple-x all tracked tightly — no de-peg pressure on the other five.
-
-Bitcoin finished the week at seventy-seven thousand three hundred fifty-two dollars, sentiment at sixty-three — Greed. S-P-Y closed at seven hundred sixty-four dollars and twenty-nine cents, down about zero point eight percent on the week. The Nasdaq one hundred closed at seven hundred fourteen dollars and eighty-eight cents, down about zero point six percent on the week. V-I-X at fifteen point eight four — Normal, sitting just above the low-volatility floor.
-
-The week's standout was Apple — up three point eight four percent, closing at three hundred thirty-two dollars and twenty-seven cents against a Monday close near three hundred twenty dollars. It is now within twelve dollars of its fifty-two week high of three hundred forty-four dollars and fifty-seven cents — the strongest move in the basket this week. Have a good weekend.
+Q-Q-Q is the standout today — off one point one percent to seven hundred seven dollars on the open. Tech is leading the slide and the V-I-X jump from a calm Friday hints at some early-week hedging — worth watching, but not alarming. Have a good one.
