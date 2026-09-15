@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, September 15, 2026</title>
+      <description><![CDATA[Status watch on net borrow cost running above one percent with Bitcoin at seventy-six thousand dollars and Google the day's standout mover down one point three percent.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-15.mp3" length="824259" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-15</guid>
+      <pubDate>Tue, 15 Sep 2026 14:18:02 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, September 14, 2026</title>
       <description><![CDATA[All clear on the collateral engine as equities open softer with the Nasdaq one hundred down over one percent and V-I-X jumping to seventeen point three four on the day.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-14.mp3" length="745683" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-10.mp3" length="801271" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-10</guid>
       <pubDate>Mon, 10 Aug 2026 14:19:23 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, August 8, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with the first draw of three thousand seven hundred fifty dollars confirmed, Nvidia the week's standout up nearly twelve percent, and Bitcoin sitting at sixty-five thousand dollars amid a fear reading.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-08.mp3" length="2737676" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-08-08</guid>
-      <pubDate>Sat, 08 Aug 2026 14:18:44 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
