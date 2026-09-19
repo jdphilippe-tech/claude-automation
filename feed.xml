@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, September 19, 2026</title>
+      <description><![CDATA[Status watch on two fronts — S-P-Y-x is showing a slight premium to its underlying and net carry is running at five percent with eleven thousand three hundred dollars drawn, while collateral sits just above the deposited base and Nvidia was the week's standout with a solid gain on Friday.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-19.mp3" length="2659518" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-19</guid>
+      <pubDate>Sat, 19 Sep 2026 14:20:53 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, September 18, 2026</title>
       <description><![CDATA[All clear on the collateral engine with Google the lone gainer in the basket up about one percent as markets drift slightly lower and Bitcoin holds around eighty thousand dollars.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-18.mp3" length="653314" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-14.mp3" length="759057" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-14</guid>
       <pubDate>Fri, 14 Aug 2026 14:18:42 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Thursday, August 13, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with Bitcoin at sixty-three thousand seven hundred fifty-three dollars and Tesla the day's standout, up one point six percent.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-13.mp3" length="651224" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-08-13</guid>
-      <pubDate>Thu, 13 Aug 2026 14:17:19 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
