@@ -1,19 +1,9 @@
-Good morning. It's Saturday, September nineteenth — here's how the week landed.
+Good morning. It's Monday, September twenty-first.
 
-Watch on two fronts. S-P-Y-x is showing a fifty-eight basis point premium to its underlying — just over the half-percent flag threshold. And net carry is running at five point one percent — that is the expected cost of the borrow, not a surprise, but it formally triggers the watch flag per the rules.
+All clear. No action needed today.
 
-Collateral is sitting at sixty thousand eight hundred ninety-six dollars across the six-position basket. Blended LTV is eighteen point six percent — well under the forty percent operating cap and nowhere near the sixty-five percent liquidation line. The collateral could lose roughly half its value before the cap is touched.
+On the crypto side — Bitcoin is at eighty-five thousand two hundred fifty-nine dollars, sentiment is Greed at seventy.
 
-Three draws are in — July, August, and September — totaling eleven thousand three hundred dollars. That puts cumulative draws at seventy-five percent of the target ceiling of fifteen thousand thirty-eight dollars, and sixty-three percent of the hard ceiling of eighteen thousand forty-six dollars. One draw remains in October, then the window closes and November deposit resets the base. Pace is on track.
+On the equity side — S-P-Y is at seven hundred sixty-seven dollars, the Nasdaq one hundred is up about one point eight percent, and V-I-X is at fourteen point eight six — low and calm.
 
-Borrow rate is five point one percent, supply yield covering less than one tenth of a percent across the basket — so the real net cost of debt is just over five percent. Worth watching as rates move but nothing actionable today.
-
-Collateral is up seven hundred forty-three dollars from the deposited base of sixty thousand one hundred fifty-three dollars — that is a one point two percent gain. As always, that is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
-
-On peg watch — five of the six tokens tracked their underlying shares tightly this week. S-P-Y-x is the outlier, trading at a fifty-eight basis point premium to S-P-Y. Not a crisis, but worth a check next week to see if it self-corrects.
-
-Bitcoin finished at eighty-one thousand three hundred fifty-eight dollars, sentiment greed at seventy-one. On equities, S-P-Y closed at seven hundred sixty-one dollars — essentially flat on the week. The Nasdaq one hundred closed at seven hundred twenty-one dollars, up about half a percent Friday. V-I-X closed at fourteen point eight — low, below fifteen — markets are calm.
-
-The week's standout was Nvidia — up one point three percent Friday, closing at two hundred twenty-two dollars, sitting within fifteen dollars of its fifty-two week high of two hundred thirty-six. No earnings on deck imminently, but it's been grinding higher and the momentum is clean.
-
-Have a good weekend.
+Tesla is the standout today — up three point one percent to three hundred seventy-five dollars. Nice bounce off last week's close — biggest mover in the basket this morning. Have a good one.
