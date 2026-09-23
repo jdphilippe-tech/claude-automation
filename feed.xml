@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Wednesday, September 23, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with Google down nearly three percent leading today's equity slide while Bitcoin holds near eighty-four thousand dollars and the V-I-X sits in low territory at fourteen point four.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-23.mp3" length="611100" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-23</guid>
+      <pubDate>Wed, 23 Sep 2026 14:18:10 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Tuesday, September 22, 2026</title>
       <description><![CDATA[All clear across the collateral engine with Google the standout today on a one point seven percent move and V-I-X holding low at fourteen point nine.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-22.mp3" length="671286" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-19.mp3" length="705559" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-19</guid>
       <pubDate>Wed, 19 Aug 2026 14:17:52 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, August 18, 2026</title>
-      <description><![CDATA[All clear on the collateral engine with no debt yet as the draw window opens, while Nvidia leads equities lower down about two point six percent on the day.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-18.mp3" length="697199" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-08-18</guid>
-      <pubDate>Tue, 18 Aug 2026 14:17:17 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
