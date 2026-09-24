@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, September 24, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with the July draw active at twelve and a half percent L-T-V, Bitcoin holding at eighty-four thousand dollars, and Nvidia the standout today on a one and a half percent pullback.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-24.mp3" length="804197" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-09-24</guid>
+      <pubDate>Thu, 24 Sep 2026 14:18:10 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, September 23, 2026</title>
       <description><![CDATA[All clear on the collateral engine with Google down nearly three percent leading today's equity slide while Bitcoin holds near eighty-four thousand dollars and the V-I-X sits in low territory at fourteen point four.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-23.mp3" length="611100" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-20.mp3" length="751534" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-20</guid>
       <pubDate>Thu, 20 Aug 2026 14:17:51 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, August 19, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with the borrow at six percent loan-to-value and Apple the standout today on a two point four percent pop.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-19.mp3" length="705559" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-08-19</guid>
-      <pubDate>Wed, 19 Aug 2026 14:17:52 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
