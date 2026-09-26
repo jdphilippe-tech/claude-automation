@@ -1,9 +1,19 @@
-Good morning. It's Friday, September twenty-fifth.
+Good morning. It's Saturday, September twenty-sixth — here's how the week landed.
 
-Watch — net carry is running at approximately five percent. Borrow is active at around five point one percent while blended supply yield is under one tenth of one percent — cost of debt is real. L-T-V sits around nineteen percent, well inside the forty percent cap.
+All clear. L-T-V is sitting at twelve point four percent, well inside the forty percent operating cap. No action needed.
 
-On the crypto side — Bitcoin is at eighty-three thousand five hundred eighty-seven dollars, sentiment is Greed at seventy-one.
+Blended L-T-V is twelve point four percent, against the forty percent operating cap and the sixty-five percent liquidation line. Collateral sits at approximately sixty thousand four hundred dollars — it would need to fall roughly seventy percent before approaching the liquidation line. Substantial cushion on all sides.
 
-On the equity side — S-P-Y is at seven hundred sixty-seven dollars, the Nasdaq one hundred is flat, and V-I-X is at fifteen point six seven — low-normal, no stress.
+Three months into the July-through-October draw window, with one month remaining before the November checkpoint. The Moonwell borrow stands at seven thousand five hundred seventeen dollars. Target D-max is fifteen thousand thirty-eight dollars across the full window, ceiling is eighteen thousand forty-six. October is the final draw month — no tracking flags this week.
 
-Tesla is the standout today — down one point seven five percent to three hundred seventy-one dollars, pulling back from an open near three hundred eighty-five. Have a good one.
+Borrow rate is running near four point seven percent. Supply yield across the xStock basket is averaging about zero point zero five percent — real cost of debt is approximately four point six five percent. That is the expected carrying cost for a collateral-backed draw structure; nothing unusual.
+
+Collateral is up approximately two hundred ninety-three dollars from the deposited base of sixty thousand one hundred fifty-three dollars. That is cushion, not borrowing room — the draw is sized off the deposited base, not market value.
+
+All six tokens tracked their underlying shares tightly this week — no de-peg pressure.
+
+Bitcoin finished at eighty-three thousand nine hundred forty-one dollars, sentiment at seventy-four — Greed. S-P-Y closed at seven hundred seventy-one thirty-five, down about zero point three percent on the week. The Nasdaq one hundred closed at seven hundred forty-four fifty, up about zero point four percent on the week — tech held slightly better than the broad index. V-I-X closed at fourteen point eight seven — Low, the calmest reading in days and well below the caution threshold. A quiet, constructive week for risk assets.
+
+The week's standout was the Nasdaq's quiet outperformance — Q-Q-Q up four tenths while S-P-Y dipped slightly, a sign that mega-cap tech continued to carry the index. With V-I-X this low heading into October and the collateral basket showing no stress, the engine is in a good position entering the final draw month.
+
+Have a good weekend.
