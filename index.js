@@ -1,5 +1,15 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v41
+// Daily Portfolio Check — GitHub Actions v42
+// v42: Kamino obligation values are now REPRICED LIVE, like the Kamino UI.
+//      Stored obligation fields freeze between on-chain touches, so v41
+//      drifted between draws. Debt = stored borrowedAmountSf × (reserve
+//      cumulativeBorrowRate ÷ entry cumulativeBorrowRate), plus a small
+//      forward-compound from the reserve's last refresh. Collateral = per
+//      deposit cTokens × reserve exchange rate × reserve price. Parses the
+//      Reserve accounts (one getMultipleAccounts call; zero new deps).
+//      Logs stored-vs-live every run; each piece falls back to stored on
+//      failure. Per-leg supply USD auto-maps via metrics reserve address.
+//
 // v41: Kamino module now reads the on-chain OBLIGATION directly
 //      (collateral = dividend/split-scaled depositedValueSf;
 //       debt = interest-accrued borrow marketValueSf; LTV computed live).
@@ -968,43 +978,127 @@ async function getEthHedge() {
   }
 }
 // ============================================================
-// KAMINO LIVE-READ FIX — drop-in replacement
-// Fixes two bugs, both rooted in "read assumed values, not chain state":
-//   BUG 1 (collateral): per-leg USD used the FROZEN raw token amount from
-//          Airtable → missed the Solana scaled-UI dividend/split multiplier.
-//   BUG 2 (debt): borrow USD was echoed from the last Airtable Borrow row →
-//          missed accrued interest between draws, and would misread a split.
+// KAMINO LIVE-READ — v42 (live repricing, UI-equivalent)
 //
-// FIX: read the Kamino obligation account directly on-chain (same raw-parse
-//      style as the Raydium module) and take the values Kamino itself stores —
-//      already multiplier-scaled (collateral) and interest-accrued (debt).
+// History:
+//   v41 read the obligation account directly. That fixed the Airtable-echo
+//   and dividend-multiplier bugs, BUT every value Kamino stores on the
+//   obligation (depositedValueSf, per-deposit marketValueSf, borrowedAmountSf,
+//   borrow marketValueSf) only refreshes when the obligation is touched
+//   on-chain (borrow/repay/deposit/withdraw). Between draws they FREEZE.
+//   The Kamino UI recomputes live, so the pipeline drifted (~$45 debt gap
+//   observed late Sep 2026; collateral drift is larger because it tracks
+//   the stock basket).
 //
-// Layout verified against @kamino-finance/klend-sdk v10 codegen:
-//   depositedValueSf (total collateral, USD ×2^60) @ byte 1192
-//   borrows[0].marketValueSf (USDC debt, USD ×2^60) @ byte 1312
-//   deposits[i].marketValueSf (per-leg, USD ×2^60) @ 96 + i*136 + 40
+// v42 FIX — compute live, the way the UI / on-chain refresh does:
+//   DEBT       = stored borrowedAmountSf
+//                × (reserve.cumulativeBorrowRate ÷ entry.cumulativeBorrowRate)
+//                × small forward-compound from the reserve's last refresh to
+//                  now at the current gross borrow APY (usually seconds–minutes).
+//   COLLATERAL = per deposit: cTokens × (reserve totalSupply ÷ cToken mint supply)
+//                ÷ 10^decimals × reserve marketPrice
+//                (identical to what refresh_obligation computes; price per
+//                 RAW token already embeds the xStocks dividend/split multiplier).
+//
+// Reserve accounts are fetched with ONE getMultipleAccounts call; raw parse,
+// zero new dependencies. Every value logs stored-vs-live side by side, and
+// each piece falls back to its stored obligation value (with the reason
+// logged) if a reserve read fails or a sanity gate trips.
+//
+// Offsets verified 2026-09-28 against @kamino-finance/klend-sdk v12.0.0
+// codegen (computed from the borsh layouts, not by hand):
+//   OBLIGATION (disc a8ce8d6a584caca7)
+//     lastUpdate.slot @16 (u64) · lastUpdate.timestamp @28 (u32)
+//     deposits[8] @96, stride 136: depositReserve @+0, depositedAmount (cTokens u64) @+32, marketValueSf @+40
+//     depositedValueSf @1192
+//     borrows[5] @1208, stride 200: borrowReserve @+0, cumulativeBorrowRateBsf @+32 (48B),
+//                                   borrowedAmountSf @+88, marketValueSf @+104
+//     borrowedAssetsMarketValueSf @2224
+//   RESERVE (disc 2bf2ccca1af73b7f, 8624 bytes)
+//     lastUpdate.slot @16 · lastUpdate.timestamp @28 (u32) · lendingMarket @32
+//     liquidity.mintPubkey @128 · totalAvailableAmount @224 (u64)
+//     borrowedAmountSf @232 · marketPriceSf @248 · marketPriceLastUpdatedTs @264 (u64)
+//     mintDecimals @272 (u64) · cumulativeBorrowRateBsf @296 (48B: 4×u64 LE value + 2×u64 pad)
+//     accumulatedProtocolFeesSf @344 · accumulatedReferrerFeesSf @360 · pendingReferrerFeesSf @376
+//     collateral.mintTotalSupply @2592 (u64)
+//   All *Sf fields are fixed-point ×2^60.
 //   Program: KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD
-//
-// Fully defensive: if the on-chain read fails or returns implausible values,
-// it FALLS BACK to the prior Airtable-echo behavior so the pipeline never
-// breaks or writes garbage. Verify on first run against the Kamino UI.
 // ============================================================
 
 const KLEND_PROGRAM_ID = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD';
 const SF_SHIFT = 40n;          // 2^60 = (>>40) then /2^20 — keeps Number precision
 const SF_DIV20 = 1048576;      // 2^20
+const SF_ONE   = 1n << 60n;
+const OBLIGATION_DISC = Buffer.from([168, 206, 141, 106, 88, 76, 172, 167]);
+const RESERVE_DISC    = Buffer.from([43, 242, 204, 202, 26, 247, 59, 127]);
+const SECONDS_PER_YEAR = 365 * 24 * 3600;
 
 function readU128LE(buf, offset) {
   const lo = buf.readBigUInt64LE(offset);
   const hi = buf.readBigUInt64LE(offset + 8);
   return lo | (hi << 64n);
 }
+// BigFractionBytes: value = [u64; 4] little-endian limbs (256-bit), scaled ×2^60
+function readBigFraction(buf, offset) {
+  let v = 0n;
+  for (let i = 3; i >= 0; i--) v = (v << 64n) | buf.readBigUInt64LE(offset + i * 8);
+  return v;
+}
 function sfToUsd(sf) { return Number(sf >> SF_SHIFT) / SF_DIV20; }
+function fmtAge(sec) {
+  if (sec == null || !isFinite(sec) || sec < 0) return 'n/a';
+  if (sec < 120) return `${Math.round(sec)}s`;
+  if (sec < 7200) return `${(sec / 60).toFixed(0)}m`;
+  if (sec < 172800) return `${(sec / 3600).toFixed(1)}h`;
+  return `${(sec / 86400).toFixed(1)}d`;
+}
 
-// Reads the live Kamino obligation for our wallet in the given market.
-// Returns { collateralUSD, debtUSD, ltv, perReserve: {addr: usd}, obligation }
-// or null on any failure (caller falls back).
-async function getKaminoLiveObligation(marketAddress) {
+// Fetches and parses reserve accounts in one RPC call.
+// Returns { [reserveAddr]: parsedReserve } — entries missing on any failure.
+async function fetchKaminoReserves(addresses, marketAddress) {
+  const out = {};
+  if (addresses.length === 0) return out;
+  const res = await solRpc('getMultipleAccounts', [addresses, { encoding: 'base64' }]);
+  const vals = res?.value ?? [];
+  addresses.forEach((addr, i) => {
+    try {
+      const acc = vals[i];
+      if (!acc?.data?.[0]) { console.error(`  [reserve] ${addr.slice(0,6)}.. not returned by RPC`); return; }
+      const b = Buffer.from(acc.data[0], 'base64');
+      if (b.length < 2600 || !b.slice(0, 8).equals(RESERVE_DISC)) {
+        console.error(`  [reserve] ${addr.slice(0,6)}.. discriminator/size mismatch (len ${b.length})`); return;
+      }
+      const market = base58EncodeBytes(Array.from(b.slice(32, 64)));
+      if (market !== marketAddress) {
+        console.error(`  [reserve] ${addr.slice(0,6)}.. belongs to market ${market.slice(0,6)}.., expected ${marketAddress.slice(0,6)}..`); return;
+      }
+      out[addr] = {
+        lastUpdateSlot:       b.readBigUInt64LE(16),
+        lastUpdateTs:         b.readUInt32LE(28),
+        mint:                 base58EncodeBytes(Array.from(b.slice(128, 160))),
+        totalAvailable:       b.readBigUInt64LE(224),
+        borrowedSf:           readU128LE(b, 232),
+        priceSf:              readU128LE(b, 248),
+        priceTs:              Number(b.readBigUInt64LE(264)),
+        decimals:             Number(b.readBigUInt64LE(272)),
+        cumBorrowRate:        readBigFraction(b, 296),
+        protocolFeesSf:       readU128LE(b, 344),
+        referrerFeesSf:       readU128LE(b, 360),
+        pendingReferrerSf:    readU128LE(b, 376),
+        cTokenSupply:         b.readBigUInt64LE(2592),
+      };
+    } catch (e) { console.error(`  [reserve] ${addr.slice(0,6)}.. parse error: ${e.message}`); }
+  });
+  return out;
+}
+
+// Reads the Kamino obligation for our wallet and reprices it live.
+// grossBorrowAPY (decimal, e.g. 0.065) is used only for the tiny forward
+// compound from the USDC reserve's last refresh to now; may be null.
+// Returns { collateralUSD, debtUSD, ltv, perReserve: {addr: usd}, obligation,
+//           stored: {collateralUSD, debtUSD, ltv}, oblAgeSec, collSource, debtSource }
+// or null on failure of the obligation read itself (caller falls back).
+async function getKaminoLiveObligation(marketAddress, grossBorrowAPY = null) {
   try {
     const accounts = await solRpc('getProgramAccounts', [
       KLEND_PROGRAM_ID,
@@ -1026,57 +1120,145 @@ async function getKaminoLiveObligation(marketAddress) {
     const buf = Buffer.from(accounts[0].account.data[0], 'base64');
     const obligation = accounts[0].pubkey;
 
-    // discriminator check: [168,206,141,106,88,76,172,167]
-    const DISC = Buffer.from([168, 206, 141, 106, 88, 76, 172, 167]);
-    if (!buf.slice(0, 8).equals(DISC)) {
+    if (!buf.slice(0, 8).equals(OBLIGATION_DISC)) {
       console.error('  [obligation] discriminator mismatch — not an Obligation account');
       return null;
     }
 
-    const collateralUSD = sfToUsd(readU128LE(buf, 1192));   // depositedValueSf (total, dividend-scaled)
+    const nowSec    = Math.floor(Date.now() / 1000);
+    const oblTs     = buf.readUInt32LE(28);
+    const oblAgeSec = oblTs > 0 ? nowSec - oblTs : null;
 
-    // Debt: the USD *value* fields (marketValueSf @1312, aggregate @2224) are
-    // STALE — they only refresh when the obligation is touched on-chain. The
-    // borrowed *token amount* (borrowedAmountSf @1296) accrues live. For a USDC
-    // borrow (~$1) that token amount IS the dollar debt. Confirmed 2026-08-03:
-    // marketValueSf/aggregate=$3766 (stale July) but borrowedAmountSf=$7517 (matches UI).
-    // Read amount for every non-empty borrow entry and sum (handles multi-borrow too).
-    let debtUSD = 0;
-    const borrowLegs = [];
-    for (let i = 0; i < 5; i++) {
-      const entry = 1208 + i * 200;
-      const reserveEmpty = buf.slice(entry, entry + 32).every(b => b === 0);
-      if (reserveEmpty) continue;
-      const amt = sfToUsd(readU128LE(buf, entry + 88)) / 1e6;  // borrowedAmountSf, USDC 6dp -> USD
-      if (amt > 0) { debtUSD += amt; borrowLegs.push(amt); }
-    }
-    // Diagnostics: stale value fields kept for visibility (do NOT use for debt).
-    const staleMv0  = sfToUsd(readU128LE(buf, 1312));
-    const staleAgg  = sfToUsd(readU128LE(buf, 2224));
-    console.log(`  [obligation] debt (live borrowedAmount) legs: [${borrowLegs.map(v => '$' + v.toFixed(2)).join(', ')}] = $${debtUSD.toFixed(2)}  |  stale value fields: mv0=$${staleMv0.toFixed(2)} agg=$${staleAgg.toFixed(2)}`);
-
-    // Per-leg: deposits[] at 96, entry size 136, marketValueSf at +40, reserve pubkey at +0
-    const perReserve = {};
+    // ---- Parse STORED (last-refresh) values ----
+    const storedCollateralUSD = sfToUsd(readU128LE(buf, 1192));
+    const deposits = [];
     for (let i = 0; i < 8; i++) {
       const base = 96 + i * 136;
-      const mvSf = readU128LE(buf, base + 40);
-      if (mvSf === 0n) continue;
-      const reserveBytes = Array.from(buf.slice(base, base + 32));
-      const reserveAddr = base58EncodeBytes(reserveBytes);  // helper already in file (Raydium module)
-      perReserve[reserveAddr] = sfToUsd(mvSf);
+      const reserveBytes = buf.slice(base, base + 32);
+      if (reserveBytes.every(x => x === 0)) continue;
+      const cTokens = buf.readBigUInt64LE(base + 32);
+      const mvSf    = readU128LE(buf, base + 40);
+      if (cTokens === 0n && mvSf === 0n) continue;
+      deposits.push({ reserve: base58EncodeBytes(Array.from(reserveBytes)), cTokens, storedUSD: sfToUsd(mvSf) });
     }
+    const borrows = [];
+    for (let i = 0; i < 5; i++) {
+      const entry = 1208 + i * 200;
+      const reserveBytes = buf.slice(entry, entry + 32);
+      if (reserveBytes.every(x => x === 0)) continue;
+      const amtSf = readU128LE(buf, entry + 88);
+      if (amtSf === 0n) continue;
+      borrows.push({
+        reserve: base58EncodeBytes(Array.from(reserveBytes)),
+        entryCbr: readBigFraction(buf, entry + 32),
+        amtSf,
+        storedMvUSD: sfToUsd(readU128LE(buf, entry + 104)),
+      });
+    }
+    const staleAgg = sfToUsd(readU128LE(buf, 2224));
 
-    // Sanity gate: collateral must be plausible ($1k–$1M) or we don't trust the parse
+    // ---- Fetch every referenced reserve in one call ----
+    const reserveAddrs = [...new Set([...deposits.map(d => d.reserve), ...borrows.map(b => b.reserve)])];
+    const reserves = await fetchKaminoReserves(reserveAddrs, marketAddress);
+
+    // ---- DEBT: stored amount × (reserve CBR ÷ entry CBR) × forward compound ----
+    let storedDebtUSD = 0, liveDebtUSD = 0, debtAllLive = borrows.length > 0, debtLiveCount = 0;
+    for (const bw of borrows) {
+      const r = reserves[bw.reserve];
+      const dec = r?.decimals ?? 6;                  // USDC = 6
+      const storedAmt = sfToUsd(bw.amtSf) / 10 ** dec;
+      storedDebtUSD += storedAmt;
+
+      let liveAmt = storedAmt, why = null, ratio = null, extrap = 1, rAge = null;
+      if (!r) why = 'reserve unavailable';
+      else if (bw.entryCbr === 0n) why = 'entry CBR = 0';
+      else if (r.cumBorrowRate < bw.entryCbr) why = 'reserve CBR < entry CBR';
+      else {
+        ratio = Number((r.cumBorrowRate * 1_000_000_000_000n) / bw.entryCbr) / 1e12;
+        if (!(ratio >= 1 && ratio < 1.5)) { why = `implausible CBR ratio ${ratio}`; ratio = null; }
+        else {
+          const accruedSf = (bw.amtSf * r.cumBorrowRate) / bw.entryCbr;
+          liveAmt = sfToUsd(accruedSf) / 10 ** dec;
+          rAge = r.lastUpdateTs > 0 ? nowSec - r.lastUpdateTs : null;
+          // Reserve CBR is itself only as fresh as the reserve's last refresh.
+          // Compound forward to "now" at the current gross APY (bounded to 7 days).
+          if (grossBorrowAPY != null && grossBorrowAPY > 0 && grossBorrowAPY < 1 && rAge != null && rAge > 0 && rAge < 7 * 86400) {
+            extrap = Math.pow(1 + grossBorrowAPY, rAge / SECONDS_PER_YEAR);
+            liveAmt *= extrap;
+          }
+        }
+      }
+      if (why) debtAllLive = false; else debtLiveCount++;
+      liveDebtUSD += liveAmt;
+      console.log(`  [obligation] DEBT ${bw.reserve.slice(0,6)}..: stored $${storedAmt.toFixed(2)} → live $${liveAmt.toFixed(2)}` +
+        (why ? `  (FALLBACK to stored: ${why})`
+             : `  (CBR ratio ×${ratio.toFixed(6)} since obligation refresh; reserve refreshed ${fmtAge(rAge)} ago, fwd ×${extrap.toFixed(8)})`) +
+        `  | stale mv=$${bw.storedMvUSD.toFixed(2)}`);
+    }
+    const debtUSD = liveDebtUSD;
+    const debtSource = borrows.length === 0 ? 'live (no debt)' : (debtAllLive ? 'live-accrued' : (debtLiveCount > 0 ? 'partial-stored' : 'stored'));
+
+    // ---- COLLATERAL: cTokens → liquidity (exchange rate) → × reserve price ----
+    const perReserve = {};
+    let liveCollateralUSD = 0, collAllLive = deposits.length > 0, collLiveCount = 0, oldestPriceAge = 0;
+    const legLogs = [];
+    for (const d of deposits) {
+      const r = reserves[d.reserve];
+      let liveUSD = d.storedUSD, why = null, pAge = null;
+      if (!r) why = 'reserve unavailable';
+      else if (r.cTokenSupply === 0n) why = 'cToken supply 0';
+      else if (r.priceSf === 0n) why = 'price 0';
+      else {
+        const totalSupplySf = r.totalAvailable * SF_ONE + r.borrowedSf - r.protocolFeesSf - r.referrerFeesSf - r.pendingReferrerSf;
+        if (totalSupplySf <= 0n) why = 'total supply ≤ 0';
+        else {
+          const liqSf  = (d.cTokens * totalSupplySf) / r.cTokenSupply;      // raw liquidity units ×2^60
+          const tokens = sfToUsd(liqSf) / 10 ** r.decimals;                 // raw tokens (UI multiplier embedded in price)
+          const price  = sfToUsd(r.priceSf);
+          const v = tokens * price;
+          const drift = d.storedUSD > 0 ? v / d.storedUSD : null;
+          if (drift != null && (drift < 0.5 || drift > 2)) why = `implausible vs stored (×${drift.toFixed(3)})`;
+          else {
+            liveUSD = v;
+            pAge = r.priceTs > 0 ? nowSec - r.priceTs : null;
+            if (pAge != null) oldestPriceAge = Math.max(oldestPriceAge, pAge);
+          }
+        }
+      }
+      if (why) collAllLive = false; else collLiveCount++;
+      perReserve[d.reserve] = liveUSD;
+      liveCollateralUSD += liveUSD;
+      const pct = d.storedUSD > 0 ? ((liveUSD / d.storedUSD - 1) * 100) : 0;
+      legLogs.push(`${d.reserve.slice(0,6)}..=$${liveUSD.toFixed(0)} (stored $${d.storedUSD.toFixed(0)}, ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%${why ? ', FALLBACK: ' + why : ', px age ' + fmtAge(pAge)})`);
+    }
+    let collateralUSD = liveCollateralUSD;
+    let collSource = collAllLive ? 'live-repriced' : (collLiveCount > 0 ? 'partial-stored' : 'stored');
+    // Whole-basket gate: if the live sum is implausible, use the stored aggregate.
+    if (!(collateralUSD > 1000 && collateralUSD < 1_000_000) ||
+        (storedCollateralUSD > 0 && (collateralUSD / storedCollateralUSD < 0.5 || collateralUSD / storedCollateralUSD > 2))) {
+      console.error(`  [obligation] live collateral $${collateralUSD.toFixed(2)} failed sanity gate — using stored $${storedCollateralUSD.toFixed(2)}`);
+      collateralUSD = storedCollateralUSD;
+      collSource = 'stored';
+    }
     if (!(collateralUSD > 1000 && collateralUSD < 1_000_000)) {
       console.error(`  [obligation] implausible collateral $${collateralUSD.toFixed(2)} — falling back`);
       return null;
     }
 
-    const ltv = collateralUSD > 0 ? (debtUSD / collateralUSD) * 100 : null;
-    console.log(`  [obligation] ${obligation}`);
-    console.log(`  [obligation] LIVE collateral $${collateralUSD.toFixed(2)} | debt $${debtUSD.toFixed(2)} | LTV ${ltv?.toFixed(2)}%`);
-    console.log(`  [obligation] per-reserve USD: ${Object.entries(perReserve).map(([a, v]) => `${a.slice(0,6)}..=$${v.toFixed(0)}`).join(', ')}`);
-    return { collateralUSD, debtUSD, ltv, perReserve, obligation };
+    const ltv       = collateralUSD > 0 ? (debtUSD / collateralUSD) * 100 : null;
+    const storedLtv = storedCollateralUSD > 0 ? (storedDebtUSD / storedCollateralUSD) * 100 : null;
+
+    console.log(`  [obligation] ${obligation} — last on-chain refresh ${fmtAge(oblAgeSec)} ago (slot ${buf.readBigUInt64LE(16)})`);
+    console.log(`  [obligation] per-reserve USD: ${legLogs.join(', ')}`);
+    console.log(`  [obligation] STORED  collateral $${storedCollateralUSD.toFixed(2)} | debt $${storedDebtUSD.toFixed(2)} | LTV ${storedLtv?.toFixed(2)}%  (stale agg debt value $${staleAgg.toFixed(2)})`);
+    console.log(`  [obligation] LIVE    collateral $${collateralUSD.toFixed(2)} [${collSource}] | debt $${debtUSD.toFixed(2)} [${debtSource}] | LTV ${ltv?.toFixed(2)}%  ← cross-check vs Kamino UI`);
+    if (oldestPriceAge > 36 * 3600) console.log(`  [obligation] ⚠ oldest reserve price is ${fmtAge(oldestPriceAge)} old — collateral may lag the market`);
+
+    return {
+      collateralUSD, debtUSD, ltv, perReserve, obligation,
+      stored: { collateralUSD: storedCollateralUSD, debtUSD: storedDebtUSD, ltv: storedLtv },
+      oblAgeSec, collSource, debtSource,
+    };
   } catch (e) {
     console.error(`  [obligation] read error: ${e.message} — falling back`);
     return null;
@@ -1084,20 +1266,29 @@ async function getKaminoLiveObligation(marketAddress) {
 }
 // ============================================================
 // MODULE: Kamino xStocks Lending (Solana) — LIVE OBLIGATION READ
-// Replaces the whole getKaminoPositions() function.
-// APY still comes from the Kamino REST API (correct as-is).
-// Collateral USD, debt USD, and LTV now come from the on-chain
-// obligation (dividend-scaled + interest-accrued). Falls back to
-// the prior Airtable-echo behavior if the chain read fails.
+// APY comes from the Kamino REST API (correct as-is).
+// Collateral USD, debt USD, and LTV come from the on-chain obligation,
+// repriced live against current reserve state (v42). Falls back to the
+// prior Airtable-echo behavior only if the obligation read itself fails.
 // ============================================================
 
-// OPTIONAL per-leg exactness: after the first run, copy the six reserve
-// addresses from the "[obligation] per-reserve USD" log line into this map
-// (symbol -> reserve pubkey). While empty, per-leg supply USD uses the prior
-// approximation; the risk-critical total/debt/LTV always use the live read.
+// OPTIONAL manual per-leg override (symbol -> reserve pubkey). v42 first
+// tries to auto-map using the reserve address the metrics API returns; this
+// map wins if filled. Addresses print in the "[obligation] per-reserve USD" line.
 const KAMINO_RESERVES = {
   // SPYx: '...', QQQx: '...', NVDAx: '...', TSLAx: '...', GOOGLx: '...', AAPLx: '...',
 };
+
+// Gross borrow APY + incentive APY (decimals) from a Kamino metrics reserve entry.
+function parseKaminoBorrowApys(usdcReserve) {
+  if (!usdcReserve) return { grossBorrowAPY: null, incentiveAPY: null };
+  const grossBorrowAPY = parseFloat(usdcReserve.borrowApy ?? usdcReserve.borrowApr ?? usdcReserve.borrowInterestApy ?? 0) || null;
+  const flat = parseFloat(usdcReserve.borrowRewardsApy ?? usdcReserve.incentiveBorrowApy ?? usdcReserve.borrowIncentiveApy ?? 0);
+  const arr  = usdcReserve.borrowRewards ?? usdcReserve.incentives ?? usdcReserve.rewards ?? [];
+  const arrSum = Array.isArray(arr) ? arr.reduce((s, x) => s + parseFloat(x.apy ?? x.rewardApy ?? x.incentiveApy ?? 0), 0) : 0;
+  const incentiveAPY = (arrSum > 0 ? arrSum : flat) || null;
+  return { grossBorrowAPY, incentiveAPY };
+}
 
 async function getKaminoPositions() {
   console.log('\n--- Kamino xStocks Lending ---');
@@ -1109,12 +1300,18 @@ async function getKaminoPositions() {
     if (!marketAddress) { throw new Error('xStocks market address not set'); }
     console.log(`  Using xStocks market: ${marketAddress}`);
 
-    // ---- LIVE on-chain obligation read (collateral, debt, LTV, per-reserve) ----
-    const liveObl = await getKaminoLiveObligation(marketAddress);
+    // ---- APY per token from Kamino REST API (fetched first: the live debt
+    //      read uses the gross borrow APY for its small forward-compound) ----
+    let metricsArr = [];
+    try {
+      const reserveMetrics = await fetchWithTimeout(`${KAMINO_API}/kamino-market/${marketAddress}/reserves/metrics`);
+      metricsArr = Array.isArray(reserveMetrics) ? reserveMetrics : (reserveMetrics?.reserves ?? []);
+    } catch (e) { console.error(`  Kamino metrics fetch error: ${e.message}`); }
+    const usdcReserve = metricsArr.find(r => (r.liquidityToken ?? r.symbol ?? '').toUpperCase() === 'USDC');
+    const { grossBorrowAPY, incentiveAPY } = parseKaminoBorrowApys(usdcReserve);
 
-    // ---- APY per token from Kamino REST API (unchanged, correct) ----
-    const reserveMetrics = await fetchWithTimeout(`${KAMINO_API}/kamino-market/${marketAddress}/reserves/metrics`);
-    const metricsArr = Array.isArray(reserveMetrics) ? reserveMetrics : (reserveMetrics?.reserves ?? []);
+    // ---- LIVE on-chain obligation read (collateral, debt, LTV, per-reserve) ----
+    const liveObl = await getKaminoLiveObligation(marketAddress, grossBorrowAPY);
 
     // ---- Token amounts from Airtable (only used for fallback per-leg USD) ----
     const kaminoPositionIds = new Set(Object.values(KAMINO_POSITIONS));
@@ -1155,7 +1352,7 @@ async function getKaminoPositions() {
 
       // Preferred: exact per-leg USD from live obligation (needs reserve address mapping)
       let supplyUSD = null;
-      const reserveAddr = KAMINO_RESERVES[tokenKey];
+      const reserveAddr = KAMINO_RESERVES[tokenKey] ?? r.reserve ?? r.address ?? r.reserveAddress ?? null;
       if (liveObl && reserveAddr && liveObl.perReserve[reserveAddr] != null) {
         supplyUSD = liveObl.perReserve[reserveAddr];
       } else if (tokenAmt != null) {
@@ -1166,25 +1363,17 @@ async function getKaminoPositions() {
       }
 
       results[tokenKey] = { supplyUSD, tokenAmt, supplyAPY };
-      console.log(`  ${tokenKey}: ${supplyUSD != null ? '$' + supplyUSD.toFixed(2) : 'USD=pending'}, APY ${(supplyAPY * 100).toFixed(3)}%${(liveObl && reserveAddr) ? ' [live]' : ''}`);
+      console.log(`  ${tokenKey}: ${supplyUSD != null ? '$' + supplyUSD.toFixed(2) : 'USD=pending'}, APY ${(supplyAPY * 100).toFixed(3)}%${(liveObl && reserveAddr && liveObl.perReserve[reserveAddr] != null) ? ' [live]' : ''}`);
     }
 
     // ---- Borrow leg: gross+incentive APY from API; debt/collateral/LTV from live obligation ----
     try {
-      const usdcReserve = metricsArr.find(r => (r.liquidityToken ?? r.symbol ?? '').toUpperCase() === 'USDC');
-      let grossBorrowAPY = null, incentiveAPY = null;
-      if (usdcReserve) {
-        grossBorrowAPY = parseFloat(usdcReserve.borrowApy ?? usdcReserve.borrowApr ?? usdcReserve.borrowInterestApy ?? 0) || null;
-        const flat = parseFloat(usdcReserve.borrowRewardsApy ?? usdcReserve.incentiveBorrowApy ?? usdcReserve.borrowIncentiveApy ?? 0);
-        const arr  = usdcReserve.borrowRewards ?? usdcReserve.incentives ?? usdcReserve.rewards ?? [];
-        const arrSum = Array.isArray(arr) ? arr.reduce((s, x) => s + parseFloat(x.apy ?? x.rewardApy ?? x.incentiveApy ?? 0), 0) : 0;
-        incentiveAPY = (arrSum > 0 ? arrSum : flat) || null;
-      } else { console.error('  USDC reserve not found in metrics'); }
+      if (!usdcReserve) console.error('  USDC reserve not found in metrics');
 
       // LIVE debt + collateral (with fallback to prior behavior)
       let debtUSD = liveObl?.debtUSD ?? null;
       let collateralValue = liveObl?.collateralUSD ?? Object.values(results).reduce((s, d) => s + (d?.supplyUSD ?? 0), 0);
-      let debtSource = liveObl?.debtUSD != null ? 'live' : null;
+      let debtSource = liveObl?.debtUSD != null ? liveObl.debtSource : null;
 
       if (debtUSD == null) {  // fallback: last logged Borrow row from Airtable
         try {
@@ -1216,7 +1405,10 @@ async function getKaminoPositions() {
       if (netDec         != null) noteParts.push(`Net: ${(netDec * 100).toFixed(2)}%`);
       if (collateralValue > 0)    noteParts.push(`Collateral: $${collateralValue.toFixed(2)}`);
       if (ltv != null)            noteParts.push(`LTV: ${ltv.toFixed(2)}%`);
-      noteParts.push(`src: ${debtSource ?? 'none'}`);
+      noteParts.push(`src: debt ${debtSource ?? 'none'}${liveObl ? `, coll ${liveObl.collSource}` : ''}`);
+      if (liveObl?.stored) {
+        noteParts.push(`Stored (obl refresh ${fmtAge(liveObl.oblAgeSec)} ago): debt $${liveObl.stored.debtUSD.toFixed(2)}, coll $${liveObl.stored.collateralUSD.toFixed(2)}`);
+      }
 
       results.__borrow = {
         borrowUSD: debtUSD,
