@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, October 1, 2026</title>
+      <description><![CDATA[All clear on the collateral engine with debt well inside the forty percent cap and Apple the session's standout, off nearly one percent on the day.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-10-01.mp3" length="672122" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-10-01</guid>
+      <pubDate>Thu, 01 Oct 2026 14:17:48 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, September 30, 2026</title>
       <description><![CDATA[Collateral engine is all clear on loan-to-value at twenty-four point six percent with Google the clear standout on the equity side up over three percent today.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-30.mp3" length="849755" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-27.mp3" length="682989" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-08-27</guid>
       <pubDate>Thu, 27 Aug 2026 14:20:18 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, August 26, 2026</title>
-      <description><![CDATA[Active borrow of seven thousand five hundred seventeen dollars is running at four point six percent against near-zero supply yield, with L-T-V at twelve point six percent and Apple the day's standout equity up nearly one percent.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-08-26.mp3" length="672122" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-08-26</guid>
-      <pubDate>Wed, 26 Aug 2026 14:19:33 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
