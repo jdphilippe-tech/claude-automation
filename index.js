@@ -114,6 +114,7 @@ const LPOS = {
   suilendSUI:     'rec2CCpli6msLPzgF',
   suilendWSOL:    'reccOax2I2jLO9ATs',
   suilendBorrow:  'rec7fEjrou7kLZ29U',
+  sparkUSDC:      'recu5T7fi0wXU0tfK',
 };
 
 // ---- Kamino xStocks Lending (Solana) ----
@@ -135,6 +136,9 @@ const KAMINO_POSITIONS = {
 const KAMINO_USDC_BORROW = 'recaR2C1uC0G0HY2Q';
 // NOTE: Kamino KLend on-chain constants (KLEND_PROGRAM_ID, SF_SHIFT, SF_DIV20,
 // KAMINO_RESERVES) are declared in the Kamino module section, next to their use.
+
+// ---- Spark Savings (Arbitrum) — sUSDC is an ERC-4626 vault over USDC ----
+const SPARK_SUSDC_ARB = '0x940098b108fB7D0a7E374f6eDED7760787464609';
 
 const COMPTROLLER = '0xfBb21d0380beE3312B33c4353c8936a0F13EF26C';
 
@@ -472,6 +476,36 @@ async function getMoonwellData() {
     } catch (e) { console.error(`${market.key}: ${e.message.slice(0, 80)}`); }
   }
 
+  return results;
+}
+
+// ============================================================
+// MODULE 2b — Spark Savings (Arbitrum, ERC-4626 sUSDC)
+// ============================================================
+async function getSparkData() {
+  console.log('\n--- Spark Savings (Arbitrum) ---');
+  const results = {};
+  try {
+    const provider = new ethers.JsonRpcProvider(ARBITRUM_RPC);
+    const vault = new ethers.Contract(SPARK_SUSDC_ARB, [
+      'function balanceOf(address) view returns (uint256)',
+      'function convertToAssets(uint256) view returns (uint256)',
+    ], provider);
+    const shares = await vault.balanceOf(WALLET_EVM);
+    if (shares === 0n) { console.log('Spark: no sUSDC shares held — skipping'); return results; }
+    const assetsRaw = await vault.convertToAssets(shares);
+    const usdc      = Number(assetsRaw) / 1e6;   // underlying USDC has 6 decimals
+    const sharesNum = Number(shares) / 1e18;     // sUSDC has 18 decimals
+
+    // APY is best-effort (Sky Savings Rate); null if DefiLlama has no match
+    let apy = null;
+    const pools = await fetchWithTimeout('https://yields.llama.fi/pools');
+    const pool = pools?.data?.find(p => p.project === 'spark-savings' && p.chain === 'Arbitrum' && p.symbol?.toUpperCase() === 'USDC');
+    if (pool?.apy != null) apy = pool.apy;
+
+    console.log(`Spark sUSDC: ${sharesNum.toFixed(6)} shares → $${usdc.toFixed(2)} USDC | APY: ${apy?.toFixed(2) ?? 'n/a'}%`);
+    results.sparkUSDC = { type: 'supply', supplyUSD: usdc, tokens: usdc, supplyAPY: apy, notes: `sUSDC shares: ${sharesNum.toFixed(6)}` };
+  } catch (e) { console.error(`Spark: ${e.message.slice(0, 120)}`); }
   return results;
 }
 
@@ -1463,7 +1497,7 @@ async function main() {
   if (!wethActive)  console.log('WETH/USDC position is not Active — skipping LP check');
   if (!hedgeActive) console.log('ETH Hedge position is not Active — skipping Hyperliquid check');
 
-  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes, kaminoRes] = await Promise.allSettled([
+  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes, kaminoRes, sparkRes] = await Promise.allSettled([
     wethActive  ? getWethPosition() : Promise.resolve(null),
     getMoonwellData(),
     getSuilendData(),
@@ -1471,6 +1505,7 @@ async function main() {
     getLighterPositions(),
     hedgeActive ? getEthHedge()     : Promise.resolve(null),
     getKaminoPositions(),
+    getSparkData(),
   ]);
 
   const weth     = wethRes.status     === 'fulfilled' ? wethRes.value     : null;
@@ -1480,6 +1515,7 @@ async function main() {
   const lighter  = lighterRes.status  === 'fulfilled' ? lighterRes.value  : {};
   const hedge    = hedgeRes.status    === 'fulfilled' ? hedgeRes.value    : null;
   const kamino   = kaminoRes.status   === 'fulfilled' ? kaminoRes.value   : {};
+  const spark    = sparkRes.status    === 'fulfilled' ? sparkRes.value    : {};
 
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
@@ -1533,6 +1569,23 @@ async function main() {
     if (batch.length > 0) {
       const ok = await airtableCreate(LENDING_TABLE, batch);
       if (ok) { written += batch.length; console.log(`✓ Moonwell: ${batch.length} records`); }
+    }
+  }
+
+  // Spark Savings
+  if (spark && Object.keys(spark).length > 0) {
+    const batch = [];
+    for (const [posKey, data] of Object.entries(spark)) {
+      if (!LPOS[posKey]) continue;
+      const fields = { [LF.supplyUSD]: data.supplyUSD, [LF.tokenAmt]: data.tokens };
+      if (data.supplyAPY != null) fields[LF.supplyAPY] = data.supplyAPY;
+      if (data.notes)             fields[LF.notes]     = data.notes;
+      batch.push(lendingRecord(LPOS[posKey], fields));
+      console.log(`  Queued ${posKey}: $${data.supplyUSD.toFixed(2)}, APY ${data.supplyAPY?.toFixed(2) ?? 'n/a'}%`);
+    }
+    if (batch.length > 0) {
+      const ok = await airtableCreate(LENDING_TABLE, batch);
+      if (ok) { written += batch.length; console.log(`✓ Spark: ${batch.length} records`); }
     }
   }
 
