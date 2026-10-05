@@ -1,17 +1,9 @@
-Good morning. It's Saturday, October third — here's how the week landed.
+Good morning. It's Monday, October fifth.
 
-Watch — net borrow cost is running at five point five two percent, which clears the one percent carry threshold. This is the expected operating state for the structure, but worth naming as the window closes.
+All clear. No action needed today.
 
-No debt yet is behind us. The draw window ran its full course — July, August, September, and the September twenty-eighth draw brought the cumulative balance to fifteen thousand ninety-five dollars, landing just above the Target D-max of fifteen thousand thirty-eight. Current balance with accrued interest as of this morning is fifteen thousand one hundred seven dollars. The window closes in October with no further draws planned. November brings the next deposit. Four months, on schedule, right on target.
+On the crypto side — Bitcoin is at eighty-six thousand six hundred twenty-eight dollars, sentiment is Greed at seventy.
 
-Blended L-T-V is twenty-four point three percent — well clear of the forty percent operating cap and a long way from the sixty-five percent liquidation line. Collateral would need to fall roughly thirty-eight percent from here before touching the operating cap. Nothing flashing.
+On the equity side — S-P-Y is at seven hundred seventy-two dollars, the Nasdaq one hundred is up modestly alongside the broader market, and V-I-X is at sixteen — normal, nothing to flag.
 
-Borrow rate is five point five eight percent, supply yield covering just under one tenth of a percent across the basket — real cost of debt is approximately five point five two percent net. That is the expected cost for this structure. No surprises.
-
-Collateral is up one thousand nine hundred thirty-two dollars — about three point two percent — from the deposited base of sixty thousand one hundred fifty-three dollars. That is cushion, not borrowing room — the draw was sized off the deposited base, not market value.
-
-All six tokens tracked their underlying shares tightly this week — no de-peg pressure worth flagging.
-
-Bitcoin finished the week at eighty-four thousand seven hundred eighty dollars, sentiment at sixty-seven — Greed. On equities, S-P-Y closed at approximately seven hundred sixty-nine dollars as of Friday's close, the Nasdaq one hundred closed at approximately seven hundred fifty dollars, and V-I-X is at sixteen — normal territory, no stress in the volatility signal.
-
-The week's standout was the collateral basket itself — quietly printing three point two percent above the deposited base with the draw window landing exactly where it was designed to. Four draws, four months, fifteen thousand one hundred seven dollars sitting on the books going into the final stretch before the November deposit. Clean execution. Have a good weekend.
+Tesla is the standout today — up two point two percent to three hundred seventy-eight dollars, its best print in several weeks. Nvidia is worth a glance too, sitting just a dollar shy of its fifty-two week high at two hundred thirty-seven dollars. Have a good one.
