@@ -500,7 +500,11 @@ async function getSparkData() {
     // APY is best-effort (Sky Savings Rate); null if DefiLlama has no match
     let apy = null;
     const pools = await fetchWithTimeout('https://yields.llama.fi/pools');
-    const pool = pools?.data?.find(p => p.project === 'spark-savings' && p.chain === 'Arbitrum' && p.symbol?.toUpperCase() === 'USDC');
+    const sparkPools = (pools?.data ?? []).filter(p => p.project?.toLowerCase().includes('spark'));
+    // Log every Spark pool DefiLlama returns so a name mismatch is visible in the Actions log
+    console.log(`  DefiLlama Spark pools: ${sparkPools.map(p => `${p.project}/${p.chain}/${p.symbol}=${p.apy?.toFixed?.(2)}`).join(' | ') || 'none'}`);
+    const pool = sparkPools.find(p => p.chain === 'Arbitrum' && /usdc/i.test(p.symbol ?? ''))
+              ?? sparkPools.find(p => /usdc/i.test(p.symbol ?? '') && p.chain === 'Ethereum');  // rate is the same on every chain
     if (pool?.apy != null) apy = pool.apy;
 
     console.log(`Spark sUSDC: ${sharesNum.toFixed(6)} shares → $${usdc.toFixed(2)} USDC | APY: ${apy?.toFixed(2) ?? 'n/a'}%`);
