@@ -423,7 +423,6 @@ Identify records by position name:
   • Moonwell supply: name contains "Moonwell" and not "Borrow"
   • Moonwell borrow: name contains "Moonwell" and "Borrow"
   • Suilend supply/borrow: same pattern with "Suilend"
-  • Lighter: name contains "LLP" or "Edge" or "LIT"
 
 For Kamino positions:
   • Most recent Supply Value (USD) per position — fldJ7T452iqgQNiWb
@@ -442,10 +441,6 @@ Computed metrics:
   • Blended LTV = total borrows / total collateral (0 if no borrows)
   • Net carry = blended borrow APY − blended supply yield (positive = cost, negative = earning)
     Currently 0 until first July draw.
-
-For Lighter (Stability Engine):
-  • Most recent Supply Value (USD) for LLP, Edge & Hedge, LIT Staking
-  • Total Stability value = sum
 
 ═══════════════════════════════════════
 STEP 2 — CHEAT SHEET (hardcoded — update only at May/Nov checkpoints)
