@@ -35,7 +35,8 @@ const AIRTABLE_BASE    = 'appWojaxYR99bXC1f';
 const DAILY_TABLE      = 'tblKsk0QnkOoKNLuk';
 const LENDING_TABLE    = 'tblFw52kzeTRvxTSM';
 
-const WALLET_EVM        = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289'; // Moonwell/Aave wallet
+const WALLET_EVM        = '0x871fd9a8A6a6E918658eadF46e9c23fE4E377289'; // Moonwell/Aave wallet (legacy)
+const WALLET_RESERVE    = '0x062853de4bDCC5DB97Dc5bED45977d6E5975cbba'; // Reserve — Ledger EVM, Spark USDC reserve (since 2026-10-05)
 const WALLET_WETH_LP    = '0x2375369D950D49897193EbCad32d99206C37D10A'; // Uniswap V3 WETH/USDC LP wallet
 const WALLET_SUI        = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
 const WALLET_HYPERLIQUID = '0x464b059B1AF55A408CB3c822D610c2D962d2cf4b';
@@ -491,7 +492,7 @@ async function getSparkData() {
       'function balanceOf(address) view returns (uint256)',
       'function convertToAssets(uint256) view returns (uint256)',
     ], provider);
-    const shares = await vault.balanceOf(WALLET_EVM);
+    const shares = await vault.balanceOf(WALLET_RESERVE);
     if (shares === 0n) { console.log('Spark: no sUSDC shares held — skipping'); return results; }
     const assetsRaw = await vault.convertToAssets(shares);
     const usdc      = Number(assetsRaw) / 1e6;   // underlying USDC has 6 decimals
@@ -883,13 +884,15 @@ async function getRaydiumPositions(xstockAssets) {
 // MODULE 5 — Lighter (LLP, Edge & Hedge, LIT Staking)
 // ============================================================
 
-async function getLighterPositions() {
+async function getLighterPositions(active = { llp: true, edge: true, lit: true }) {
   console.log('\n--- Lighter ---');
   const results = {};
 
   try {
     const headers = { 'Authorization': LIGHTER_TOKEN };
+    if (!active.llp && !active.edge && !active.lit) { console.log('Lighter: all assets Closed — skipping'); return results; }
 
+    if (active.llp) {
     const llpRes = await fetchWithTimeout(
       `${LIGHTER_BASE}/publicPoolsMetadata?index=${LIGHTER_LLP_ID + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
       { headers }
@@ -904,7 +907,9 @@ async function getLighterPositions() {
     } else {
       console.error('LLP: no account_share in response');
     }
+    } else { console.log('LLP: Closed in Airtable — skipping'); }
 
+    if (active.edge) {
     const edgeRes = await fetchWithTimeout(
       `${LIGHTER_BASE}/publicPoolsMetadata?index=${LIGHTER_EDGE_ID + 1}&limit=1&account_index=${LIGHTER_ACCT}`,
       { headers }
@@ -919,6 +924,9 @@ async function getLighterPositions() {
     } else {
       console.error('Edge & Hedge: no account_share in response');
     }
+    } else { console.log('Edge & Hedge: Closed in Airtable — skipping'); }
+
+    if (!active.lit) { console.log('LIT Staking: Closed in Airtable — skipping'); return results; }
 
     let litStakeAmount = LIT_STAKE_AMOUNT;
     let litAPR = 0.0684;
@@ -1475,10 +1483,14 @@ async function main() {
   console.log('\n--- Fetching asset records from Airtable ---');
   let wethAssetRes  = null;
   let hedgeAssetRes = null;
+  let llpAssetRes = null, edgeAssetRes = null, litAssetRes = null;
   try {
-    [wethAssetRes, hedgeAssetRes] = await Promise.all([
+    [wethAssetRes, hedgeAssetRes, llpAssetRes, edgeAssetRes, litAssetRes] = await Promise.all([
       airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.wethPrimary),
       airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.ethHedge),
+      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.lighterLLP),
+      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.lighterEdge),
+      airtableFetchRecord('tblrATIQI0ld9tz1y', ASSET.lighterLIT),
     ]);
   } catch (e) {
     console.error(`Asset record fetch failed: ${e.message}`);
@@ -1498,6 +1510,15 @@ async function main() {
   // Status-gated module execution — skip API calls for inactive/closed assets
   const wethActive  = wethStatus === 'Active';
   const hedgeActive = hedgeStatus === 'Active';
+  // Lighter (Stability Engine archived 2026-10-05): only query assets still Active in Airtable.
+  // If a status can't be read, treat it as Active so a fetch hiccup never silently drops data.
+  const statusOf = (r) => r?.fields?.['fldDRyGqgXJTuHTpx']?.name ?? r?.fields?.['fldDRyGqgXJTuHTpx'] ?? null;
+  const lighterActive = {
+    llp:  (statusOf(llpAssetRes)  ?? 'Active') === 'Active',
+    edge: (statusOf(edgeAssetRes) ?? 'Active') === 'Active',
+    lit:  (statusOf(litAssetRes)  ?? 'Active') === 'Active',
+  };
+  console.log(`✓ Lighter status — LLP: ${statusOf(llpAssetRes)} | Edge: ${statusOf(edgeAssetRes)} | LIT: ${statusOf(litAssetRes)}`);
   if (!wethActive)  console.log('WETH/USDC position is not Active — skipping LP check');
   if (!hedgeActive) console.log('ETH Hedge position is not Active — skipping Hyperliquid check');
 
@@ -1506,7 +1527,7 @@ async function main() {
     getMoonwellData(),
     getSuilendData(),
     getRaydiumPositions(xstockAssets),
-    getLighterPositions(),
+    getLighterPositions(lighterActive),
     hedgeActive ? getEthHedge()     : Promise.resolve(null),
     getKaminoPositions(),
     getSparkData(),
