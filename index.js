@@ -1,5 +1,11 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v42
+// Daily Portfolio Check — GitHub Actions v43
+// v43: TWO Kamino positions, tracked separately (2026-10-13 multisig migration).
+//      Legacy 5yiT… (frozen at ~40% LTV, flag > 45%) and Deep Roots — the
+//      Squads 2-of-3 vault BvcW… (all deposits/draws, flag > 40%). Each
+//      obligation is read live on its own, writes to its own 7 Lending
+//      Position records, and carries its own LTV + flag in the borrow Notes.
+//      Never blended for risk; a combined total is logged for info only.
 // v42: Kamino obligation values are now REPRICED LIVE, like the Kamino UI.
 //      Stored obligation fields freeze between on-chain touches, so v41
 //      drifted between draws. Debt = stored borrowedAmountSf × (reserve
@@ -119,10 +125,17 @@ const LPOS = {
 };
 
 // ---- Kamino xStocks Lending (Solana) ----
-const KAMINO_API             = 'https://api.kamino.finance';
-const WALLET_KAMINO_LENDING  = '5yiTWdskR7yd5RXvs7MJLqWsn6n7geM8SzvYjUpRHrTX';
+// Two separate Kamino obligations (positions) since 2026-10-13:
+//   • LEGACY     — owner 5yiT… (Ledger Flex "Collateral", single-signature).
+//                  Frozen at ~40% LTV: no draws, no deposits. Flag > 45%.
+//   • DEEP ROOTS — owner = Squads 2-of-3 vault BvcW…. All deposits/draws.
+//                  Draw line 40% LTV. Flag > 40%.
+// They are NEVER blended for risk; each is read, flagged and logged on its own.
+const KAMINO_API                = 'https://api.kamino.finance';
+const WALLET_KAMINO_LENDING     = '5yiTWdskR7yd5RXvs7MJLqWsn6n7geM8SzvYjUpRHrTX'; // Legacy
+const WALLET_KAMINO_DEEP_ROOTS  = 'BvcWBq8ouMucCjmZqY8Y3FP5xqBT3rPDjDVXSXvAdBE6'; // Squads vault (NOT the 6pKC… multisig account)
 
-// Airtable Lending Position record IDs for 6 Kamino xStocks collateral positions.
+// Airtable Lending Position record IDs for the 6 LEGACY Kamino xStocks collateral positions.
 // These are permanent record IDs — never change. Status/APY data is fetched live.
 const KAMINO_POSITIONS = {
   SPYx:   'recAAa654hqvJapSU',
@@ -133,8 +146,25 @@ const KAMINO_POSITIONS = {
   AAPLx:  'rectkbR1l6gvcx3nl',
 };
 
-// Kamino USDC Borrow position (the off-ramp debt leg). Permanent record ID.
+// Kamino USDC Borrow position (the LEGACY off-ramp debt leg). Permanent record ID.
 const KAMINO_USDC_BORROW = 'recaR2C1uC0G0HY2Q';
+
+// DEEP ROOTS (multisig) Lending Position record IDs — created 2026-10-13.
+const KAMINO_DEEP_ROOTS_POSITIONS = {
+  SPYx:   'recz2dV3vorc2ipcM',
+  TSLAx:  'recRUQVPQt9Unpifo',
+  QQQx:   'recoZDAQJm7cjNULl',
+  GOOGLx: 'recQ7fd7CIE9JRDp9',
+  NVDAx:  'recXg3lcSKAnVfRkt',
+  AAPLx:  'rec7UEWe4k4nCTbw7',
+};
+const KAMINO_DEEP_ROOTS_USDC_BORROW = 'recPaaQCC6NZJZVUB';
+
+// One entry per Kamino obligation. ltvFlag = the % above which the run flags it.
+const KAMINO_BOOKS = [
+  { key: 'legacy',    label: 'Legacy 5yiT',           owner: WALLET_KAMINO_LENDING,    positions: KAMINO_POSITIONS,            borrowId: KAMINO_USDC_BORROW,            ltvFlag: 45, flagMsg: 'ABOVE 45% — rule: bring back to 40%' },
+  { key: 'deepRoots', label: 'Deep Roots multisig',   owner: WALLET_KAMINO_DEEP_ROOTS, positions: KAMINO_DEEP_ROOTS_POSITIONS, borrowId: KAMINO_DEEP_ROOTS_USDC_BORROW, ltvFlag: 40, flagMsg: 'ABOVE the 40% draw line' },
+];
 // NOTE: Kamino KLend on-chain constants (KLEND_PROGRAM_ID, SF_SHIFT, SF_DIV20,
 // KAMINO_RESERVES) are declared in the Kamino module section, next to their use.
 
@@ -1138,27 +1168,27 @@ async function fetchKaminoReserves(addresses, marketAddress) {
   return out;
 }
 
-// Reads the Kamino obligation for our wallet and reprices it live.
+// Reads the Kamino obligation owned by `owner` and reprices it live.
 // grossBorrowAPY (decimal, e.g. 0.065) is used only for the tiny forward
 // compound from the USDC reserve's last refresh to now; may be null.
 // Returns { collateralUSD, debtUSD, ltv, perReserve: {addr: usd}, obligation,
 //           stored: {collateralUSD, debtUSD, ltv}, oblAgeSec, collSource, debtSource }
 // or null on failure of the obligation read itself (caller falls back).
-async function getKaminoLiveObligation(marketAddress, grossBorrowAPY = null) {
+async function getKaminoLiveObligation(marketAddress, grossBorrowAPY = null, owner = WALLET_KAMINO_LENDING) {
   try {
     const accounts = await solRpc('getProgramAccounts', [
       KLEND_PROGRAM_ID,
       {
         encoding: 'base64',
         filters: [
-          { memcmp: { offset: 32, bytes: marketAddress } },          // lendingMarket
-          { memcmp: { offset: 64, bytes: WALLET_KAMINO_LENDING } },  // owner
+          { memcmp: { offset: 32, bytes: marketAddress } },  // lendingMarket
+          { memcmp: { offset: 64, bytes: owner } },          // owner
         ],
       },
     ]);
 
     if (!Array.isArray(accounts) || accounts.length === 0) {
-      console.error('  [obligation] none found via getProgramAccounts (RPC may block gPA — set SOL_RPC_URL to a full-access endpoint)');
+      console.error(`  [obligation] none found for owner ${owner.slice(0,4)}… via getProgramAccounts (RPC may block gPA — set SOL_RPC_URL to a full-access endpoint)`);
       return null;
     }
     // Pick the largest account (the obligation is ~3.3KB; guards against stray matches)
@@ -1338,7 +1368,10 @@ function parseKaminoBorrowApys(usdcReserve) {
 
 async function getKaminoPositions() {
   console.log('\n--- Kamino xStocks Lending ---');
-  const results = {};
+  // v43: returns { legacy: {...}, deepRoots: {...} } — one sub-result per
+  // Kamino obligation (see KAMINO_BOOKS). Each sub-result has the six
+  // per-token supply legs plus __borrow, exactly as v42 returned for one.
+  const allResults = {};
 
   try {
     const XSTOCKS_MARKET_ADDRESS = process.env.KAMINO_XSTOCKS_MARKET ?? '5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua';
@@ -1346,8 +1379,8 @@ async function getKaminoPositions() {
     if (!marketAddress) { throw new Error('xStocks market address not set'); }
     console.log(`  Using xStocks market: ${marketAddress}`);
 
-    // ---- APY per token from Kamino REST API (fetched first: the live debt
-    //      read uses the gross borrow APY for its small forward-compound) ----
+    // ---- APY per token from Kamino REST API (fetched once, shared by both
+    //      positions; the live debt read uses the gross borrow APY) ----
     let metricsArr = [];
     try {
       const reserveMetrics = await fetchWithTimeout(`${KAMINO_API}/kamino-market/${marketAddress}/reserves/metrics`);
@@ -1356,118 +1389,123 @@ async function getKaminoPositions() {
     const usdcReserve = metricsArr.find(r => (r.liquidityToken ?? r.symbol ?? '').toUpperCase() === 'USDC');
     const { grossBorrowAPY, incentiveAPY } = parseKaminoBorrowApys(usdcReserve);
 
-    // ---- LIVE on-chain obligation read (collateral, debt, LTV, per-reserve) ----
-    const liveObl = await getKaminoLiveObligation(marketAddress, grossBorrowAPY);
-
-    // ---- Token amounts from Airtable (only used for fallback per-leg USD) ----
-    const kaminoPositionIds = new Set(Object.values(KAMINO_POSITIONS));
+    // ---- Latest Airtable rows (fallback token amounts + fallback debt), fetched once ----
     let lendingActionsRaw = [];
     try {
       const { default: fetch } = await import('node-fetch');
       const params = new URLSearchParams();
-      [LF.position, LF.tokenAmt, LF.date].forEach(f => params.append('fields[]', f));
-      params.append('filterByFormula', '{Token Amount} > 0');
+      [LF.position, LF.tokenAmt, LF.borrowUSD, LF.date].forEach(f => params.append('fields[]', f));
       params.append('sort[0][field]', LF.date);
       params.append('sort[0][direction]', 'desc');
       params.append('pageSize', '100');
       const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${params}&returnFieldsByFieldId=true`,
         { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } });
       if (res.ok) { lendingActionsRaw = (await res.json()).records ?? []; }
-    } catch (e) { console.error(`  Token amount Airtable fetch error: ${e.message}`); }
-
-    const kaminoTokenAmounts = {};
-    for (const record of lendingActionsRaw) {
-      const posLinks = record.fields?.[LF.position];
+    } catch (e) { console.error(`  Kamino Airtable fallback fetch error: ${e.message}`); }
+    const linkId = (rec) => {
+      const posLinks = rec.fields?.[LF.position];
       const rawLink  = Array.isArray(posLinks) ? posLinks[0] : posLinks;
-      const posId    = (typeof rawLink === 'object' && rawLink !== null) ? rawLink.id : rawLink;
-      if (!posId || !kaminoPositionIds.has(posId)) continue;
-      const tokenKey = Object.keys(KAMINO_POSITIONS).find(k => KAMINO_POSITIONS[k] === posId);
-      if (!tokenKey || kaminoTokenAmounts[tokenKey] !== undefined) continue;
-      const tokenAmt = parseFloat(record.fields?.[LF.tokenAmt] ?? 0);
-      if (tokenAmt > 0) kaminoTokenAmounts[tokenKey] = tokenAmt;
-    }
+      return (typeof rawLink === 'object' && rawLink !== null) ? rawLink.id : rawLink;
+    };
 
-    // ---- Per-leg supply USD + APY ----
-    for (const r of metricsArr) {
-      const sym = (r.liquidityToken ?? r.symbol ?? '').toUpperCase();
-      const tokenKey = Object.keys(KAMINO_POSITIONS).find(k => k.toUpperCase() === sym);
-      if (!tokenKey) continue;
+    for (const book of KAMINO_BOOKS) {
+      console.log(`\n  ── Kamino position: ${book.label} (owner ${book.owner.slice(0,4)}…) ──`);
+      const results = {};
+      try {
+        // ---- LIVE on-chain obligation read (collateral, debt, LTV, per-reserve) ----
+        const liveObl = await getKaminoLiveObligation(marketAddress, grossBorrowAPY, book.owner);
 
-      const supplyAPY = parseFloat(r.supplyApy ?? 0);
-      const tokenAmt  = kaminoTokenAmounts[tokenKey] ?? null;
+        // ---- Token amounts from Airtable (only used for fallback per-leg USD) ----
+        const posIds = new Set(Object.values(book.positions));
+        const tokenAmounts = {};
+        for (const record of lendingActionsRaw) {
+          const posId = linkId(record);
+          if (!posId || !posIds.has(posId)) continue;
+          const tokenKey = Object.keys(book.positions).find(k => book.positions[k] === posId);
+          if (!tokenKey || tokenAmounts[tokenKey] !== undefined) continue;
+          const tokenAmt = parseFloat(record.fields?.[LF.tokenAmt] ?? 0);
+          if (tokenAmt > 0) tokenAmounts[tokenKey] = tokenAmt;
+        }
 
-      // Preferred: exact per-leg USD from live obligation (needs reserve address mapping)
-      let supplyUSD = null;
-      const reserveAddr = KAMINO_RESERVES[tokenKey] ?? r.reserve ?? r.address ?? r.reserveAddress ?? null;
-      if (liveObl && reserveAddr && liveObl.perReserve[reserveAddr] != null) {
-        supplyUSD = liveObl.perReserve[reserveAddr];
-      } else if (tokenAmt != null) {
-        // Fallback: prior approximation (token amt x price-per-token from metrics)
-        const totalSupplyTokens = parseFloat(r.totalSupply ?? 0);
-        const totalSupplyUsd    = parseFloat(r.totalSupplyUsd ?? 0);
-        if (totalSupplyTokens > 0) supplyUSD = tokenAmt * (totalSupplyUsd / totalSupplyTokens);
-      }
+        // ---- Per-leg supply USD + APY ----
+        for (const r of metricsArr) {
+          const sym = (r.liquidityToken ?? r.symbol ?? '').toUpperCase();
+          const tokenKey = Object.keys(book.positions).find(k => k.toUpperCase() === sym);
+          if (!tokenKey) continue;
 
-      results[tokenKey] = { supplyUSD, tokenAmt, supplyAPY };
-      console.log(`  ${tokenKey}: ${supplyUSD != null ? '$' + supplyUSD.toFixed(2) : 'USD=pending'}, APY ${(supplyAPY * 100).toFixed(3)}%${(liveObl && reserveAddr && liveObl.perReserve[reserveAddr] != null) ? ' [live]' : ''}`);
-    }
+          const supplyAPY = parseFloat(r.supplyApy ?? 0);
+          const tokenAmt  = tokenAmounts[tokenKey] ?? null;
 
-    // ---- Borrow leg: gross+incentive APY from API; debt/collateral/LTV from live obligation ----
-    try {
-      if (!usdcReserve) console.error('  USDC reserve not found in metrics');
-
-      // LIVE debt + collateral (with fallback to prior behavior)
-      let debtUSD = liveObl?.debtUSD ?? null;
-      let collateralValue = liveObl?.collateralUSD ?? Object.values(results).reduce((s, d) => s + (d?.supplyUSD ?? 0), 0);
-      let debtSource = liveObl?.debtUSD != null ? liveObl.debtSource : null;
-
-      if (debtUSD == null) {  // fallback: last logged Borrow row from Airtable
-        try {
-          const { default: fetch } = await import('node-fetch');
-          const p = new URLSearchParams();
-          [LF.position, LF.borrowUSD, LF.date].forEach(f => p.append('fields[]', f));
-          p.append('sort[0][field]', LF.date); p.append('sort[0][direction]', 'desc'); p.append('pageSize', '100');
-          const res = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/${LENDING_TABLE}?${p}&returnFieldsByFieldId=true`,
-            { headers: { 'Authorization': `Bearer ${AIRTABLE_API_KEY}` } });
-          if (res.ok) {
-            for (const rec of ((await res.json()).records ?? [])) {
-              const link = rec.fields?.[LF.position];
-              const raw  = Array.isArray(link) ? link[0] : link;
-              const pid  = (typeof raw === 'object' && raw) ? raw.id : raw;
-              if (pid !== KAMINO_USDC_BORROW) continue;
-              const v = parseFloat(rec.fields?.[LF.borrowUSD] ?? 0);
-              if (v > 0) { debtUSD = v; debtSource = 'airtable-echo'; break; }
-            }
+          // Preferred: exact per-leg USD from live obligation (needs reserve address mapping)
+          let supplyUSD = null;
+          const reserveAddr = KAMINO_RESERVES[tokenKey] ?? r.reserve ?? r.address ?? r.reserveAddress ?? null;
+          const live = liveObl && reserveAddr && liveObl.perReserve[reserveAddr] != null;
+          if (live) {
+            supplyUSD = liveObl.perReserve[reserveAddr];
+          } else if (tokenAmt != null) {
+            // Fallback: prior approximation (token amt x price-per-token from metrics)
+            const totalSupplyTokens = parseFloat(r.totalSupply ?? 0);
+            const totalSupplyUsd    = parseFloat(r.totalSupplyUsd ?? 0);
+            if (totalSupplyTokens > 0) supplyUSD = tokenAmt * (totalSupplyUsd / totalSupplyTokens);
           }
-        } catch (e) { console.error(`  Borrow debt fallback error: ${e.message}`); }
-      }
 
-      const ltv    = liveObl?.ltv ?? ((debtUSD != null && collateralValue > 0) ? (debtUSD / collateralValue) * 100 : null);
-      const netDec = (grossBorrowAPY != null && incentiveAPY != null) ? grossBorrowAPY - incentiveAPY : null;
+          results[tokenKey] = { supplyUSD, tokenAmt, supplyAPY };
+          console.log(`  ${tokenKey}: ${supplyUSD != null ? '$' + supplyUSD.toFixed(2) : 'USD=pending'}, APY ${(supplyAPY * 100).toFixed(3)}%${live ? ' [live]' : ''}`);
+        }
 
-      const noteParts = [];
-      if (grossBorrowAPY != null) noteParts.push(`Gross borrow: ${(grossBorrowAPY * 100).toFixed(2)}%`);
-      if (incentiveAPY   != null) noteParts.push(`USDC incentive: ${(incentiveAPY * 100).toFixed(2)}%`);
-      if (netDec         != null) noteParts.push(`Net: ${(netDec * 100).toFixed(2)}%`);
-      if (collateralValue > 0)    noteParts.push(`Collateral: $${collateralValue.toFixed(2)}`);
-      if (ltv != null)            noteParts.push(`LTV: ${ltv.toFixed(2)}%`);
-      noteParts.push(`src: debt ${debtSource ?? 'none'}${liveObl ? `, coll ${liveObl.collSource}` : ''}`);
-      if (liveObl?.stored) {
-        noteParts.push(`Stored (obl refresh ${fmtAge(liveObl.oblAgeSec)} ago): debt $${liveObl.stored.debtUSD.toFixed(2)}, coll $${liveObl.stored.collateralUSD.toFixed(2)}`);
-      }
+        // ---- Borrow leg: gross+incentive APY from API; debt/collateral/LTV from live obligation ----
+        if (!usdcReserve) console.error('  USDC reserve not found in metrics');
 
-      results.__borrow = {
-        borrowUSD: debtUSD,
-        borrowAPY: grossBorrowAPY != null ? grossBorrowAPY * 100 : null,
-        ltv,
-        notes: noteParts.join(' | '),
-      };
-      console.log(`  Borrow leg [${debtSource}]: debt ${debtUSD != null ? '$' + debtUSD.toFixed(2) : 'n/a'}, gross ${grossBorrowAPY != null ? (grossBorrowAPY * 100).toFixed(2) + '%' : 'n/a'}, LTV ${ltv != null ? ltv.toFixed(2) + '%' : 'n/a'}`);
-    } catch (e) { console.error(`  Borrow leg error: ${e.message}`); }
+        let debtUSD = liveObl?.debtUSD ?? null;
+        let collateralValue = liveObl?.collateralUSD ?? Object.values(results).reduce((s, d) => s + (d?.supplyUSD ?? 0), 0);
+        let debtSource = liveObl?.debtUSD != null ? liveObl.debtSource : null;
+
+        if (debtUSD == null) {  // fallback: last logged Borrow row for THIS position from Airtable
+          for (const rec of lendingActionsRaw) {
+            if (linkId(rec) !== book.borrowId) continue;
+            const v = parseFloat(rec.fields?.[LF.borrowUSD] ?? 0);
+            if (v > 0) { debtUSD = v; debtSource = 'airtable-echo'; break; }
+          }
+        }
+
+        const ltv    = liveObl?.ltv ?? ((debtUSD != null && collateralValue > 0) ? (debtUSD / collateralValue) * 100 : null);
+        const netDec = (grossBorrowAPY != null && incentiveAPY != null) ? grossBorrowAPY - incentiveAPY : null;
+        const flagged = ltv != null && ltv > book.ltvFlag;
+
+        const noteParts = [`[${book.label}]`];
+        if (flagged)                noteParts.push(`⚠ LTV ${ltv.toFixed(2)}% ${book.flagMsg}`);
+        if (grossBorrowAPY != null) noteParts.push(`Gross borrow: ${(grossBorrowAPY * 100).toFixed(2)}%`);
+        if (incentiveAPY   != null) noteParts.push(`USDC incentive: ${(incentiveAPY * 100).toFixed(2)}%`);
+        if (netDec         != null) noteParts.push(`Net: ${(netDec * 100).toFixed(2)}%`);
+        if (collateralValue > 0)    noteParts.push(`Collateral: $${collateralValue.toFixed(2)}`);
+        if (ltv != null)            noteParts.push(`LTV: ${ltv.toFixed(2)}% (flag above ${book.ltvFlag}%)`);
+        noteParts.push(`src: debt ${debtSource ?? 'none'}${liveObl ? `, coll ${liveObl.collSource}` : ''}`);
+        if (liveObl?.stored) {
+          noteParts.push(`Stored (obl refresh ${fmtAge(liveObl.oblAgeSec)} ago): debt $${liveObl.stored.debtUSD.toFixed(2)}, coll $${liveObl.stored.collateralUSD.toFixed(2)}`);
+        }
+
+        results.__borrow = {
+          borrowUSD: debtUSD,
+          borrowAPY: grossBorrowAPY != null ? grossBorrowAPY * 100 : null,
+          ltv,
+          collateralUSD: collateralValue,
+          flagged,
+          notes: noteParts.join(' | '),
+        };
+        console.log(`  Borrow leg [${debtSource}]: debt ${debtUSD != null ? '$' + debtUSD.toFixed(2) : 'n/a'}, gross ${grossBorrowAPY != null ? (grossBorrowAPY * 100).toFixed(2) + '%' : 'n/a'}, LTV ${ltv != null ? ltv.toFixed(2) + '%' : 'n/a'}${flagged ? `  ⚠ ${book.flagMsg}` : ''}`);
+      } catch (e) { console.error(`  Kamino ${book.label} error: ${e.message}`); }
+      allResults[book.key] = results;
+    }
+
+    // Combined line is informational only (net worth); risk is judged per position above.
+    const parts = KAMINO_BOOKS.map(b => allResults[b.key]?.__borrow).filter(Boolean);
+    const totColl = parts.reduce((s, b) => s + (b.collateralUSD ?? 0), 0);
+    const totDebt = parts.reduce((s, b) => s + (b.borrowUSD ?? 0), 0);
+    console.log(`\n  Kamino combined (info only): collateral $${totColl.toFixed(2)} | debt $${totDebt.toFixed(2)}`);
 
   } catch (e) { console.error(`Kamino fatal: ${e.message}`); }
 
-  return results;
+  return allResults;
 }
 
 // ============================================================
@@ -1700,11 +1738,13 @@ async function main() {
     }
   }
 
-  // Kamino xStocks Lending (6 supply legs + 1 USDC borrow leg)
-  if (kamino && Object.keys(kamino).length > 0) {
+  // Kamino xStocks Lending — per position (Legacy + Deep Roots), 6 supply legs + 1 USDC borrow leg each
+  for (const book of KAMINO_BOOKS) {
+    const kb = kamino?.[book.key];
+    if (!kb || Object.keys(kb).length === 0) { console.error(`Kamino ${book.label}: no data — nothing written`); continue; }
     const batch = [];
-    for (const [tokenKey, data] of Object.entries(kamino)) {
-      const posId = KAMINO_POSITIONS[tokenKey];
+    for (const [tokenKey, data] of Object.entries(kb)) {
+      const posId = book.positions[tokenKey];
       if (!posId) continue;  // skips the __borrow key (handled separately below)
       const fields = {};
       if (data.supplyUSD != null && data.supplyUSD > 0) fields[LF.supplyUSD] = data.supplyUSD;
@@ -1713,23 +1753,23 @@ async function main() {
       batch.push(lendingRecord(posId, fields));
       const usdStr = data.supplyUSD != null ? `$${data.supplyUSD.toFixed(2)}` : 'USD=pending';
       const tokStr = data.tokenAmt  != null ? `${data.tokenAmt.toFixed(4)} tokens` : 'tokens=pending';
-      console.log(`  Queued ${tokenKey}: ${usdStr}, ${tokStr}, APY ${data.supplyAPY != null ? (data.supplyAPY * 100).toFixed(3) + '%' : 'n/a'}`);
+      console.log(`  Queued ${book.label} ${tokenKey}: ${usdStr}, ${tokStr}, APY ${data.supplyAPY != null ? (data.supplyAPY * 100).toFixed(3) + '%' : 'n/a'}`);
     }
 
-    // Borrow leg → Kamino USDC Borrow position (gross APY in field; incentive/net/LTV in Notes)
-    if (kamino.__borrow) {
-      const b = kamino.__borrow;
+    // Borrow leg → that position's USDC Borrow record (gross APY in field; incentive/net/LTV/flag in Notes)
+    if (kb.__borrow) {
+      const b = kb.__borrow;
       const bFields = {};
       if (b.borrowUSD != null) bFields[LF.borrowUSD] = b.borrowUSD;
       if (b.borrowAPY != null) bFields[LF.borrowAPY] = b.borrowAPY;  // gross, whole-percent
       if (b.notes)             bFields[LF.notes]     = b.notes;
-      batch.push(lendingRecord(KAMINO_USDC_BORROW, bFields));
-      console.log(`  Queued USDC Borrow: ${b.borrowUSD != null ? '$' + b.borrowUSD.toFixed(2) : 'n/a'}, gross APY ${b.borrowAPY != null ? b.borrowAPY.toFixed(2) + '%' : 'n/a'}, LTV ${b.ltv != null ? b.ltv.toFixed(2) + '%' : 'n/a'}`);
+      batch.push(lendingRecord(book.borrowId, bFields));
+      console.log(`  Queued ${book.label} USDC Borrow: ${b.borrowUSD != null ? '$' + b.borrowUSD.toFixed(2) : 'n/a'}, gross APY ${b.borrowAPY != null ? b.borrowAPY.toFixed(2) + '%' : 'n/a'}, LTV ${b.ltv != null ? b.ltv.toFixed(2) + '%' : 'n/a'}${b.flagged ? '  ⚠ ' + book.flagMsg : ''}`);
     }
 
     if (batch.length > 0) {
       const ok = await airtableCreate(LENDING_TABLE, batch);
-      if (ok) { written += batch.length; console.log(`✓ Kamino: ${batch.length} records written`); }
+      if (ok) { written += batch.length; console.log(`✓ Kamino ${book.label}: ${batch.length} records written`); }
     }
   }
 

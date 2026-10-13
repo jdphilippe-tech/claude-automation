@@ -22,6 +22,10 @@
  *               Stability Engine (Lighter), market pulse (BTC/F&G/SPY/QQQ/VIX),
  *               and spotlight (TSLA/NVDA/GOOGL/AAPL). Sunday skip added.
  *               Brief extraction updated for "Have a good weekend." marker.
+ *   Fix 20    — Two Kamino positions (2026-10-13 multisig migration): Deep Roots
+ *               and Legacy reported separately, per-position LTV and flags
+ *               (Deep Roots > 40%, Legacy > 45%), never a blended LTV.
+ *               Cheat sheet updated to the current Notion draw rule.
  */
 
 import fs from 'fs';
@@ -54,6 +58,7 @@ Field IDs (use in fields[] array):
   fldJLDy5yOHq8S6RS = Supply APY % (as a percentage, e.g. 0.17 means 0.17%)
   fldTSqf1Yrxg7O0tr = Borrow Value (USD)
   fldWHlp8HCuMYGc9e = Borrow APY %
+  fldHzWRmzI1H3zueM = Notes        (Kamino borrow rows carry the position label, LTV and any ⚠ flag)
 
 Sort by fldUksu7BXYunAADh descending to get most recent records first.
 Paginate until has_more = false. Offset tokens expire after ~5 min — if 422,
@@ -419,28 +424,30 @@ Query the Lending Actions table (${AIRTABLE_LENDING_TABLE}):
 
 The Position field (fldFi5nwRXNC5n0pU) returns the linked position's display name.
 Identify records by position name:
-  • Kamino collateral supply: name contains "Kamino" (6 positions: AAPLx QQQx GOOGLx NVDAx SPYx TSLAx)
+  • Kamino has TWO SEPARATE positions (since 2026-10-13). Never blend them for risk.
+      – DEEP ROOTS (multisig, the main position): name contains "(Deep Roots)",
+        e.g. "Kamino SPYx (Deep Roots) Supply", "Kamino USDC (Deep Roots) Borrow".
+      – LEGACY (old single-signature wallet, frozen): name starts with "Kamino" and does NOT
+        contain "(Deep Roots)", e.g. "Kamino SPYx Supply", "Kamino USDC Borrow".
+      Each has 6 supply positions (AAPLx QQQx GOOGLx NVDAx SPYx TSLAx) and 1 USDC borrow.
   • Moonwell supply: name contains "Moonwell" and not "Borrow"
   • Moonwell borrow: name contains "Moonwell" and "Borrow"
   • Suilend supply/borrow: same pattern with "Suilend"
 
-For Kamino positions:
-  • Most recent Supply Value (USD) per position — fldJ7T452iqgQNiWb
+For Kamino — compute EACH position (Deep Roots, Legacy) separately:
+  • Most recent Supply Value (USD) per supply position — fldJ7T452iqgQNiWb
   • Supply APY % per position — fldJLDy5yOHq8S6RS
-  • Total collateral = sum of 6 supply USD values
-  • Blended supply yield = capital-weighted average of 6 supply APYs
-  • Growth vs deposited base: total collateral − $60,153 (the deposited base)
+  • Position collateral = sum of its 6 supply USD values
+  • Position debt = most recent Borrow Value (USD) of its USDC borrow — fldTSqf1Yrxg7O0tr
+  • Position LTV = position debt / position collateral. The borrow row's Notes also state the LTV
+    and carry a "⚠" flag when a position is over its line — trust the Notes flag if present.
+  • Blended supply yield = capital-weighted average of all 12 supply APYs (yield only — not risk)
+  • Kamino borrow APY % — fldWHlp8HCuMYGc9e (same market rate for both positions)
+  • Combined collateral and combined debt may be stated for size only. NEVER report a combined LTV.
 
-For borrow records (Moonwell + Suilend borrows):
-  • Most recent Borrow Value (USD) per borrow position — fldTSqf1Yrxg7O0tr
-  • Borrow APY % — fldWHlp8HCuMYGc9e
-  • Total borrows = sum of all borrow values
-  • Blended borrow APY = capital-weighted average
+Other borrow records (Moonwell + Suilend): most recent Borrow Value per position, if any are still active.
 
-Computed metrics:
-  • Blended LTV = total borrows / total collateral (0 if no borrows)
-  • Net carry = blended borrow APY − blended supply yield (positive = cost, negative = earning)
-    Currently 0 until first July draw.
+Net carry = Kamino borrow APY − blended supply yield (positive = cost, negative = earning).
 
 ═══════════════════════════════════════
 STEP 2 — CHEAT SHEET (hardcoded — update only at May/Nov checkpoints)
@@ -448,29 +455,22 @@ Source of truth: Notion page 37912a7e-409e-818e-a487-f291507e28f9
 ═══════════════════════════════════════
 Use these values directly — do NOT search for them:
 
-  Deposited base C      = $60,153
-  Operating LTV cap     = 40%  (watch at >35%; act at >40%)
-  Liquidation line      ≈ 65% (blended across basket)
-  Standing draw         = $3,750/month (Target, Jul–Oct 2026 window)
-  Target D_max          = $15,038 (= 0.25 × C)
-  Ceiling D_max         = $18,046 (= 0.30 × C)
-  Window                = Jul–Oct 2026 (4 months)
-  Next deposit          = November 2026
-  Current debt          = $0 (no draw yet)
-
-⚠️ PRE-DRAW PLACEHOLDER: Until the first July 2026 borrow lands in Airtable,
-all debt-related blocks use this language:
-  Collateral health: "No debt yet — draw begins July."
-  Borrowing pace:    "Nothing drawn yet. First draw July — three thousand seven hundred fifty dollars."
-  Net carry:         "No borrow cost yet. Supply yield is [X%] — small but ticking."
+  Deep Roots draw line  = 40% LTV (one number — the draw is never sized above it)
+  Legacy rule           = frozen; if its LTV goes above 45%, bring it back to 40%
+  Liquidation line      ≈ 68.5% (blended across basket)
+  Monthly draw          = $3,600/month (Nov 2026 – Apr 2027 window; drawn from Deep Roots)
+  Deposits              = end of April and end of October
+  Deep Roots opened     = 2026-10-13 with ~$31.8K and no debt; the November deposit and all draws go there.
+  Legacy at migration   = ~$37.8K collateral, ~$15.1K debt, ~40% LTV
 
 ═══════════════════════════════════════
 STEP 3 — STATUS LINE LOGIC
 ═══════════════════════════════════════
-Evaluate three conditions in order:
-  1. LTV vs cap: LTV > 35% → Watch; LTV > 40% → Act (currently always clear — no debt)
+Evaluate these conditions in order (each Kamino position on its own):
+  1a. Legacy LTV > 45% → Act — "bring the legacy position back to forty percent."
+  1b. Deep Roots LTV > 40% → Act — "Deep Roots is over the forty percent line."
   2. Peg deviation > 0.5% on any token → Watch (Saturday only — see peg watch)
-  3. Net carry turns positive AND > 1% → Watch (currently always clear — no debt)
+  3. Net carry turns positive AND > 1% → Watch
 
 If none flag: "All clear. No action needed today." (skinny) / "All clear." (weekly)
 If watch: "Watch — [one clause naming what.]"
@@ -549,20 +549,20 @@ FULL WEEKLY (Saturday, ~430 words calm):
 
 2. Status: "[verdict]. [One-clause watch if applicable — else omit watch clause.]"
 
-3. COLLATERAL HEALTH:
-   Pre-draw: "No debt yet — draw begins July. Collateral is sitting at [total USD], and the first draw puts opening LTV well under the forty percent cap."
-   Post-draw: "Blended LTV is [X] percent, against the forty percent operating cap and the sixty-five percent liquidation line. [Collateral could fall X% before the cap — one sentence.]"
+3. COLLATERAL HEALTH — two positions, one sentence each:
+   "Deep Roots is at [X] percent L-T-V on [collateral], against the forty percent draw line."
+   "The legacy position is at [Y] percent on [collateral], against its forty-five percent trigger."
+   Then one sentence on the sixty-eight and a half percent liquidation line (how far the higher one could fall).
 
 4. BORROWING PACE:
-   Pre-draw: "Nothing drawn yet. First draw July — three thousand seven hundred fifty dollars at Target, under the ceiling of four thousand five hundred. No tracking needed until then."
-   Post-draw: MTD drawn vs Target · cumulative vs Target D_max ($15,038) and Ceiling D_max ($18,046) · months to November.
+   Draws come from Deep Roots: month-to-date drawn vs the three thousand six hundred dollar monthly draw · months to the next deposit. Legacy takes no new draws.
 
 5. NET CARRY:
    Pre-draw: "No borrow cost yet. Supply yield is averaging [X%] across the basket — small but ticking."
    Post-draw: "Borrow rate is [X%], supply yield covering [Y%] [plus incentive of Z% if active] — real cost of debt is [net]% [. Note if incentive is promotional.]"
 
 6. GROWTH:
-   "Collateral is [up/down] [amount or X%] from the deposited base of sixty thousand one hundred fifty-three dollars. [ALWAYS TAG]: that is cushion, not borrowing room — the draw is sized off the deposited base, not market value."
+   "Combined collateral across both positions is [total], [up/down X percent] on the week." (Compare to the same-position supply values about seven days earlier. The draw is sized off market value at each checkpoint, so growth does raise future draw room — but only at the checkpoint, never mid-window.)
 
 7. PEG WATCH:
    All clean: "All six tokens tracked their underlying shares tightly this week — no de-peg pressure."
@@ -584,7 +584,7 @@ Good morning. It's [day]...
 
 DESCRIPTION examples:
   "All clear across the collateral engine with Bitcoin holding above one hundred thousand dollars and Tesla the week's standout on a four percent move."
-  "Status all clear with the collateral sitting five percent above the deposited base and Nvidia pushing a new high ahead of earnings."
+  "Status all clear with both Kamino positions under their lines and Nvidia pushing a new high ahead of earnings."
 
 Only one brief. No drafts. No self-correction notes. No text after the closing phrase.`;
 
