@@ -1,5 +1,8 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v43
+// Daily Portfolio Check — GitHub Actions v44
+// v44: Bridge spend-down tracked daily — Tangem (0xF384…9f93) USDC in Aave V3
+//      on Base (Tangem yield mode). aToken read live from the Pool; balance
+//      incl. interest + supply APY written to "Aave USDC (Bridge) Supply".
 // v43: TWO Kamino positions, tracked separately (2026-10-13 multisig migration).
 //      Legacy 5yiT… (frozen at ~40% LTV, flag > 45%) and Deep Roots — the
 //      Squads 2-of-3 vault BvcW… (all deposits/draws, flag > 40%). Each
@@ -46,6 +49,11 @@ const WALLET_RESERVE    = '0x062853de4bDCC5DB97Dc5bED45977d6E5975cbba'; // Reser
 const WALLET_WETH_LP    = '0x2375369D950D49897193EbCad32d99206C37D10A'; // Uniswap V3 WETH/USDC LP wallet
 const WALLET_SUI        = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c576f1ce36705e9';
 const WALLET_HYPERLIQUID = '0x464b059B1AF55A408CB3c822D610c2D962d2cf4b';
+const WALLET_BRIDGE     = '0xF3841e27b27B6bC78Ea4ad2dC9a1882D04F39f93'; // Tangem — Bridge spend-down, Aave USDC on Base (since 2026-10-22)
+
+// Aave V3 on Base (Bridge). The aToken address is read live from the Pool, not hardcoded.
+const AAVE_V3_POOL_BASE = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
+const USDC_BASE         = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
@@ -122,6 +130,7 @@ const LPOS = {
   suilendWSOL:    'reccOax2I2jLO9ATs',
   suilendBorrow:  'rec7fEjrou7kLZ29U',
   sparkUSDC:      'recu5T7fi0wXU0tfK',
+  bridgeUSDC:     'recMoHdpaUNeS7Ymp',   // Aave USDC (Bridge) Supply — Tangem on Base
 };
 
 // ---- Kamino xStocks Lending (Solana) ----
@@ -513,6 +522,38 @@ async function getMoonwellData() {
 // ============================================================
 // MODULE 2b — Spark Savings (Arbitrum, ERC-4626 sUSDC)
 // ============================================================
+// ============================================================
+// MODULE: Bridge spend-down — Tangem yield mode = Aave V3 USDC on Base
+// Balance = aToken balanceOf(Tangem) (includes accrued interest).
+// APY     = compounded from the reserve's currentLiquidityRate (ray, APR).
+// ============================================================
+async function getBridgeData() {
+  console.log('\n--- Bridge (Tangem · Aave USDC on Base) ---');
+  const results = {};
+  try {
+    const provider = new ethers.JsonRpcProvider(BASE_RPC);
+    const pool = new ethers.Contract(AAVE_V3_POOL_BASE, [
+      'function getReserveData(address asset) view returns (tuple(uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt))',
+    ], provider);
+    const rd = await pool.getReserveData(USDC_BASE);
+    const aTokenAddr = rd.aTokenAddress;
+    const aToken = new ethers.Contract(aTokenAddr, ['function balanceOf(address) view returns (uint256)'], provider);
+    const bal = await aToken.balanceOf(WALLET_BRIDGE);
+    const usdc = Number(bal) / 1e6;  // aUSDC has 6 decimals, 1 aUSDC = 1 USDC
+    if (usdc <= 0) { console.log('Bridge: no Aave USDC balance — skipping'); return results; }
+
+    const apr = Number(rd.currentLiquidityRate) / 1e27;
+    const apy = (Math.pow(1 + apr / SECONDS_PER_YEAR, SECONDS_PER_YEAR) - 1) * 100;
+
+    console.log(`Bridge aUSDC (${aTokenAddr.slice(0, 8)}…): $${usdc.toFixed(2)} | APY: ${apy.toFixed(2)}%`);
+    results.bridgeUSDC = {
+      type: 'supply', supplyUSD: usdc, tokens: usdc, supplyAPY: apy,
+      notes: `Bridge spend-down — Tangem ${WALLET_BRIDGE.slice(0, 6)}…${WALLET_BRIDGE.slice(-4)} · Aave V3 USDC on Base (aToken ${aTokenAddr}). Plan: $4,000/mo.`,
+    };
+  } catch (e) { console.error(`Bridge: ${e.message.slice(0, 160)}`); }
+  return results;
+}
+
 async function getSparkData() {
   console.log('\n--- Spark Savings (Arbitrum) ---');
   const results = {};
@@ -1560,7 +1601,7 @@ async function main() {
   if (!wethActive)  console.log('WETH/USDC position is not Active — skipping LP check');
   if (!hedgeActive) console.log('ETH Hedge position is not Active — skipping Hyperliquid check');
 
-  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes, kaminoRes, sparkRes] = await Promise.allSettled([
+  const [wethRes, moonwellRes, suilendRes, raydiumRes, lighterRes, hedgeRes, kaminoRes, sparkRes, bridgeRes] = await Promise.allSettled([
     wethActive  ? getWethPosition() : Promise.resolve(null),
     getMoonwellData(),
     getSuilendData(),
@@ -1569,6 +1610,7 @@ async function main() {
     hedgeActive ? getEthHedge()     : Promise.resolve(null),
     getKaminoPositions(),
     getSparkData(),
+    getBridgeData(),
   ]);
 
   const weth     = wethRes.status     === 'fulfilled' ? wethRes.value     : null;
@@ -1578,7 +1620,9 @@ async function main() {
   const lighter  = lighterRes.status  === 'fulfilled' ? lighterRes.value  : {};
   const hedge    = hedgeRes.status    === 'fulfilled' ? hedgeRes.value    : null;
   const kamino   = kaminoRes.status   === 'fulfilled' ? kaminoRes.value   : {};
-  const spark    = sparkRes.status    === 'fulfilled' ? sparkRes.value    : {};
+  // Spark reserve + Bridge share one write path (same supply-record shape, keyed by LPOS)
+  const spark    = { ...(sparkRes.status === 'fulfilled' ? sparkRes.value : {}),
+                     ...(bridgeRes.status === 'fulfilled' ? bridgeRes.value : {}) };
 
   console.log('\n--- Writing to Airtable ---');
   let written = 0;
@@ -1648,7 +1692,7 @@ async function main() {
     }
     if (batch.length > 0) {
       const ok = await airtableCreate(LENDING_TABLE, batch);
-      if (ok) { written += batch.length; console.log(`✓ Spark: ${batch.length} records`); }
+      if (ok) { written += batch.length; console.log(`✓ Spark + Bridge: ${batch.length} records`); }
     }
   }
 
