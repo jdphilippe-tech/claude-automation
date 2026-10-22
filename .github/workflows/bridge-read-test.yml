@@ -23,6 +23,15 @@ jobs:
           open('bridge_test.mjs','w').write(src)
           PY
           node bridge_test.mjs > bridge-test-output.txt 2>&1 || true
+          A=0xF3841e27b27B6bC78Ea4ad2dC9a1882D04F39f93
+          echo "== token balances ==" >> bridge-test-output.txt
+          curl -s "https://base.blockscout.com/api/v2/addresses/$A/token-balances" | python3 -c "import sys,json;d=json.load(sys.stdin);[print(x['token'].get('symbol'),x['token'].get('address_hash') or x['token'].get('address'),x['value'],x['token'].get('decimals')) for x in d]" >> bridge-test-output.txt 2>&1
+          echo "== token transfers ==" >> bridge-test-output.txt
+          curl -s "https://base.blockscout.com/api/v2/addresses/$A/token-transfers" | python3 -c "
+          import sys,json;d=json.load(sys.stdin)
+          for x in d.get('items',[])[:25]:
+            t=x['token'];print(x['timestamp'],t.get('symbol'),'from',x['from']['hash'],'to',x['to']['hash'],x['total'].get('value'),x.get('method'))
+          " >> bridge-test-output.txt 2>&1
           cat bridge-test-output.txt
       - name: Save output
         run: |
