@@ -2,3 +2,5 @@
 --- Bridge (Tangem · Aave USDC on Base) ---
 Bridge: no Aave USDC balance — skipping
 RESULT {}
+balances error Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+transfers error Unexpected token '<', "<!DOCTYPE "... is not valid JSON
