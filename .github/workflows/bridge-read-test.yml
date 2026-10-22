@@ -23,7 +23,7 @@ jobs:
           open('bridge_test.mjs','w').write(src)
           PY
           node bridge_test.mjs > bridge-test-output.txt 2>&1 || true
-          node discover.mjs >> bridge-test-output.txt 2>&1 || true
+          BASE_RPC_URL=${{ secrets.BASE_RPC_URL }} node discover.mjs >> bridge-test-output.txt 2>&1 || true
           cat bridge-test-output.txt
       - name: Save output
         run: |
