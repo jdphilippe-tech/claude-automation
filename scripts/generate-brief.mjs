@@ -26,6 +26,8 @@
  *               and Legacy reported separately, per-position LTV and flags
  *               (Deep Roots > 40%, Legacy > 45%), never a blended LTV.
  *               Cheat sheet updated to the current Notion draw rule.
+ *   Fix 21    — Bridge (Tangem, Aave USDC on Base) balance + months left
+ *               in the Saturday brief; never counted as collateral.
  */
 
 import fs from 'fs';
@@ -447,6 +449,11 @@ For Kamino — compute EACH position (Deep Roots, Legacy) separately:
 
 Other borrow records (Moonwell + Suilend): most recent Borrow Value per position, if any are still active.
 
+BRIDGE (spend-down, NOT collateral — never add it to Kamino totals or LTV):
+  • Position name "Aave USDC (Bridge) Supply" — most recent Supply Value (USD) fldJ7T452iqgQNiWb
+    and Supply APY % fldJLDy5yOHq8S6RS.
+  • Months of Bridge left = Bridge balance ÷ 4,000 (the planned monthly spend-down), one decimal.
+
 Net carry = Kamino borrow APY − blended supply yield (positive = cost, negative = earning).
 
 ═══════════════════════════════════════
@@ -556,6 +563,7 @@ FULL WEEKLY (Saturday, ~430 words calm):
 
 4. BORROWING PACE:
    Draws come from Deep Roots: month-to-date drawn vs the three thousand six hundred dollar monthly draw · months to the next deposit. Legacy takes no new draws.
+   Then one sentence on the Bridge: "The Bridge holds [balance], about [N] months of spend-down at four thousand a month." (Skip if no Bridge record exists.)
 
 5. NET CARRY:
    Pre-draw: "No borrow cost yet. Supply yield is averaging [X%] across the basket — small but ticking."
