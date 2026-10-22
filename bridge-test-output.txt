@@ -1,14 +1,4 @@
 
 --- Bridge (Tangem · Aave USDC on Base) ---
-Bridge: no Aave USDC balance — skipping
-RESULT {}
-impl 0x66cC410eC0Dd4013b7dA0a003404F6c503109093
-module 0xC67cED6E260f7a94374E72481Bf22A104a20D8B0
-module code bytes 183
-effectiveBalance 10038758314
-protocolBalance 10038762178
-effectiveProtocolBalance 10038758314
-calculateServiceFee 3864
-owner 0xF3841e27b27B6bC78Ea4ad2dC9a1882D04F39f93
-aUSDC of module 10038762178
-USDC of module 0
+Bridge (module 0xC67cED…): $10038.76 net of Tangem fee (Aave gross $10038.76) | Aave APY: 3.84% | ~2.5 months at $4,000
+RESULT {"bridgeUSDC":{"type":"supply","supplyUSD":10038.75911,"tokens":10038.75911,"supplyAPY":3.840367471063244,"notes":"Bridge spend-down — Tangem 0xF384…9f93 via Tangem Yield Module 0xC67c…D8B0 (Aave V3 USDC, Base). Net of Tangem fee; Aave gross $10038.76. APY shown is Aave gross. ~2.5 months left at $4,000/mo."}}
