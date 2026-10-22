@@ -1,8 +1,9 @@
 // ============================================================
 // Daily Portfolio Check — GitHub Actions v44
 // v44: Bridge spend-down tracked daily — Tangem (0xF384…9f93) USDC in Aave V3
-//      on Base (Tangem yield mode). aToken read live from the Pool; balance
-//      incl. interest + supply APY written to "Aave USDC (Bridge) Supply".
+//      on Base via Tangem's personal Yield Module (0xC67c…D8B0, which holds the
+//      aUSDC). Reads effectiveBalance (what the Tangem app shows, net of
+//      Tangem's fee) + Aave gross APY → "Aave USDC (Bridge) Supply".
 // v43: TWO Kamino positions, tracked separately (2026-10-13 multisig migration).
 //      Legacy 5yiT… (frozen at ~40% LTV, flag > 45%) and Deep Roots — the
 //      Squads 2-of-3 vault BvcW… (all deposits/draws, flag > 40%). Each
@@ -51,9 +52,13 @@ const WALLET_SUI        = '0xa43b2375ebc13ade7ea537e26e46cd32dc46edd4e23776149c5
 const WALLET_HYPERLIQUID = '0x464b059B1AF55A408CB3c822D610c2D962d2cf4b';
 const WALLET_BRIDGE     = '0xF3841e27b27B6bC78Ea4ad2dC9a1882D04F39f93'; // Tangem — Bridge spend-down, Aave USDC on Base (since 2026-10-22)
 
-// Aave V3 on Base (Bridge). The aToken address is read live from the Pool, not hardcoded.
-const AAVE_V3_POOL_BASE = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
-const USDC_BASE         = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+// Tangem yield mode does NOT hold funds at the Tangem address. It deploys a
+// personal Tangem Yield Module (ERC1967 proxy, factory 0xC49B…03f0 on Base)
+// that holds the aUSDC. Module found 2026-10-22 via
+// factory.calculateYieldModuleAddress(Tangem); its owner() = the Tangem address.
+const TANGEM_YIELD_MODULE = '0xC67cED6E260f7a94374E72481Bf22A104a20D8B0';
+const AAVE_V3_POOL_BASE   = '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5';
+const USDC_BASE           = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 const BASE_RPC     = process.env.BASE_RPC_URL ?? 'https://base.llamarpc.com';
 const ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
@@ -532,23 +537,37 @@ async function getBridgeData() {
   const results = {};
   try {
     const provider = new ethers.JsonRpcProvider(BASE_RPC);
-    const pool = new ethers.Contract(AAVE_V3_POOL_BASE, [
-      'function getReserveData(address asset) view returns (tuple(uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt))',
+    const mod = new ethers.Contract(TANGEM_YIELD_MODULE, [
+      'function owner() view returns (address)',
+      'function effectiveBalance(address yieldToken) view returns (uint256)',
+      'function protocolBalance(address yieldToken) view returns (uint256)',
     ], provider);
-    const rd = await pool.getReserveData(USDC_BASE);
-    const aTokenAddr = rd.aTokenAddress;
-    const aToken = new ethers.Contract(aTokenAddr, ['function balanceOf(address) view returns (uint256)'], provider);
-    const bal = await aToken.balanceOf(WALLET_BRIDGE);
-    const usdc = Number(bal) / 1e6;  // aUSDC has 6 decimals, 1 aUSDC = 1 USDC
-    if (usdc <= 0) { console.log('Bridge: no Aave USDC balance — skipping'); return results; }
+    const owner = await mod.owner();
+    if (owner.toLowerCase() !== WALLET_BRIDGE.toLowerCase()) {
+      console.error(`Bridge: yield module owner ${owner} ≠ Tangem ${WALLET_BRIDGE} — skipping`); return results;
+    }
+    // effectiveBalance = USDC idle in the Tangem wallet + Aave balance (incl. interest) − Tangem service fee.
+    // This is the figure the Tangem app shows.
+    const [effRaw, protoRaw] = await Promise.all([mod.effectiveBalance(USDC_BASE), mod.protocolBalance(USDC_BASE)]);
+    const usdc  = Number(effRaw) / 1e6;
+    const gross = Number(protoRaw) / 1e6;
+    if (usdc <= 0) { console.log('Bridge: zero balance — skipping'); return results; }
 
-    const apr = Number(rd.currentLiquidityRate) / 1e27;
-    const apy = (Math.pow(1 + apr / SECONDS_PER_YEAR, SECONDS_PER_YEAR) - 1) * 100;
+    // Aave's gross supply APY (Tangem's service fee comes out of this)
+    let apy = null;
+    try {
+      const pool = new ethers.Contract(AAVE_V3_POOL_BASE, [
+        'function getReserveData(address asset) view returns (tuple(uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt))',
+      ], provider);
+      const rd  = await pool.getReserveData(USDC_BASE);
+      const apr = Number(rd.currentLiquidityRate) / 1e27;
+      apy = (Math.pow(1 + apr / SECONDS_PER_YEAR, SECONDS_PER_YEAR) - 1) * 100;
+    } catch (e) { console.error(`Bridge APY: ${e.message.slice(0, 120)}`); }
 
-    console.log(`Bridge aUSDC (${aTokenAddr.slice(0, 8)}…): $${usdc.toFixed(2)} | APY: ${apy.toFixed(2)}%`);
+    console.log(`Bridge (module ${TANGEM_YIELD_MODULE.slice(0, 8)}…): $${usdc.toFixed(2)} net of Tangem fee (Aave gross $${gross.toFixed(2)}) | Aave APY: ${apy?.toFixed(2) ?? 'n/a'}% | ~${(usdc / 4000).toFixed(1)} months at $4,000`);
     results.bridgeUSDC = {
       type: 'supply', supplyUSD: usdc, tokens: usdc, supplyAPY: apy,
-      notes: `Bridge spend-down — Tangem ${WALLET_BRIDGE.slice(0, 6)}…${WALLET_BRIDGE.slice(-4)} · Aave V3 USDC on Base (aToken ${aTokenAddr}). Plan: $4,000/mo.`,
+      notes: `Bridge spend-down — Tangem ${WALLET_BRIDGE.slice(0, 6)}…${WALLET_BRIDGE.slice(-4)} via Tangem Yield Module ${TANGEM_YIELD_MODULE.slice(0, 6)}…${TANGEM_YIELD_MODULE.slice(-4)} (Aave V3 USDC, Base). Net of Tangem fee; Aave gross $${gross.toFixed(2)}. APY shown is Aave gross. ~${(usdc / 4000).toFixed(1)} months left at $4,000/mo.`,
     };
   } catch (e) { console.error(`Bridge: ${e.message.slice(0, 160)}`); }
   return results;
