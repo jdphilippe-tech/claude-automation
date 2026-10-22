@@ -2,5 +2,68 @@
 --- Bridge (Tangem · Aave USDC on Base) ---
 Bridge: no Aave USDC balance — skipping
 RESULT {}
-balances error Unexpected token '<', "<!DOCTYPE "... is not valid JSON
-transfers error Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+latest 52952334
+aUSDC 0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB
+USDC bal of A 0
+aUSDC bal of A 0
+code at A bytes 0
+logs err 52950335 52952334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52948335 52950334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52946335 52948334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52944335 52946334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52942335 52944334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52940335 52942334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52938335 52940334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52936335 52938334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52934335 52936334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52932335 52934334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52930335 52932334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52928335 52930334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52926335 52928334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52924335 52926334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52922335 52924334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52920335 52922334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52918335 52920334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52916335 52918334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52914335 52916334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52912335 52914334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52910335 52912334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52908335 52910334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52906335 52908334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52904335 52906334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52902335 52904334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52900335 52902334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52898335 52900334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52896335 52898334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52894335 52896334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52892335 52894334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52890335 52892334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52888335 52890334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52886335 52888334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52884335 52886334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52882335 52884334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52880335 52882334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52878335 52880334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52876335 52878334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52874335 52876334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52872335 52874334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52870335 52872334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52868335 52870334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52866335 52868334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52864335 52866334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52862335 52864334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52860335 52862334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52858335 52860334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52856335 52858334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52854335 52856334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52852335 52854334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52850335 52852334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52848335 52850334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52846335 52848334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52844335 52846334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52842335 52844334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52840335 52842334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52838335 52840334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52836335 52838334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52834335 52836334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
+logs err 52832335 52834334 could not coalesce error (error={ "code": -32600, "message": "Under the Free tier plan, you can make
