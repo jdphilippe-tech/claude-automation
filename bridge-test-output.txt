@@ -1,0 +1,4 @@
+
+--- Bridge (Tangem · Aave USDC on Base) ---
+Bridge: no Aave USDC balance — skipping
+RESULT {}
