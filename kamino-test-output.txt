@@ -1,0 +1,36 @@
+
+--- Kamino xStocks Lending ---
+  Using xStocks market: 5wJeMrUYECGq41fxRESKALVcHnNX26TAWy4W98yULsua
+
+  ── Kamino position: Legacy 5yiT (owner 5yiT…) ──
+  [obligation] DEBT 97zoyw..: stored $15130.05 → live $15166.99  (CBR ratio ×1.002441 since obligation refresh; reserve refreshed 76s ago, fwd ×1.00000018)  | stale mv=$15128.65
+  [obligation] 7CBqV8bcyYDwtdJYnbbd1EfT5JaQJhbuHntbr5w5CQn9 — last on-chain refresh 12.7d ago (slot 456323897)
+  [obligation] per-reserve USD: UvXjBu..=$8920 (stored $9132, -2.33%, px age 7m), 5iTicz..=$5698 (stored $5787, -1.54%, px age 3m), 2jerdA..=$8585 (stored $9091, -5.57%, px age 7m), 4wg6rE..=$3997 (stored $4403, -9.20%, px age 7m), 7B66Az..=$5825 (stored $6250, -6.80%, px age 6m), CKJbqa..=$3243 (stored $5852, -44.57%, px age 7m)
+  [obligation] STORED  collateral $40514.28 | debt $15130.05 | LTV 37.34%  (stale agg debt value $15128.65)
+  [obligation] LIVE    collateral $36267.74 [live-repriced] | debt $15166.99 [live-accrued] | LTV 41.82%  ← cross-check vs Kamino UI
+  SPYx: $8919.51, APY 0.102% [live]
+  QQQx: $8584.73, APY 0.173% [live]
+  GOOGLx: $3997.47, APY 0.000% [live]
+  TSLAx: $5697.79, APY 0.002% [live]
+  NVDAx: $5824.99, APY 0.022% [live]
+  AAPLx: $3243.26, APY 0.000% [live]
+  Borrow leg [live-accrued]: debt $15166.99, gross 7.85%, LTV 41.82%
+
+  ── Kamino position: Deep Roots multisig (owner BvcW…) ──
+  [obligation] DEBT 97zoyw..: stored $4000.85 → live $4000.85  (CBR ratio ×1.000001 since obligation refresh; reserve refreshed 83s ago, fwd ×1.00000020)  | stale mv=$4000.05
+  [obligation] ENCwatKAvRuaP7mU6gq6CC2RDoziao8eAtbYDENad1h2 — last on-chain refresh 6m ago (slot 461417681)
+  [obligation] per-reserve USD: UvXjBu..=$16134 (stored $16134, -0.00%, px age 7m), 4wg6rE..=$4424 (stored $4424, -0.00%, px age 7m), 2jerdA..=$15841 (stored $15841, -0.00%, px age 7m), 5iTicz..=$10548 (stored $10548, -0.00%, px age 3m), 7B66Az..=$10629 (stored $10629, -0.00%, px age 6m), CKJbqa..=$5609 (stored $5609, -0.00%, px age 7m), 5AWpVY..=$1047 (stored $0, +0.00%, px age 7m)
+  [obligation] STORED  collateral $63186.22 | debt $4000.85 | LTV 6.33%  (stale agg debt value $4000.05)
+  [obligation] LIVE    collateral $64232.83 [live-repriced] | debt $4000.85 [live-accrued] | LTV 6.23%  ← cross-check vs Kamino UI
+  SPYx: $16134.39, APY 0.102% [live]
+  QQQx: $15840.73, APY 0.173% [live]
+  GOOGLx: $4424.42, APY 0.000% [live]
+  cbBTC: $1046.61, APY 0.000% [live]
+  TSLAx: $10548.46, APY 0.002% [live]
+  NVDAx: $10629.05, APY 0.022% [live]
+  AAPLx: $5609.18, APY 0.000% [live]
+  Borrow leg [live-accrued]: debt $4000.85, gross 7.85%, LTV 6.23%
+
+  Kamino combined (info only): collateral $100500.57 | debt $19167.84
+RESULT legacy {"coll":36267.74211189737,"debt":15166.987741913985,"ltv":41.819498151054084,"flagged":false,"legs":{"SPYx":8919.507775132015,"QQQx":8584.728073606528,"GOOGLx":3997.468331227298,"TSLAx":5697.787344052516,"NVDAx":5824.992816487758,"AAPLx":3243.25777139126}}
+RESULT deepRoots {"coll":64232.828874823485,"debt":4000.852255796951,"ltv":6.22867204493482,"flagged":false,"legs":{"SPYx":16134.387565009732,"QQQx":15840.731868728411,"GOOGLx":4424.420404640171,"cbBTC":1046.6068759417708,"TSLAx":10548.461405257638,"NVDAx":10629.045258563277,"AAPLx":5609.175496682487}}
