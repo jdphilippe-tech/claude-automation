@@ -1,0 +1,34 @@
+name: cbBTC read test (temporary)
+on:
+  push:
+    branches: [ 'test/cbbtc-read' ]
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install
+      - name: Read both Kamino positions (no Airtable writes)
+        env:
+          AIRTABLE_API_KEY: ${{ secrets.AIRTABLE_API_KEY }}
+          SOL_RPC_URL: ${{ secrets.SOL_RPC_URL }}
+        run: |
+          python3 - <<'PY'
+          src=open('index.js').read()
+          i=src.rindex('main().catch(')
+          src=src[:i]+"\nconst r = await getKaminoPositions();\nfor (const k of Object.keys(r)) { const b=r[k].__borrow; console.log('RESULT', k, JSON.stringify({coll:b?.collateralUSD, debt:b?.borrowUSD, ltv:b?.ltv, flagged:b?.flagged, legs:Object.fromEntries(Object.entries(r[k]).filter(([t])=>t!=='__borrow').map(([t,d])=>[t,d.supplyUSD]))})); }\n"
+          open('kamino_test.mjs','w').write(src)
+          PY
+          node kamino_test.mjs > kamino-test-output.txt 2>&1 || true
+          cat kamino-test-output.txt
+      - name: Save output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add kamino-test-output.txt
+          git commit -m "kamino read test output"
+          git push
