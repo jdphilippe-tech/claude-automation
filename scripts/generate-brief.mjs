@@ -28,6 +28,9 @@
  *               Cheat sheet updated to the current Notion draw rule.
  *   Fix 21    — Bridge (Tangem, Aave USDC on Base) balance + months left
  *               in the Saturday brief; never counted as collateral.
+ *   Fix 22    — cbBTC added to Deep Roots (2026-10-25): Deep Roots has 7 supply
+ *               positions, Legacy 6. cbBTC peg checked vs the BTC price.
+ *               Cheat-sheet draw updated to $4,000/month (decided 2026-10-24).
  */
 
 import fs from 'fs';
@@ -431,7 +434,8 @@ Identify records by position name:
         e.g. "Kamino SPYx (Deep Roots) Supply", "Kamino USDC (Deep Roots) Borrow".
       – LEGACY (old single-signature wallet, frozen): name starts with "Kamino" and does NOT
         contain "(Deep Roots)", e.g. "Kamino SPYx Supply", "Kamino USDC Borrow".
-      Each has 6 supply positions (AAPLx QQQx GOOGLx NVDAx SPYx TSLAx) and 1 USDC borrow.
+      Legacy has 6 supply positions (AAPLx QQQx GOOGLx NVDAx SPYx TSLAx) and 1 USDC borrow.
+      Deep Roots has the same 6 PLUS "Kamino cbBTC (Deep Roots) Supply" (7 total) and 1 USDC borrow.
   • Moonwell supply: name contains "Moonwell" and not "Borrow"
   • Moonwell borrow: name contains "Moonwell" and "Borrow"
   • Suilend supply/borrow: same pattern with "Suilend"
@@ -439,11 +443,11 @@ Identify records by position name:
 For Kamino — compute EACH position (Deep Roots, Legacy) separately:
   • Most recent Supply Value (USD) per supply position — fldJ7T452iqgQNiWb
   • Supply APY % per position — fldJLDy5yOHq8S6RS
-  • Position collateral = sum of its 6 supply USD values
+  • Position collateral = sum of all its supply USD values (6 Legacy, 7 Deep Roots)
   • Position debt = most recent Borrow Value (USD) of its USDC borrow — fldTSqf1Yrxg7O0tr
   • Position LTV = position debt / position collateral. The borrow row's Notes also state the LTV
     and carry a "⚠" flag when a position is over its line — trust the Notes flag if present.
-  • Blended supply yield = capital-weighted average of all 12 supply APYs (yield only — not risk)
+  • Blended supply yield = capital-weighted average of all 13 supply APYs (yield only — not risk)
   • Kamino borrow APY % — fldWHlp8HCuMYGc9e (same market rate for both positions)
   • Combined collateral and combined debt may be stated for size only. NEVER report a combined LTV.
 
@@ -464,8 +468,8 @@ Use these values directly — do NOT search for them:
 
   Deep Roots draw line  = 40% LTV (one number — the draw is never sized above it)
   Legacy rule           = frozen; if its LTV goes above 45%, bring it back to 40%
-  Liquidation line      ≈ 68.5% (blended across basket)
-  Monthly draw          = $3,600/month (Nov 2026 – Apr 2027 window; drawn from Deep Roots)
+  Liquidation line      ≈ 68.5% (blended across basket; cbBTC's 80% nudges it up slightly)
+  Monthly draw          = $4,000/month (Nov 2026 – Apr 2027 window; drawn from Deep Roots)
   Deposits              = end of April and end of October
   Deep Roots opened     = 2026-10-13 with ~$31.8K and no debt; the November deposit and all draws go there.
   Legacy at migration   = ~$37.8K collateral, ~$15.1K debt, ~40% LTV
@@ -514,9 +518,9 @@ Spotlight (both brief types):
 ═══════════════════════════════════════
 STEP 5 — PEG WATCH (SATURDAY FULL WEEKLY ONLY)
 ═══════════════════════════════════════
-For each of the 6 xStocks tokens, compute deviation vs underlying:
+For each of the 6 xStocks tokens (both positions) and cbBTC (Deep Roots), compute deviation vs underlying:
   token_price = Airtable Supply Value (USD) / Token Amount
-  Underlying mapping: SPYx→SPY, QQQx→QQQ, TSLAx→TSLA, NVDAx→NVDA, GOOGLx→GOOGL, AAPLx→AAPL
+  Underlying mapping: SPYx→SPY, QQQx→QQQ, TSLAx→TSLA, NVDAx→NVDA, GOOGLx→GOOGL, AAPLx→AAPL, cbBTC→BTC (use the BTC price you already fetched)
   Deviation % = (token_price − underlying_price) / underlying_price × 100
   Flag if |deviation| > 0.5%
 
@@ -533,7 +537,7 @@ SPEAKING RULES (ElevenLabs TTS — critical):
     BTC → "Bitcoin"     SPY → "S-P-Y"      QQQ → "Q-Q-Q"      VIX → "V-I-X"
     TSLA → "Tesla"      NVDA → "Nvidia"    GOOGL → "Google"    AAPL → "Apple"
     TSLAx → "Tesla-x"   NVDAx → "Nvidia-x" GOOGLx → "Google-x" AAPLx → "Apple-x"
-    SPYx → "S-P-Y-x"    QQQx → "Q-Q-Q-x"   LLP → "L-L-P"
+    SPYx → "S-P-Y-x"    QQQx → "Q-Q-Q-x"   LLP → "L-L-P"   cbBTC → "c-b Bitcoin"
 
 BLOCK COMPRESSION RULE: every block collapses to ONE LINE when calm.
 Do not pad to hit a target length. Calm weeks stay short.
@@ -562,7 +566,7 @@ FULL WEEKLY (Saturday, ~430 words calm):
    Then one sentence on the sixty-eight and a half percent liquidation line (how far the higher one could fall).
 
 4. BORROWING PACE:
-   Draws come from Deep Roots: month-to-date drawn vs the three thousand six hundred dollar monthly draw · months to the next deposit. Legacy takes no new draws.
+   Draws come from Deep Roots: month-to-date drawn vs the four thousand dollar monthly draw · months to the next deposit. Legacy takes no new draws.
    Then one sentence on the Bridge: "The Bridge holds [balance], about [N] months of spend-down at four thousand a month." (Skip if no Bridge record exists.)
 
 5. NET CARRY:
@@ -573,7 +577,7 @@ FULL WEEKLY (Saturday, ~430 words calm):
    "Combined collateral across both positions is [total], [up/down X percent] on the week." (Compare to the same-position supply values about seven days earlier. The draw is sized off market value at each checkpoint, so growth does raise future draw room — but only at the checkpoint, never mid-window.)
 
 7. PEG WATCH:
-   All clean: "All six tokens tracked their underlying shares tightly this week — no de-peg pressure."
+   All clean: "All six stock tokens tracked their underlying shares tightly this week, and c-b Bitcoin tracked Bitcoin — no de-peg pressure."
    Flag: "[Token-x] is showing [X] basis points of gap vs [underlying] — [one context sentence]."
 
 8. MARKET PULSE:

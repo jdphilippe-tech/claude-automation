@@ -1,5 +1,9 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v44
+// Daily Portfolio Check — GitHub Actions v45
+// v45: cbBTC added to Deep Roots (first deposit 2026-10-25; 5% target decided
+//      2026-10-24). Deep Roots now has 7 supply legs; legacy keeps its 6.
+//      The metrics API symbol "cbBTC" matches the key case-insensitively and
+//      its per-leg USD auto-maps via the reserve address, like the xStocks.
 // v44: Bridge spend-down tracked daily — Tangem (0xF384…9f93) USDC in Aave V3
 //      on Base via Tangem's personal Yield Module (0xC67c…D8B0, which holds the
 //      aUSDC). Reads effectiveBalance (what the Tangem app shows, net of
@@ -171,6 +175,7 @@ const KAMINO_DEEP_ROOTS_POSITIONS = {
   GOOGLx: 'recQ7fd7CIE9JRDp9',
   NVDAx:  'recXg3lcSKAnVfRkt',
   AAPLx:  'rec7UEWe4k4nCTbw7',
+  cbBTC:  'recBtJ3kt00aWQMgT',   // added 2026-10-25 (Coinbase-wrapped BTC, 80% liq. threshold)
 };
 const KAMINO_DEEP_ROOTS_USDC_BORROW = 'recPaaQCC6NZJZVUB';
 
@@ -1429,8 +1434,8 @@ function parseKaminoBorrowApys(usdcReserve) {
 async function getKaminoPositions() {
   console.log('\n--- Kamino xStocks Lending ---');
   // v43: returns { legacy: {...}, deepRoots: {...} } — one sub-result per
-  // Kamino obligation (see KAMINO_BOOKS). Each sub-result has the six
-  // per-token supply legs plus __borrow, exactly as v42 returned for one.
+  // Kamino obligation (see KAMINO_BOOKS). Each sub-result has its per-token
+  // supply legs (6 legacy, 7 Deep Roots incl. cbBTC since v45) plus __borrow.
   const allResults = {};
 
   try {
@@ -1801,7 +1806,7 @@ async function main() {
     }
   }
 
-  // Kamino xStocks Lending — per position (Legacy + Deep Roots), 6 supply legs + 1 USDC borrow leg each
+  // Kamino xStocks Lending — per position (Legacy: 6 supply legs, Deep Roots: 7 incl. cbBTC) + 1 USDC borrow leg each
   for (const book of KAMINO_BOOKS) {
     const kb = kamino?.[book.key];
     if (!kb || Object.keys(kb).length === 0) { console.error(`Kamino ${book.label}: no data — nothing written`); continue; }
