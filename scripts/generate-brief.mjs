@@ -31,6 +31,8 @@
  *   Fix 22    — cbBTC added to Deep Roots (2026-10-25): Deep Roots has 7 supply
  *               positions, Legacy 6. cbBTC peg checked vs the BTC price.
  *               Cheat-sheet draw updated to $4,000/month (decided 2026-10-24).
+ *   Fix 23    — Legacy tiers (2026-11-11): 40% target, 45–50% watch, above 50% act
+ *               (restore to ~42%, preferably by borrowing from Deep Roots).
  */
 
 import fs from 'fs';
@@ -467,7 +469,8 @@ Source of truth: Notion page 37912a7e-409e-818e-a487-f291507e28f9
 Use these values directly — do NOT search for them:
 
   Deep Roots draw line  = 40% LTV (one number — the draw is never sized above it)
-  Legacy rule           = frozen; if its LTV goes above 45%, bring it back to 40%
+  Legacy rule           = frozen; 40% target · 45–50% WATCH · above 50% ACT → bring back to ~42%
+                          (preferred fix: borrow from Deep Roots and repay Legacy)
   Liquidation line      ≈ 68.5% (blended across basket; cbBTC's 80% nudges it up slightly)
   Monthly draw          = $4,000/month (Nov 2026 – Apr 2027 window; drawn from Deep Roots)
   Deposits              = end of April and end of October
@@ -478,10 +481,11 @@ Use these values directly — do NOT search for them:
 STEP 3 — STATUS LINE LOGIC
 ═══════════════════════════════════════
 Evaluate these conditions in order (each Kamino position on its own):
-  1a. Legacy LTV > 45% → Act — "bring the legacy position back to forty percent."
+  1a. Legacy LTV > 50% → Act — "bring the legacy position back to about forty-two percent."
   1b. Deep Roots LTV > 40% → Act — "Deep Roots is over the forty percent line."
-  2. Peg deviation > 0.5% on any token → Watch (Saturday only — see peg watch)
-  3. Net carry turns positive AND > 1% → Watch
+  2. Legacy LTV between 45% and 50% → Watch — "the legacy position is at [X] percent, in the watch zone."
+  3. Peg deviation > 0.5% on any token → Watch (Saturday only — see peg watch)
+  4. Net carry turns positive AND > 1% → Watch
 
 If none flag: "All clear. No action needed today." (skinny) / "All clear." (weekly)
 If watch: "Watch — [one clause naming what.]"
@@ -562,7 +566,7 @@ FULL WEEKLY (Saturday, ~430 words calm):
 
 3. COLLATERAL HEALTH — two positions, one sentence each:
    "Deep Roots is at [X] percent L-T-V on [collateral], against the forty percent draw line."
-   "The legacy position is at [Y] percent on [collateral], against its forty-five percent trigger."
+   "The legacy position is at [Y] percent on [collateral], against its fifty percent action line (forty-five to fifty is the watch zone)."
    Then one sentence on the sixty-eight and a half percent liquidation line (how far the higher one could fall).
 
 4. BORROWING PACE:
