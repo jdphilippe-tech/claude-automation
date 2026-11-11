@@ -1,5 +1,7 @@
 // ============================================================
-// Daily Portfolio Check — GitHub Actions v45
+// Daily Portfolio Check — GitHub Actions v46
+// v46: Legacy flag raised 45% → 50% (2026-11-11 rule: 40 target · 45–50 watch
+//      · above 50 act → restore to ~42%, preferably by borrowing from Deep Roots).
 // v45: cbBTC added to Deep Roots (first deposit 2026-10-25; 5% target decided
 //      2026-10-24). Deep Roots now has 7 supply legs; legacy keeps its 6.
 //      The metrics API symbol "cbBTC" matches the key case-insensitively and
@@ -181,7 +183,7 @@ const KAMINO_DEEP_ROOTS_USDC_BORROW = 'recPaaQCC6NZJZVUB';
 
 // One entry per Kamino obligation. ltvFlag = the % above which the run flags it.
 const KAMINO_BOOKS = [
-  { key: 'legacy',    label: 'Legacy 5yiT',           owner: WALLET_KAMINO_LENDING,    positions: KAMINO_POSITIONS,            borrowId: KAMINO_USDC_BORROW,            ltvFlag: 45, flagMsg: 'ABOVE 45% — rule: bring back to 40%' },
+  { key: 'legacy',    label: 'Legacy 5yiT',           owner: WALLET_KAMINO_LENDING,    positions: KAMINO_POSITIONS,            borrowId: KAMINO_USDC_BORROW,            ltvFlag: 50, flagMsg: 'ABOVE 50% — rule: bring back to ~42% (borrow from Deep Roots to repay Legacy)' },
   { key: 'deepRoots', label: 'Deep Roots multisig',   owner: WALLET_KAMINO_DEEP_ROOTS, positions: KAMINO_DEEP_ROOTS_POSITIONS, borrowId: KAMINO_DEEP_ROOTS_USDC_BORROW, ltvFlag: 40, flagMsg: 'ABOVE the 40% draw line' },
 ];
 // NOTE: Kamino KLend on-chain constants (KLEND_PROGRAM_ID, SF_SHIFT, SF_DIV20,
