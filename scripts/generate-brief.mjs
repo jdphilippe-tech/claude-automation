@@ -33,6 +33,11 @@
  *               Cheat-sheet draw updated to $4,000/month (decided 2026-10-24).
  *   Fix 23    — Legacy tiers (2026-11-11): 40% target, 45–50% watch, above 50% act
  *               (restore to ~42%, preferably by borrowing from Deep Roots).
+ *   Fix 24    — Investments-only brief (2026-11-14): weekday brief now states both
+ *               position LTVs; Saturday adds a basket-vs-target line (7 targets incl.
+ *               cbBTC 5%, 5/25 bands) and frames Bitcoin as Deep Roots collateral.
+ *               Bridge line removed (spend-down is budgeting, not investing).
+ *               Dead Moonwell/Suilend references removed.
  */
 
 import fs from 'fs';
@@ -438,9 +443,8 @@ Identify records by position name:
         contain "(Deep Roots)", e.g. "Kamino SPYx Supply", "Kamino USDC Borrow".
       Legacy has 6 supply positions (AAPLx QQQx GOOGLx NVDAx SPYx TSLAx) and 1 USDC borrow.
       Deep Roots has the same 6 PLUS "Kamino cbBTC (Deep Roots) Supply" (7 total) and 1 USDC borrow.
-  • Moonwell supply: name contains "Moonwell" and not "Borrow"
-  • Moonwell borrow: name contains "Moonwell" and "Borrow"
-  • Suilend supply/borrow: same pattern with "Suilend"
+  • IGNORE every record that is not a Kamino position (e.g. Bridge, Spark). This brief covers
+    investments only — never mention the Bridge, the Reserve, Spark, or spending.
 
 For Kamino — compute EACH position (Deep Roots, Legacy) separately:
   • Most recent Supply Value (USD) per supply position — fldJ7T452iqgQNiWb
@@ -453,12 +457,10 @@ For Kamino — compute EACH position (Deep Roots, Legacy) separately:
   • Kamino borrow APY % — fldWHlp8HCuMYGc9e (same market rate for both positions)
   • Combined collateral and combined debt may be stated for size only. NEVER report a combined LTV.
 
-Other borrow records (Moonwell + Suilend): most recent Borrow Value per position, if any are still active.
-
-BRIDGE (spend-down, NOT collateral — never add it to Kamino totals or LTV):
-  • Position name "Aave USDC (Bridge) Supply" — most recent Supply Value (USD) fldJ7T452iqgQNiWb
-    and Supply APY % fldJLDy5yOHq8S6RS.
-  • Months of Bridge left = Bridge balance ÷ 4,000 (the planned monthly spend-down), one decimal.
+BASKET WEIGHTS (Saturday only) — the basket is the whole engine (both positions together):
+  • For each of the 7 names, add its most recent supply USD across Deep Roots and Legacy
+    (cbBTC is Deep Roots only), divide by combined collateral → current weight %.
+  • Compare to the targets and bands in STEP 2. A name is OFF TARGET only if outside its band.
 
 Net carry = Kamino borrow APY − blended supply yield (positive = cost, negative = earning).
 
@@ -476,6 +478,10 @@ Use these values directly — do NOT search for them:
   Deposits              = end of April and end of October
   Deep Roots opened     = 2026-10-13 with ~$31.8K and no debt; the November deposit and all draws go there.
   Legacy at migration   = ~$37.8K collateral, ~$15.1K debt, ~40% LTV
+  Basket targets        = SPYx 23 · QQQx 23 · NVDAx 15 · TSLAx 15 · GOOGLx 11 · AAPLx 8 · cbBTC 5 (%)
+  Rebalance bands (5/25)= SPYx/QQQx ±5 · NVDAx/TSLAx ±3.75 · GOOGLx ±2.75 · AAPLx ±2 · cbBTC ±1.25 (pts)
+  Rebalancing           = new deposit money only, at checkpoints — never sell collateral.
+                          cbBTC is expected to sit under target until the April 2027 deposit fills it.
 
 ═══════════════════════════════════════
 STEP 3 — STATUS LINE LOGIC
@@ -503,7 +509,9 @@ Fetch using the RECOMMENDED FLOW (fastest, most reliable):
 
   BTC price:    web_fetch → https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd
   Fear & Greed: web_fetch → https://api.alternative.me/fng/?limit=1
-  SPY:          web_search "SPY ETF price today" → if no price in snippet, web_fetch Yahoo Finance chart endpoint
+  BTC weekly %: (Saturday only) web_fetch → https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin&price_change_percentage=7d
+                use price_change_percentage_7d_in_currency
+  SPY:         web_search "SPY ETF price today" → if no price in snippet, web_fetch Yahoo Finance chart endpoint
   QQQ:          web_search "QQQ ETF price today" → fallback to web_fetch (the Nasdaq 100 ETF)
   VIX:          web_search "VIX index today" → classify: Low (<15) / Normal (15–20) / Elevated (20–30) / High (>30)
 
@@ -547,15 +555,16 @@ BLOCK COMPRESSION RULE: every block collapses to ONE LINE when calm.
 Do not pad to hit a target length. Calm weeks stay short.
 
 ─────────────────────────────────────
-SKINNY DAILY (Monday–Friday, ~55 words):
+SKINNY DAILY (Monday–Friday, ~65 words):
 ─────────────────────────────────────
 1. "Good morning. It's [Weekday], [Month] [Day]."
 2. Status line (one sentence — verdict only).
-3. "On the crypto side — Bitcoin is at [price], sentiment is [label] at [number]."
-4. "On the equity side — S-P-Y is at [price], the Nasdaq one hundred is [up/flat/down about X percent], and V-I-X is at [level] — [one brief characterization]."
-5. Spotlight + close: "[Name] is the standout today — [price action in one phrase]. [One optional context note.] Have a good one."
+3. "Deep Roots is at [X] percent L-T-V, and the legacy position is at [Y] percent."
+4. "On the crypto side — Bitcoin is at [price], sentiment is [label] at [number]."
+5. "On the equity side — S-P-Y is at [price], the Nasdaq one hundred is [up/flat/down about X percent], and V-I-X is at [level] — [one brief characterization]."
+6. Spotlight + close: "[Name] is the standout today — [price action in one phrase]. [One optional context note.] Have a good one."
 
-OMIT entirely: collateral health, LTV detail, draw pace, net carry, growth, peg watch.
+OMIT entirely: liquidation-line detail, draw pace, net carry, growth, basket weights, peg watch.
 
 ─────────────────────────────────────
 FULL WEEKLY (Saturday, ~430 words calm):
@@ -571,7 +580,6 @@ FULL WEEKLY (Saturday, ~430 words calm):
 
 4. BORROWING PACE:
    Draws come from Deep Roots: month-to-date drawn vs the four thousand dollar monthly draw · months to the next deposit. Legacy takes no new draws.
-   Then one sentence on the Bridge: "The Bridge holds [balance], about [N] months of spend-down at four thousand a month." (Skip if no Bridge record exists.)
 
 5. NET CARRY:
    Pre-draw: "No borrow cost yet. Supply yield is averaging [X%] across the basket — small but ticking."
@@ -580,14 +588,20 @@ FULL WEEKLY (Saturday, ~430 words calm):
 6. GROWTH:
    "Combined collateral across both positions is [total], [up/down X percent] on the week." (Compare to the same-position supply values about seven days earlier. The draw is sized off market value at each checkpoint, so growth does raise future draw room — but only at the checkpoint, never mid-window.)
 
-7. PEG WATCH:
+7. BASKET:
+   Always one sentence on Bitcoin's place in the basket: "c-b Bitcoin is [value], [X] percent of the basket against its five percent target." If it is under target, add "— expected until the April deposit fills it."
+   Then: all six stock names inside their bands → "The six stock names are all within their rebalance bands."
+   Otherwise name only the off-target ones: "[Name-x] is at [X] percent against a [Y] percent target — new money goes there first at the next deposit."
+   Never suggest selling to rebalance.
+
+8. PEG WATCH:
    All clean: "All six stock tokens tracked their underlying shares tightly this week, and c-b Bitcoin tracked Bitcoin — no de-peg pressure."
    Flag: "[Token-x] is showing [X] basis points of gap vs [underlying] — [one context sentence]."
 
-8. MARKET PULSE:
-   "Bitcoin [finished/is] at [price], sentiment [label] at [number]. On equities, S-P-Y [closed at/is at] [price], the Nasdaq one hundred [up/down X percent on the week], and V-I-X at [level] — [characterization]."
+9. MARKET PULSE:
+   "Bitcoin [finished/is] at [price], [up/down X percent on the week — it moves your c-b Bitcoin collateral], sentiment [label] at [number]. On equities, S-P-Y [closed at/is at] [price], the Nasdaq one hundred [up/down X percent on the week], and V-I-X at [level] — [characterization]."
 
-9. SPOTLIGHT + CLOSE:
+10. SPOTLIGHT + CLOSE:
    "The week's standout was [Name] — [move + context]. [One additional sentence if the move warrants it.] Have a good weekend."
 
 ═══════════════════════════════════════
