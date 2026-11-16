@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, November 16, 2026</title>
+      <description><![CDATA[Legacy position holding just below the watch zone at forty-four point seven five percent as markets sell off with the Nasdaq one hundred down over two percent and Bitcoin in extreme fear territory.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-16.mp3" length="762818" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-11-16</guid>
+      <pubDate>Mon, 16 Nov 2026 15:17:09 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, October 5, 2026</title>
       <description><![CDATA[All clear across the collateral engine with no debt drawn yet and Tesla the standout today on a two percent move touching its highest level since late September.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-10-05.mp3" length="716426" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-02.mp3" length="713082" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-09-02</guid>
       <pubDate>Wed, 02 Sep 2026 14:18:49 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, September 1, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with Bitcoin at seventy-eight thousand two hundred fifty-three dollars and Tesla the day's standout, sliding two and a half percent on the first trading day of September.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-01.mp3" length="675048" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-09-01</guid>
-      <pubDate>Tue, 01 Sep 2026 14:18:19 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
