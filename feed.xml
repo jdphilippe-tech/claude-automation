@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, November 17, 2026</title>
+      <description><![CDATA[Status watch on carry cost with both Kamino positions well under their lines, while Nvidia holds the spotlight ahead of earnings tonight.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-17.mp3" length="830110" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-11-17</guid>
+      <pubDate>Tue, 17 Nov 2026 15:17:36 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, November 16, 2026</title>
       <description><![CDATA[Legacy position holding just below the watch zone at forty-four point seven five percent as markets sell off with the Nasdaq one hundred down over two percent and Bitcoin in extreme fear territory.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-16.mp3" length="762818" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-03.mp3" length="689676" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-09-03</guid>
       <pubDate>Thu, 03 Sep 2026 14:18:04 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, September 2, 2026</title>
-      <description><![CDATA[[one sentence for the audio description]]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-02.mp3" length="713082" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-09-02</guid>
-      <pubDate>Wed, 02 Sep 2026 14:18:49 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
