@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, November 20, 2026</title>
+      <description><![CDATA[Legacy position sitting at about forty-four percent L-T-V with both Kamino positions clear of their action lines, while Nvidia dropped over four percent to tag its fifty-two-week low as the Nasdaq sold off.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-20.mp3" length="795419" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-11-20</guid>
+      <pubDate>Fri, 20 Nov 2026 15:17:25 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, November 19, 2026</title>
       <description><![CDATA[The collateral engine is all clear with the legacy position approaching the watch zone at forty-four point eight percent L-T-V, and Google leading equities up nearly four percent on a risk-on session with the V-I-X falling sharply.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-19.mp3" length="793747" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-07.mp3" length="895730" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-09-07</guid>
       <pubDate>Mon, 07 Sep 2026 14:19:18 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, September 5, 2026</title>
-      <description><![CDATA[All six xStock tokens tracking well with S-P-Y-x showing a slim fifty-six basis point premium, Nvidia the week's standout up over four percent, and the collateral engine carrying eleven thousand three hundred dollars of live debt at eighteen point six percent LTV — well inside the forty percent cap.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-05.mp3" length="2990959" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-09-05</guid>
-      <pubDate>Sat, 05 Sep 2026 14:18:07 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
