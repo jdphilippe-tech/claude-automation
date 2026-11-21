@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Saturday, November 21, 2026</title>
+      <description><![CDATA[Legacy Kamino position in the watch zone at forty-nine point four five percent L-T-V as equities sold off sharply, with Nvidia the week's standout on a heavy decline amid the broader market rout.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-21.mp3" length="3999912" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-11-21</guid>
+      <pubDate>Sat, 21 Nov 2026 15:19:01 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Friday, November 20, 2026</title>
       <description><![CDATA[Legacy position sitting at about forty-four percent L-T-V with both Kamino positions clear of their action lines, while Nvidia dropped over four percent to tag its fifty-two-week low as the Nasdaq sold off.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-20.mp3" length="795419" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-08.mp3" length="976814" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-09-08</guid>
       <pubDate>Tue, 08 Sep 2026 14:18:05 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Monday, September 7, 2026</title>
-      <description><![CDATA[Markets closed for Labor Day with Tesla shedding nearly six percent at Friday's close, while the collateral engine flags a net borrow cost running close to five percent.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-07.mp3" length="895730" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-09-07</guid>
-      <pubDate>Mon, 07 Sep 2026 14:19:18 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>

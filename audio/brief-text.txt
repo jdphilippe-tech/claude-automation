@@ -1,11 +1,21 @@
-Good morning. It's Friday, November twentieth.
+Good morning. It's Saturday, November twenty-first — here's how the week landed.
 
-All clear. No action needed today.
+Watch — the legacy position is at forty-nine point four five percent L-T-V, sitting just below the fifty percent action line.
 
-Deep Roots is at eight point nine percent L-T-V, and the legacy position is at forty-four percent.
+Deep Roots is at sixteen point eight three percent L-T-V on fifty-eight thousand one hundred twenty-three dollars of collateral, against the forty percent draw line. The legacy position is at forty-nine point four five percent on thirty thousand eight hundred thirty-one dollars of collateral, against its fifty percent action line — with forty-five to fifty being the watch zone. The legacy position is about one percent of collateral away from the action threshold; the sixty-eight and a half percent liquidation line is still more than nineteen full percentage points above it, so there is no immediate liquidation risk — but the drift higher warrants attention.
 
-On the crypto side — Bitcoin is at sixty-one thousand dollars, sentiment is Extreme Fear at twelve.
+Two draws have been taken so far — the November draw and the December draw, four thousand dollars each, eight thousand dollars total out of a twenty-four thousand dollar window. Deep Roots debt now sits at nine thousand seven hundred eighty-five dollars. The next deposit is at the end of April, roughly five months out. Legacy takes no new draws.
 
-On the equity side — S-P-Y is at seven hundred thirteen dollars, the Nasdaq one hundred is down about one point four percent, and V-I-X is at twenty-seven — elevated, in the middle of the stress range.
+The borrow rate is seven point two four percent. Supply yield across all thirteen positions averages just under zero point zero five percent — the basket is almost entirely unyielding xStocks collateral. Real cost of debt is running at approximately seven point two percent. No supply-side offset worth noting.
 
-Nvidia is the standout today — down four point two percent to one hundred thirty-nine dollars, touching a fresh fifty-two-week low on heavy volume. Google was the one bright spot, up two point six percent against a broadly weaker tape. Have a good one.
+Combined collateral across both positions is eighty-eight thousand nine hundred fifty-four dollars, down about ten point nine percent on the week. That is a meaningful move driven by the equity and crypto selloff — it shrinks draw room at the next checkpoint, though the checkpoint is still five months out.
+
+C-b Bitcoin is at one thousand six hundred ninety-one dollars, one point nine percent of the basket against its five percent target — expected until the April deposit fills it. Nvidia-x has drifted to eleven point zero three percent of the basket against its fifteen percent target, just barely below the eleven point two five percent lower rebalance band — new money goes there first at the next deposit. The remaining five stock names are all within their rebalance bands. No selling to rebalance — deposits only.
+
+Two tokens showed slight premium to their underlying shares this week. S-P-Y-x in the Deep Roots position is showing about fifty-three basis points of gap above S-P-Y, and Google-x in both positions is running about sixty-three basis points above Google shares. These are modest and consistent with oracle lag during a fast-moving selloff — worth watching but not flagged as structural de-peg pressure. All other tokens, including c-b Bitcoin, tracked tightly.
+
+Bitcoin is at sixty thousand two hundred thirty-six dollars, down nine point eight percent on the week — that moves c-b Bitcoin collateral in the same direction. Sentiment is Extreme Fear at twelve. On equities, S-P-Y closed Friday at six hundred eighty-nine dollars eighty-one cents, down roughly eight and a half percent on the week. The Nasdaq one hundred closed at six hundred eight dollars forty-five cents, down about ten and a half percent on the week. V-I-X is at thirty-five point eight nine — that is High territory, well above thirty, signaling genuine stress in the market.
+
+The week's standout was Nvidia — shares closed Friday at one hundred twenty-five dollars fifty-three cents, down sharply on the week as the AI trade unwound alongside the broader selloff. Nvidia-x in the basket followed it down, which is the primary reason its basket weight slipped below the lower rebalance band. No earnings catalyst here — this was macro and sentiment-driven. Keep an eye on whether it stabilizes before the April deposit sets the rebalance target.
+
+Have a good weekend.
