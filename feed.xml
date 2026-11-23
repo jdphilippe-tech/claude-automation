@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Monday, November 23, 2026</title>
+      <description><![CDATA[Status watch on the legacy position at forty-five percent loan-to-value as Nvidia surges thirty-three percent and markets stage a broad relief rally with the V-I-X falling sharply.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-23.mp3" length="1157372" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-11-23</guid>
+      <pubDate>Mon, 23 Nov 2026 15:17:36 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Saturday, November 21, 2026</title>
       <description><![CDATA[Legacy Kamino position in the watch zone at forty-nine point four five percent L-T-V as equities sold off sharply, with Nvidia the week's standout on a heavy decline amid the broader market rout.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-21.mp3" length="3999912" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-09.mp3" length="818408" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-09-09</guid>
       <pubDate>Wed, 09 Sep 2026 14:18:46 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Tuesday, September 8, 2026</title>
-      <description><![CDATA[Status watch on net carry with the borrow rate outpacing supply yield, while Tesla bucks a soft tape with a two percent gain and Bitcoin sits just above seventy-eight thousand dollars.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-08.mp3" length="976814" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-09-08</guid>
-      <pubDate>Tue, 08 Sep 2026 14:18:05 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
