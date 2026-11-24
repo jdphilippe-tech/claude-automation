@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Tuesday, November 24, 2026</title>
+      <description><![CDATA[The legacy Kamino position is in the watch zone at forty-five point nine percent L-T-V, while Nvidia leads equity headlines lower with a six-plus percent drop as the AI rally cools and Bitcoin sentiment sits at extreme fear.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-24.mp3" length="810883" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-11-24</guid>
+      <pubDate>Tue, 24 Nov 2026 18:49:30 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Monday, November 23, 2026</title>
       <description><![CDATA[Status watch on the legacy position at forty-five percent loan-to-value as Nvidia surges thirty-three percent and markets stage a broad relief rally with the V-I-X falling sharply.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-23.mp3" length="1157372" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-10.mp3" length="876922" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-09-10</guid>
       <pubDate>Thu, 10 Sep 2026 14:18:11 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Wednesday, September 9, 2026</title>
-      <description><![CDATA[Status watch on net carry cost with the borrow program running at five point one percent above supply yield, Bitcoin pulling back below eighty thousand dollars and Apple the equity standout on a near two percent decline.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-09.mp3" length="818408" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-09-09</guid>
-      <pubDate>Wed, 09 Sep 2026 14:18:46 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
