@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Thursday, November 26, 2026</title>
+      <description><![CDATA[The legacy position sits in the watch zone at forty-six point eight percent L-T-V as markets sell off across the board with Nvidia down nearly four percent and Bitcoin down five percent on the week.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-26.mp3" length="878593" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-11-26</guid>
+      <pubDate>Thu, 26 Nov 2026 15:18:01 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Wednesday, November 25, 2026</title>
       <description><![CDATA[A sharp broad market selloff hits the engine on Wednesday with Nvidia down over seven percent, V-I-X spiking to thirty-two, and the legacy Kamino position sitting just below the watch zone at forty-four point nine percent L-T-V.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-25.mp3" length="1043687" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-12.mp3" length="2705075" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-09-12</guid>
       <pubDate>Sat, 12 Sep 2026 14:20:07 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Friday, September 11, 2026</title>
-      <description><![CDATA[All clear across the collateral engine with Google leading the basket up two percent on a broad equity rally and the V-I-X dropping to its lowest level this week.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-11.mp3" length="770760" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-09-11</guid>
-      <pubDate>Fri, 11 Sep 2026 14:18:31 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
