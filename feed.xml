@@ -15,6 +15,15 @@
     </itunes:owner>
     <link>https://github.com/jdphilippe-tech/claude-automation</link>
     <item>
+      <title>Morning Brief - Friday, November 27, 2026</title>
+      <description><![CDATA[The legacy position is in the watch zone at forty-nine point four five percent L-T-V while Bitcoin sits at fifty-nine thousand dollars with sentiment in extreme fear and Tesla the day's standout up over three percent.]]></description>
+      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-27.mp3" length="807958" type="audio/mpeg"/>
+      <guid isPermaLink="false">morning-brief-2026-11-27</guid>
+      <pubDate>Fri, 27 Nov 2026 15:17:16 GMT</pubDate>
+      <itunes:duration>90</itunes:duration>
+      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
+    </item>
+    <item>
       <title>Morning Brief - Thursday, November 26, 2026</title>
       <description><![CDATA[The legacy position sits in the watch zone at forty-six point eight percent L-T-V as markets sell off across the board with Nvidia down nearly four percent and Bitcoin down five percent on the week.]]></description>
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-11-26.mp3" length="878593" type="audio/mpeg"/>
@@ -272,15 +281,6 @@
       <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-14.mp3" length="745683" type="audio/mpeg"/>
       <guid isPermaLink="false">morning-brief-2026-09-14</guid>
       <pubDate>Mon, 14 Sep 2026 14:18:09 GMT</pubDate>
-      <itunes:duration>90</itunes:duration>
-      <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
-    </item>
-    <item>
-      <title>Morning Brief - Saturday, September 12, 2026</title>
-      <description><![CDATA[All positions on pace with draw at eleven thousand three hundred dollars and Apple the week's standout up nearly four percent, while S-P-Y-x shows a slim peg gap just above the half-percent flag.]]></description>
-      <enclosure url="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/audio/brief-2026-09-12.mp3" length="2705075" type="audio/mpeg"/>
-      <guid isPermaLink="false">morning-brief-2026-09-12</guid>
-      <pubDate>Sat, 12 Sep 2026 14:20:07 GMT</pubDate>
       <itunes:duration>90</itunes:duration>
       <itunes:image href="https://raw.githubusercontent.com/jdphilippe-tech/claude-automation/main/artwork.jpg"/>
     </item>
