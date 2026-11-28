@@ -1,9 +1,21 @@
-Good morning. It's Friday, November 27th.
+Good morning. It's Saturday, November 28th — here's how the week landed.
 
-Watch — the legacy position is at forty-nine point four five percent L-T-V, in the watch zone. Deep Roots is at sixteen point eight percent L-T-V, and the legacy position is at forty-nine point four five percent.
+Watch — the legacy position is at forty-five point five percent L-T-V, inside the forty-five to fifty percent watch zone. No action needed yet, but it bears watching if markets soften further.
 
-On the crypto side — Bitcoin is at fifty-nine thousand six hundred dollars, sentiment is extreme fear at twelve.
+Deep Roots is at fifteen point five percent L-T-V on sixty-three thousand dollars of collateral, against the forty percent draw line — plenty of room. The legacy position is at forty-five point five percent on thirty-three thousand five hundred dollars, against its fifty percent action line, with the forty-five to fifty percent range being the watch zone. The higher of the two positions, legacy at forty-five and a half percent, would need to fall roughly another thirty-three percentage points before reaching the sixty-eight and a half percent liquidation line — meaningful buffer, but the direction of travel this past week is worth noting given the market volatility.
 
-On the equity side — S-P-Y is at seven hundred twenty-two dollars, the Nasdaq one hundred is up about one percent, and V-I-X is at twenty-seven point two five — elevated, and worth watching.
+On borrowing pace — the November draw of four thousand dollars came from the Bridge reserve as designed, so the Deep Roots Kamino borrow balance is essentially unchanged at nine thousand eight hundred dollars, accruing interest only. The legacy debt sits at fifteen thousand three hundred dollars. The next Kamino deposit window opens at the end of April — about five months out.
 
-Tesla is the standout today — up three point three percent to three hundred ninety-two dollars, reclaiming ground on a light post-holiday session. Have a good one.
+On net carry — the borrow rate is eight point zero seven percent against a blended supply yield of just zero point zero five percent across the basket, so the real annualized cost of the debt is about eight percent. That runs roughly one hundred sixty-eight dollars a month in interest on the combined twenty-five thousand dollar borrow — a known and accepted cost of the draw structure.
+
+Combined collateral across both positions is ninety-six thousand six hundred dollars, up eight point six percent on the week. The recovery was driven by Thursday's violent equity snapback after Wednesday's broad selloff.
+
+On the basket — c-b Bitcoin is at one thousand six hundred sixty-five dollars, one point seven percent of the basket against its five percent target — expected until the April deposit fills it. The six stock names are all within their rebalance bands. Tesla-x is the heaviest at eighteen percent against a fifteen percent target, still inside its band. S-P-Y-x is at nearly twenty-five percent against a twenty-three percent target — also in band. No rebalancing action triggered; new money goes to c-b Bitcoin and Nvidia-x first at the next deposit.
+
+On peg watch — five of the six stock tokens tracked their underlying shares tightly this week. S-P-Y-x in the Deep Roots position is showing a small premium of about fifty-seven basis points versus S-P-Y — just at the flag threshold. All other tokens, including c-b Bitcoin, were clean. Worth a glance next week to see if that S-P-Y-x gap closes.
+
+On the market — Bitcoin finished at fifty-nine thousand three hundred forty-four dollars, down two point one percent on the week. With sentiment at extreme fear, a reading of ten out of one hundred, the crypto side of the basket is under pressure and c-b Bitcoin is dragging slightly. On equities, S-P-Y closed at seven hundred twenty-eight dollars, essentially flat on the week despite a bruising mid-week drop to six hundred ninety dollars on Wednesday before recovering. The Nasdaq one hundred similarly erased its losses by Friday. V-I-X closed at twenty-three point eight — elevated, meaning options markets are still pricing in meaningful near-term risk even after the bounce.
+
+The week's standout was Nvidia — not for where it finished, but for how it got there. It crashed fourteen percent to one hundred twenty-five dollars and fifty cents on Wednesday, the lowest print in over a year, then rocketed thirty-one percent on Thursday to one hundred sixty-five dollars, one of the largest single-day recoveries on record for a mega-cap. It closed the week at one hundred fifty dollars and forty-nine cents, nearly unchanged from last Friday — but the round trip shook out a lot of weak hands. With Nvidia-x at twelve percent of the basket against a fifteen percent target, that volatility moved the collateral meaningfully intra-week even if it ended close to flat.
+
+Have a good weekend.
